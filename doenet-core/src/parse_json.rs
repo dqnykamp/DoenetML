@@ -16,56 +16,75 @@ use crate::state_variables::*;
 
 /// This error is caused by invalid DoenetML.
 /// It is thrown only on core creation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DoenetMLError {
 
     ComponentDoesNotExist {
         comp_name: String,
+        doenetml_range: RangeInDoenetML,
     },
     StateVarDoesNotExist {
         comp_name: ComponentName,
         sv_name: String,
+        doenetml_range: RangeInDoenetML,
     },
     AttributeDoesNotExist {
         comp_name: ComponentName,
         attr_name: String,
+        doenetml_range: RangeInDoenetML,
     },
     InvalidComponentType {
         comp_type: String,
+        doenetml_range: RangeInDoenetML,
     },
+    // Note: currently not used
     NonNumericalIndex {
         comp_name: ComponentName,
         invalid_index: String,
+        doenetml_range: RangeInDoenetML,
     },
+    // Note: currently not used
     InvalidStaticAttribute {
         comp_name: ComponentName,
         attr_name: String,
+        doenetml_range: RangeInDoenetML,
     },
     CannotCopyArrayStateVar {
         // copier_comp_name: ComponentName, 
         source_comp_name: ComponentName,
         source_sv_name: StateVarName,
+        doenetml_range: RangeInDoenetML,
     },
     CannotCopyIndexForStateVar {
         source_comp_name: ComponentName,
         source_sv_name: StateVarName,
+        doenetml_range: RangeInDoenetML,
     },
 
     DuplicateName {
         name: String,
+        doenetml_range: RangeInDoenetML,
+    },
+    InvalidComponentName {
+        name: String,
+        doenetml_range: RangeInDoenetML,
     },
     CyclicalDependency {
         component_chain: Vec<ComponentName>,
+        doenetml_range: RangeInDoenetML,
     },
     ComponentCannotCopyOtherType {
         component_name: ComponentName,
         component_type: ComponentType,
         source_type: ComponentType,
+        doenetml_range: RangeInDoenetML,
     },
 
+    // Note: currently not used
     /// For the componentType static attr of <sources>
     CannotImplySourcesComponentType {
         component_name: ComponentName,
+        doenetml_range: RangeInDoenetML,
     }
 }
 
@@ -75,25 +94,27 @@ impl Display for DoenetMLError {
         use DoenetMLError::*;
 
         match self {
-            ComponentDoesNotExist { comp_name } => 
-                write!(f, "Component '{}' does not exist", comp_name),
-            StateVarDoesNotExist { comp_name, sv_name } =>
-                write!(f, "State variable '{}' does not exist on {}", sv_name, comp_name),
-            AttributeDoesNotExist { comp_name, attr_name } =>
-                write!(f, "Attribute '{}' does not exist on {}", attr_name, comp_name),
-            InvalidComponentType { comp_type } => 
-                write!(f, "Component type {} does not exist", comp_type),
-            NonNumericalIndex { comp_name, invalid_index } =>
-                write!(f, "Component {} has non-numerical index '{}'", comp_name, invalid_index),
-            InvalidStaticAttribute { comp_name, attr_name } =>
-                write!(f, "Component {} attribute '{}' must be static", comp_name, attr_name),
-            CannotCopyArrayStateVar { source_comp_name, source_sv_name } =>
-                write!(f, "Cannot copy array state variable '{}' from component {}", source_sv_name, source_comp_name),
-            CannotCopyIndexForStateVar { source_comp_name, source_sv_name } =>
-                write!(f, "Cannot use propIndex for state variable '{}' from component {} because this state variable is not an array", source_sv_name, source_comp_name),
-            DuplicateName { name} =>
-                write!(f, "The component name {} is used multiple times", name),
-            CyclicalDependency { component_chain } => {
+            ComponentDoesNotExist { comp_name, doenetml_range } => 
+                write!(f, "Component '{}' does not exist. {}", comp_name, doenetml_range.to_string()),
+            StateVarDoesNotExist { comp_name, sv_name, doenetml_range } =>
+                write!(f, "State variable '{}' does not exist on {}. {}", sv_name, comp_name, doenetml_range.to_string()),
+            AttributeDoesNotExist { comp_name, attr_name, doenetml_range } =>
+                write!(f, "Attribute '{}' does not exist on {}. {}", attr_name, comp_name, doenetml_range.to_string()),
+            InvalidComponentType { comp_type, doenetml_range } => 
+                write!(f, "Component type {} does not exist. {}", comp_type, doenetml_range.to_string()),
+            NonNumericalIndex { comp_name, invalid_index, doenetml_range } =>
+                write!(f, "Component {} has non-numerical index '{}'. {}", comp_name, invalid_index, doenetml_range.to_string()),
+            InvalidStaticAttribute { comp_name, attr_name, doenetml_range } =>
+                write!(f, "Component {} attribute '{}' must be static. {}", comp_name, attr_name, doenetml_range.to_string()),
+            CannotCopyArrayStateVar { source_comp_name, source_sv_name, doenetml_range } =>
+                write!(f, "Cannot copy array state variable '{}' from component {}. {}", source_sv_name, source_comp_name, doenetml_range.to_string()),
+            CannotCopyIndexForStateVar { source_comp_name, source_sv_name, doenetml_range } =>
+                write!(f, "Cannot use propIndex for state variable '{}' from component {} because this state variable is not an array. {}", source_sv_name, source_comp_name, doenetml_range.to_string()),
+            DuplicateName { name, doenetml_range } =>
+                write!(f, "The component name {} is used multiple times. {}", name, doenetml_range.to_string()),
+            InvalidComponentName { name, doenetml_range } =>
+                write!(f, "The component name {} is invalid.  It must begin with a letter and can contain only letters, numbers, hyphens, and underscores. {}", name, doenetml_range.to_string()),
+            CyclicalDependency { component_chain, doenetml_range } => {
                 let mut msg = String::from("Cyclical dependency through components: ");
                 for comp in component_chain {
                     msg.push_str(&format!("{}, ", comp));
@@ -101,12 +122,14 @@ impl Display for DoenetMLError {
                 msg.pop();
                 msg.pop();
 
+                msg.push_str(&doenetml_range.to_string());
+
                 write!(f, "{}", msg)
             },
-            ComponentCannotCopyOtherType { component_name, component_type, source_type } => {
-                write!(f, "The {} component '{}' cannot copy a {} component.", component_type, component_name, source_type)
+            ComponentCannotCopyOtherType { component_name, component_type, source_type, doenetml_range } => {
+                write!(f, "The {} component '{}' cannot copy a {} component. {}", component_type, component_name, source_type, doenetml_range.to_string())
             },
-            CannotImplySourcesComponentType { component_name } => write!(f, "Cannot impy 'componentType' attribute of {}", component_name),
+            CannotImplySourcesComponentType { component_name, doenetml_range } => write!(f, "Cannot impy 'componentType' attribute of {}. {}", component_name, doenetml_range.to_string()),
         }
     }
 }
@@ -152,6 +175,11 @@ struct ComponentTree {
     component_type: String,
     props: Props,
     children: Vec<ComponentOrString>,
+    #[serde(default)]
+    #[serde(alias = "range")]
+    doenetml_range: RangeInDoenetML,
+    #[serde(default)]
+    allow_underscore_component_type: bool
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -182,6 +210,47 @@ impl ToString for AttributeValue {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCloseRange {
+    open_begin: usize,
+    open_end: usize,
+    close_begin: usize,
+    close_end: usize
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfCloseRange {
+    self_close_begin: usize,
+    self_close_end: usize
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum RangeInDoenetML {
+    OpenClose(OpenCloseRange),
+    SelfClose(SelfCloseRange),
+    None,
+}
+
+impl ToString for RangeInDoenetML {
+    fn to_string(&self) -> String {
+        match self {
+            Self::OpenClose(v) => format!("Found at indices {}-{}.", v.open_begin, v.close_end),
+            Self::SelfClose(v) => format!("Found at indices {}-{}.", v.self_close_begin, v.self_close_end),
+            Self::None => String::new()
+        }
+    }
+}
+
+impl Default for RangeInDoenetML {
+    fn default() -> Self {
+        RangeInDoenetML::None
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -227,6 +296,9 @@ pub fn create_components_tree_from_json(program: &str)
     let component_tree: Vec<ComponentOrString> = serde_json::from_str(program)
         .expect("Error extracting json");
 
+
+    // TODO: if find a document child, shouldn't ignore all other children
+
     let component_tree = component_tree
         .iter()
         .find_map(|v| match v {
@@ -238,6 +310,8 @@ pub fn create_components_tree_from_json(program: &str)
             component_type: "document".to_string(),
             props: Props::default(),
             children: component_tree,
+            doenetml_range: RangeInDoenetML::None,
+            allow_underscore_component_type: false
         });
 
     log_json!(format!("Parsed JSON into tree"), component_tree);
@@ -250,6 +324,8 @@ pub fn create_components_tree_from_json(program: &str)
 
     let mut component_type_counter: HashMap<String, u32> = HashMap::new();
 
+    let mut errors_encountered: Vec<DoenetMLError> = Vec::new();
+
     let root_component_name = add_component_from_json(
         &mut components,
         &mut attributes,
@@ -259,10 +335,13 @@ pub fn create_components_tree_from_json(program: &str)
         &component_tree,
         None,
         &mut component_type_counter,
-    )?
-    .unwrap();
+        &mut errors_encountered
+    )?;
 
+    // TODO: send the list of the errors to Javascript to alert app of the errors
+    log!("Errors encounter: {:#?}", errors_encountered);
 
+    
     // Determine <sources>'s componentType static attribute, if not specified
     // TODO: <sources> inside <sources>
     // TODO: <sources> with copySource another <sources>
@@ -353,27 +432,52 @@ fn add_component_from_json(
     component_tree: &ComponentTree,
     parent: Option<String>,
     component_type_counter: &mut HashMap<String, u32>,
-) -> Result<Option<ComponentName>, DoenetMLError> {
+    errors_encountered: &mut Vec<DoenetMLError>
+) -> Result<ComponentName, DoenetMLError> {
 
     let component_type: &str = &component_tree.component_type;
 
     let definition = &COMPONENT_DEFINITIONS
         .get_key_value_ignore_case(component_type)
         .ok_or(DoenetMLError::InvalidComponentType {
-            comp_type: component_type.to_string() }
+            comp_type: component_type.to_string(),
+            doenetml_range: component_tree.doenetml_range.clone()
+        }
         )?
         .1;
+
+    let component_type = definition.component_type;
+
+    if component_type.chars().next().unwrap() =='_' && !component_tree.allow_underscore_component_type {
+        return Err(DoenetMLError::InvalidComponentType { 
+            comp_type: component_type.to_string(),
+            doenetml_range: component_tree.doenetml_range.clone()
+         })
+    }
 
     let count = component_type_counter.entry(component_type.to_string()).or_insert(0);
     *count += 1;
 
     let name = match &component_tree.props.name {
-        Some(name) => name.clone(),
+        Some(name) => {
+            if regex_at(&BEGIN_LETTER, name,0).is_err() || regex_at(&CONTAINS_ONLY_NAME_CHARACTERS, name,0).is_err() {
+                return Err(DoenetMLError::InvalidComponentName { 
+                    name: name.clone(),
+                    doenetml_range: component_tree.doenetml_range.clone()
+                  });
+            }
+            name.clone()
+            // TODO: add namespaces so default should be:
+            // format!("/{}", name.clone())
+        },
         None => format!("/_{}{}", component_type, count),
     };
 
     if components.contains_key(&name) {
-        return Err(DoenetMLError::DuplicateName { name: name.clone() });
+        return Err(DoenetMLError::DuplicateName {
+            name: name.clone(),
+            doenetml_range: component_tree.doenetml_range.clone()
+          });
     }
 
     let mut static_attributes = HashMap::new();
@@ -399,7 +503,8 @@ fn add_component_from_json(
         } else {
             return Err(DoenetMLError::AttributeDoesNotExist {
                 comp_name: name.clone(),
-                attr_name: attr_name.clone()
+                attr_name: attr_name.clone(),
+                doenetml_range: component_tree.doenetml_range.clone()  
             });
         }
     }
@@ -421,7 +526,7 @@ fn add_component_from_json(
             },
 
             ComponentOrString::Component(child_tree) => {
-                let child_name_if_not_error = add_component_from_json(
+                let child_name_or_error = add_component_from_json(
                     components,
                     attributes,
                     component_indices,
@@ -430,11 +535,65 @@ fn add_component_from_json(
                     &child_tree,
                     Some(name.clone()),
                     component_type_counter,
-                )?;
+                    errors_encountered
+                );
 
-                if let Some(child_name) = child_name_if_not_error {
-                    children.push(ComponentChild::Component(child_name));
+                match child_name_or_error {
+                    Ok(child_name) => {
+                        children.push(ComponentChild::Component(child_name));
+                    }
+                    Err(error) => {
+                        if !definition.display_errors {
+                            return Err(error);
+                        }
+
+                        let mut attributes_for_props = HashMap::new();
+
+                        let (child_begin_index, child_end_index) = match &child_tree.doenetml_range {
+                            RangeInDoenetML::OpenClose(open_close) => {
+                                (open_close.open_begin, open_close.close_end)
+                            }
+                            RangeInDoenetML::SelfClose(self_close) => {
+                                (self_close.self_close_begin, self_close.self_close_end)
+                            }
+                            RangeInDoenetML::None => (0, 0)
+                        };
+
+                        attributes_for_props.insert("start_index".to_string(), AttributeValue::String(child_begin_index.to_string()));
+                        attributes_for_props.insert("end_index".to_string(), AttributeValue::String(child_end_index.to_string()));
+
+
+                        // create a component of type _error to display the error in the document
+                        let error_component = ComponentTree {
+                            component_type: "_error".to_string(),
+                            props: Props {
+                                attributes: attributes_for_props,
+                                ..Default::default()
+                            },
+                            children: vec![ComponentOrString::String(error.to_string())],
+                            doenetml_range: RangeInDoenetML::None,
+                            allow_underscore_component_type: true
+                        };
+
+                        let error_child_name= add_component_from_json(
+                            components,
+                            attributes,
+                            component_indices,
+                            prop_indices,
+                            map_sources_alias,
+                            &error_component,
+                            Some(name.clone()),
+                            component_type_counter,
+                            errors_encountered,
+                        )?;
+
+                        children.push(ComponentChild::Component(error_child_name));
+
+                        errors_encountered.push(error);
+    
+                    }
                 }
+
             },
         }
     }
@@ -466,7 +625,7 @@ fn add_component_from_json(
     component_indices.insert(name.clone(), component_tree.props.component_index.clone());
     prop_indices.insert(name.clone(), component_tree.props.prop_index.clone());
 
-    return Ok(Some(name));
+    return Ok(name);
 }
 
 /// Temporary implementation to test if maps are working.
@@ -917,6 +1076,9 @@ lazy_static! { static ref COMPONENT: Regex   = Regex::new(r"[a-zA-Z_]\w*").unwra
 lazy_static! { static ref PROP: Regex        = Regex::new(r"[a-zA-Z]\w*").unwrap(); }
 lazy_static! { static ref INDEX: Regex       = Regex::new(r" *(\d+|\$)").unwrap(); }
 lazy_static! { static ref INDEX_END: Regex   = Regex::new(r" *]").unwrap(); }
+lazy_static! { static ref BEGIN_LETTER: Regex= Regex::new(r"^[a-zA-Z]").unwrap(); }
+lazy_static! { static ref CONTAINS_ONLY_NAME_CHARACTERS: Regex= Regex::new(r"^[a-zA-Z0-9_\-]+$").unwrap(); }
+
 
 fn regex_at<'a>(regex: &Regex, string: &'a str, at: usize) -> Result<regex::Match<'a>, String> {
     regex.find_at(string, at)

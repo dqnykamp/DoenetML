@@ -100,6 +100,8 @@ lazy_static! {
 
         should_render_children: true,
 
+        display_errors: true,
+
         valid_children_profiles: ValidChildTypes::AllComponents,
 
         ..Default::default()

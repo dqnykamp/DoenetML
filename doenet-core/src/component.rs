@@ -26,6 +26,7 @@ pub mod template;
 pub mod sources;
 pub mod conditional_content;
 pub mod case;
+pub mod _error;
 
 lazy_static! {
     pub static ref COMPONENT_DEFINITIONS: HashMap<ComponentType, &'static ComponentDefinition> = {
@@ -50,6 +51,7 @@ lazy_static! {
             &crate::sources            ::MY_COMPONENT_DEFINITION,
             &crate::conditional_content::MY_COMPONENT_DEFINITION,
             &crate::case               ::MY_COMPONENT_DEFINITION,
+            &crate::_error               ::MY_COMPONENT_DEFINITION,
         ];
 
         defs.into_iter().map(|def| (def.component_type, def)).collect()
@@ -136,6 +138,8 @@ pub struct ComponentDefinition {
     ) -> Vec<(StateRef, StateVarValue)>,
 
     pub should_render_children: bool,
+
+    pub display_errors: bool,
 
     /// These have to match `on_action` and with what the renderers have
     pub action_names: fn() -> Vec<&'static str>,
@@ -286,6 +290,7 @@ impl Default for ComponentDefinition {
             static_attribute_names: Vec::new(),
             array_aliases: HashMap::new(),
             should_render_children: false,
+            display_errors: false,
             renderer_type: RendererType::Myself,
             primary_input_state_var: None,
             component_profiles: vec![],

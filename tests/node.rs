@@ -8,7 +8,7 @@ use doenet_core::parse_json::DoenetMLWarning;
 use serde_json;
 
 use common_node::*;
-use doenet_core::{parse_json::DoenetMLError, state_variables::StateVarValue};
+use doenet_core::{parse_json::{DoenetMLError, RangeInDoenetML}, state_variables::StateVarValue};
 use wasm_bindgen_test::{wasm_bindgen_test, console_log};
 
 // ========= DoenetML errrors ============
@@ -22,7 +22,7 @@ fn doenet_ml_error_cyclic_dependency_through_children_indirectly() {
     display_doenet_ml_on_failure!(DATA);
 
     let error = doenet_core_from(DATA).unwrap_err();
-    assert!(matches!(error, DoenetMLError::CyclicalDependency { component_chain: _ }));
+    assert!(matches!(error, DoenetMLError::CyclicalDependency { component_chain: _, doenetml_range: _ }));
 }
 
 
@@ -34,7 +34,7 @@ fn doenet_ml_error_copy_nonexistent_component_gives_error() {
     display_doenet_ml_on_failure!(DATA);
 
     let error = doenet_core_from(DATA).unwrap_err();
-    assert!(matches!(error, DoenetMLError::ComponentDoesNotExist { comp_name: _ }));
+    assert!(matches!(error, DoenetMLError::ComponentDoesNotExist { comp_name: _, doenetml_range: _ }));
 }
 
 #[wasm_bindgen_test]
@@ -48,7 +48,8 @@ fn doenet_ml_error_copy_nonexistent_state_var_gives_error() {
     let error = doenet_core_from(DATA).unwrap_err();
     assert_eq!(error, DoenetMLError::StateVarDoesNotExist {
         comp_name: "a".into(),
-        sv_name: "qwertyqwerty".into()
+        sv_name: "qwertyqwerty".into(),
+        doenetml_range: RangeInDoenetML::None
     });
 }
 
@@ -148,7 +149,7 @@ fn text_copy_component_cyclical_gives_error() {
     display_doenet_ml_on_failure!(DATA);
 
     let error = doenet_core_from(DATA).unwrap_err();
-    assert!(matches!(error, DoenetMLError::CyclicalDependency { component_chain: _ }));
+    assert!(matches!(error, DoenetMLError::CyclicalDependency { component_chain: _, doenetml_range: _ }));
 
 }
 
@@ -161,7 +162,7 @@ fn text_copy_itself_as_child_gives_error() {
 
 
     let error = doenet_core_from(DATA).unwrap_err();
-    assert!(matches!(error, DoenetMLError::CyclicalDependency { component_chain: _ }));
+    assert!(matches!(error, DoenetMLError::CyclicalDependency { component_chain: _, doenetml_range: _ }));
 }
 
 
@@ -175,7 +176,7 @@ fn text_copy_itself_as_grandchild_gives_error() {
 
     let error = doenet_core_from(DATA).unwrap_err();
     match error {
-        DoenetMLError::CyclicalDependency { component_chain } => assert_eq!(component_chain.len(), 3),
+        DoenetMLError::CyclicalDependency { component_chain, doenetml_range: _ } => assert_eq!(component_chain.len(), 3),
         _ => panic!("Wrong error type")
     };
 }

@@ -9,7 +9,7 @@ pub mod math_expression;
 
 use base_definitions::{PROP_INDEX_SV, prop_index_determine_value, get_children_of_type};
 use lazy_static::lazy_static;
-use parse_json::{DoenetMLError, DoenetMLWarning, MLComponent};
+use parse_json::{DoenetMLError, DoenetMLWarning, MLComponent, RangeInDoenetML};
 use state::StateForStateVar;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
@@ -304,7 +304,8 @@ fn copy_source_for_ml_component(
         let source_comp = ml_components
             .get(map_source)
             .ok_or(DoenetMLError::ComponentDoesNotExist {
-                comp_name: source_comp_name.clone()
+                comp_name: source_comp_name.clone(),
+                doenetml_range: RangeInDoenetML::None,
             })?;
         let relative_instance = calculate_relative_instance(ml_components, ml_component, source_comp, vec![]);
         let copy_map_source = ComponentRelative {
@@ -317,7 +318,8 @@ fn copy_source_for_ml_component(
     let source_comp = ml_components
         .get(source_comp_name)
         .ok_or(DoenetMLError::ComponentDoesNotExist {
-            comp_name: source_comp_name.clone()
+            comp_name: source_comp_name.clone(),
+            doenetml_range: RangeInDoenetML::None,
         })?;
     let copy_instance = ml_component.copy_instance.clone().unwrap_or_default();
     let relative_instance = calculate_relative_instance(ml_components, ml_component, source_comp, copy_instance);
@@ -379,6 +381,7 @@ fn copy_source_for_ml_component(
                 component_name: ml_component.name.clone(),
                 component_type: ml_component.definition.component_type,
                 source_type: &source_def.component_type,
+                doenetml_range: RangeInDoenetML::None,
             });
         }
 
@@ -396,6 +399,7 @@ fn copy_source_for_ml_component(
         .ok_or(DoenetMLError::StateVarDoesNotExist {
             comp_name: source_comp.name.clone(),
             sv_name: copy_prop.clone(),
+            doenetml_range: RangeInDoenetML::None,
         })?
         .0;
 
@@ -424,6 +428,7 @@ fn copy_source_for_ml_component(
                 return Err(DoenetMLError::CannotCopyIndexForStateVar {
                     source_comp_name: copy_ref_relative.of_node_relative().name.clone(),
                     source_sv_name,
+                    doenetml_range: RangeInDoenetML::None,
                 });
             }
 
@@ -439,6 +444,7 @@ fn copy_source_for_ml_component(
                 return Err(DoenetMLError::CannotCopyArrayStateVar {
                     source_comp_name: copy_ref_relative.of_node_relative().name.clone(),
                     source_sv_name,
+                    doenetml_range: RangeInDoenetML::None,
                 });
             }
             Ok(Some(CopySource::StateVar(ComponentRefStateRelative(
@@ -3605,7 +3611,8 @@ fn check_cyclic_copy_source_component(
             let (_, relevant_chain) = chain.split_at(start_index);
 
             return Some(DoenetMLError::CyclicalDependency {
-                component_chain: Vec::from(relevant_chain)
+                component_chain: Vec::from(relevant_chain),
+                doenetml_range: RangeInDoenetML::None,
             });
 
 
@@ -3633,7 +3640,8 @@ fn check_for_invalid_component_names(
                         if !component_nodes.contains_key(comp_obj) {
                             // The component tried to copy a non-existent component.
                             return Err(DoenetMLError::ComponentDoesNotExist {
-                                comp_name: comp_obj.to_owned()
+                                comp_name: comp_obj.to_owned(),
+                                doenetml_range: RangeInDoenetML::None,
                             });
                         }
                     }
@@ -3705,7 +3713,8 @@ fn check_for_cyclical_dependency_chain(
                     }
 
                     return Some(DoenetMLError::CyclicalDependency {
-                        component_chain
+                        component_chain,
+                        doenetml_range: RangeInDoenetML::None,
                     });
 
                 } else {
