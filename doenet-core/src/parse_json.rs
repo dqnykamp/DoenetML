@@ -143,11 +143,28 @@ pub enum DoenetMLWarning {
         // we can't know if it is an integer or not, so we don't throw this warning
         comp_name: ComponentName,
         invalid_index: String,
+        doenetml_range: RangeInDoenetML,
     },
     InvalidChildType {
         parent_comp_name: ComponentName,
         child_comp_name: ComponentName,
         child_comp_type: ComponentType,
+        doenetml_range: RangeInDoenetML,
+    },
+    ComponentDoesNotExist {
+        comp_name: ComponentName,
+        doenetml_range: RangeInDoenetML,
+    },
+    StateVarDoesNotExist {
+        comp_name: ComponentName,
+        sv_name: String,
+        doenetml_range: RangeInDoenetML,
+    },
+    InvalidArrayIndex {
+        comp_name: ComponentName,
+        sv_name: Option<String>,
+        array_index: String,
+        doenetml_range: RangeInDoenetML,
     },
 }
 
@@ -156,11 +173,23 @@ impl Display for DoenetMLWarning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use DoenetMLWarning::*;
         match self {
-            PropIndexIsNotPositiveInteger { comp_name, invalid_index } => {
-                write!(f, "Component {} has propIndex '{}' which is not a positive integer", comp_name, invalid_index)
+            PropIndexIsNotPositiveInteger { comp_name, invalid_index, doenetml_range } => {
+                write!(f, "Component {} has propIndex '{}' which is not a positive integer. {}", comp_name, invalid_index, doenetml_range.to_string())
             },
-            InvalidChildType { parent_comp_name, child_comp_name: _, child_comp_type } => {
-                write!(f, "Component {} cannot have a child component of type {}", parent_comp_name, child_comp_type)
+            InvalidChildType { parent_comp_name, child_comp_name: _, child_comp_type, doenetml_range } => {
+                write!(f, "Component {} cannot have a child component of type {}. {}", parent_comp_name, child_comp_type, doenetml_range.to_string())
+            },
+            ComponentDoesNotExist { comp_name, doenetml_range } => {
+                write!(f, "Component {} does not exist. {}", comp_name, doenetml_range.to_string())
+            },
+            StateVarDoesNotExist { comp_name, sv_name, doenetml_range } =>
+                write!(f, "State variable '{}' does not exist on {}. {}", sv_name, comp_name, doenetml_range.to_string()),
+            InvalidArrayIndex { comp_name, sv_name, array_index, doenetml_range } => {
+                let sv_description = match sv_name {
+                    Some(sv) => format!(" on state variable '{}'", sv),
+                    None => String::new()
+                };
+                write!(f, "Invalid array index {}{} of {}. {}", array_index, sv_description, comp_name, doenetml_range.to_string())
             },
         }
 
@@ -214,17 +243,23 @@ impl ToString for AttributeValue {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenCloseRange {
-    open_begin: usize,
-    open_end: usize,
-    close_begin: usize,
-    close_end: usize
+    pub open_begin: usize,
+    pub open_end: usize,
+    pub close_begin: usize,
+    pub close_end: usize
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SelfCloseRange {
-    self_close_begin: usize,
-    self_close_end: usize
+    pub self_close_begin: usize,
+    pub self_close_end: usize
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MacroRange {
+    pub macro_begin: usize,
+    pub macro_end: usize
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -232,6 +267,7 @@ pub struct SelfCloseRange {
 pub enum RangeInDoenetML {
     OpenClose(OpenCloseRange),
     SelfClose(SelfCloseRange),
+    FromMacro(MacroRange),
     None,
 }
 
@@ -240,6 +276,7 @@ impl ToString for RangeInDoenetML {
         match self {
             Self::OpenClose(v) => format!("Found at indices {}-{}.", v.open_begin, v.close_end),
             Self::SelfClose(v) => format!("Found at indices {}-{}.", v.self_close_begin, v.self_close_end),
+            Self::FromMacro(v) => format!("Found at indices {}-{}.", v.macro_begin, v.macro_end),
             Self::None => String::new()
         }
     }
@@ -278,6 +315,8 @@ pub struct MLComponent {
     pub prop_index: Vec<ObjectName>,
 
     pub definition: &'static ComponentDefinition,
+
+    doenetml_range: RangeInDoenetML,
 }
 
 /// Convert serialized JSON of doenetML into tree of MLComponents
@@ -287,6 +326,8 @@ pub fn create_components_tree_from_json(program: &str)
             HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
             ComponentName,
             HashMap<String, ComponentName>,
+            Vec<DoenetMLWarning>,
+            Vec<DoenetMLError>
         ), DoenetMLError> {
 
     // log!("Parsing string for component tree: {}", program);
@@ -324,6 +365,7 @@ pub fn create_components_tree_from_json(program: &str)
 
     let mut component_type_counter: HashMap<String, u32> = HashMap::new();
 
+    let mut warnings_encountered: Vec<DoenetMLWarning> = Vec::new();
     let mut errors_encountered: Vec<DoenetMLError> = Vec::new();
 
     let root_component_name = add_component_from_json(
@@ -337,9 +379,6 @@ pub fn create_components_tree_from_json(program: &str)
         &mut component_type_counter,
         &mut errors_encountered
     )?;
-
-    // TODO: send the list of the errors to Javascript to alert app of the errors
-    log!("Errors encounter: {:#?}", errors_encountered);
 
     
     // Determine <sources>'s componentType static attribute, if not specified
@@ -379,6 +418,7 @@ pub fn create_components_tree_from_json(program: &str)
             prop_indices,
             component_indices,
             &map_sources_alias,
+            &mut warnings_encountered,
         );
 
     // log_debug!("Components to add from macros: {:#?}", components_to_add);
@@ -417,7 +457,7 @@ pub fn create_components_tree_from_json(program: &str)
         macro_components.into_iter().map(|c| (c.name.clone(), c))
     ).collect();
 
-    Ok((components, attributes_parsed, root_component_name, map_sources_alias))
+    Ok((components, attributes_parsed, root_component_name, map_sources_alias, warnings_encountered, errors_encountered))
 }
 
 /// Recursive function
@@ -556,6 +596,9 @@ fn add_component_from_json(
                             RangeInDoenetML::SelfClose(self_close) => {
                                 (self_close.self_close_begin, self_close.self_close_end)
                             }
+                            RangeInDoenetML::FromMacro(from_macro) => {
+                                (from_macro.macro_begin, from_macro.macro_end)
+                            }
                             RangeInDoenetML::None => (0, 0)
                         };
 
@@ -615,6 +658,8 @@ fn add_component_from_json(
         static_attributes,
 
         definition,
+
+        doenetml_range: component_tree.doenetml_range.clone(),
     };
 
     components.insert(name.clone(), component_node);
@@ -656,6 +701,7 @@ fn parse_attributes_and_macros(
     prop_indices: HashMap<ComponentName, Option<String>>,
     component_indices: HashMap<ComponentName, Option<String>>,
     map_sources_alias: &HashMap<String, ComponentName>,
+    warnings_encountered: &mut Vec<DoenetMLWarning>
 ) -> (
     HashMap<ComponentName, HashMap<usize, Vec<ObjectName>>>,
     Vec<MLComponent>,
@@ -705,13 +751,34 @@ fn parse_attributes_and_macros(
     // Component string children
     for (child_id, string_val, component) in all_string_children {
 
+        let mut range_begin = None;
+        if let RangeInDoenetML::OpenClose(open_close) = &component.doenetml_range {
+            range_begin = Some(open_close.open_end);
+
+            if child_id > 0 {
+                if let ObjectName::Component(comp_name) = &component.children[child_id-1] {
+                    let &previous_child = &components.get(comp_name).unwrap();
+
+                    range_begin = match &previous_child.doenetml_range {
+                        RangeInDoenetML::OpenClose(open_close) => Some(open_close.close_end),
+                        RangeInDoenetML::SelfClose(self_close) => Some(self_close.self_close_end),
+                        RangeInDoenetML::FromMacro(from_macro) => Some(from_macro.macro_end),
+                        RangeInDoenetML::None => range_begin
+                    }
+
+                }
+            }
+        }
+
         let objects = apply_macro_to_string(
             string_val,
             &component.name,
             components,
             map_sources_alias,
             &mut macro_copy_counter,
-            &mut components_to_add
+            &mut components_to_add,
+            range_begin,
+            warnings_encountered,
         );
 
         // For now, replace everything in the children field
@@ -739,6 +806,8 @@ fn parse_attributes_and_macros(
                         map_sources_alias,
                         &mut macro_copy_counter,
                         &mut components_to_add,
+                        None,
+                        warnings_encountered,
                     )
                 )
             ).collect();
@@ -758,7 +827,9 @@ fn parse_attributes_and_macros(
                 components,
                 map_sources_alias,
                 &mut macro_copy_counter,
-                &mut components_to_add
+                &mut components_to_add,
+                None,
+                warnings_encountered,
             ),
             None => vec![],
         };
@@ -776,7 +847,9 @@ fn parse_attributes_and_macros(
                 components,
                 map_sources_alias,
                 &mut macro_copy_counter,
-                &mut components_to_add
+                &mut components_to_add,
+                None,
+                warnings_encountered,
             ),
             None => vec![],
         };
@@ -800,6 +873,9 @@ fn apply_macro_to_string(
     map_sources_alias: &HashMap<String, ComponentName>,
     macro_copy_counter: &mut HashMap<ComponentName, usize>,
     components_to_add: &mut Vec<MLComponent>,
+    start_doenetml_ind: Option<usize>,
+    warnings_encountered: &mut Vec<DoenetMLWarning>
+
 ) -> Vec<ObjectName> {
 
     let mut objects = Vec::new();
@@ -817,7 +893,7 @@ fn apply_macro_to_string(
 
         // Append the regular string until start of macro
         let before = &string[previous_end..next_macro.start()];
-        if !before.trim().is_empty() {
+        if !before.is_empty() {
             objects.push(ObjectName::String(before.to_string()));
         }
 
@@ -827,15 +903,24 @@ fn apply_macro_to_string(
             components,
             map_sources_alias,
             macro_copy_counter,
-            components_to_add
+            components_to_add,
+            start_doenetml_ind,
+            warnings_encountered
         ) {
             Ok((macro_name, macro_end)) => {
                 previous_end = macro_end;
                 objects.push(ObjectName::Component(macro_name));
             },
-            Err(msg) => {
+            Err((msg, error_end, skip_error_string)) => {
                 log!("macro failed: {}", msg);
-                break;
+                if !skip_error_string {
+                    let skipped = &string[next_macro.start()..error_end];
+                    if !skipped.is_empty() {
+                        objects.push(ObjectName::String(skipped.to_string()));
+                    }
+                }
+
+                previous_end = error_end;
             }
         }
     }
@@ -857,11 +942,13 @@ fn macro_comp_ref(
     map_sources_alias: &HashMap<String, ComponentName>,
     macro_copy_counter: &mut HashMap<ComponentName, usize>,
     components_to_add: &mut Vec<MLComponent>,
-) -> Result<(ComponentName, usize), String> {
+    start_doenetml_ind: Option<usize>,
+    warnings_encountered: &mut Vec<DoenetMLWarning>
+) -> Result<(ComponentName, usize), (String, usize, bool)> {
 
     // log_debug!("macro at {} of {}", start, string);
 
-    let comp_match = regex_at(&COMPONENT, string, start)?;
+    let comp_match = regex_at(&COMPONENT, string, start).map_err(|err| (err, start+1, false))?;
 
     let copy_source = comp_match.as_str().to_string();
     let (copy_source, copy_instance) = convert_copy_source_name(Some(copy_source.clone()));
@@ -873,10 +960,11 @@ fn macro_comp_ref(
 
         let component_type = components.get(sources_name).unwrap()
             .static_attributes.get("componentType")
-            .ok_or("Sources did not define component type")?;
+            .ok_or(("Sources did not define component type".to_string(), comp_match.end(), true))?;
         let definition = &COMPONENT_DEFINITIONS
             .get(component_type.as_str())
-            .ok_or("Sources invalid component type")?;
+            .ok_or(("Sources invalid component type".to_string(), comp_match.end(), true))?;
+
 
         let macro_copy = MLComponent {
             name: name_macro_component(&copy_source, macro_parent, macro_copy_counter),
@@ -890,6 +978,7 @@ fn macro_comp_ref(
             prop_index: vec![],
             static_attributes: HashMap::new(),
             definition,
+            doenetml_range: RangeInDoenetML::None,
         };
 
         let macro_name = macro_copy.name.clone();
@@ -897,22 +986,40 @@ fn macro_comp_ref(
         return Ok((macro_name, comp_match.end()))
     }
 
-    let source_component = components.get(&copy_source).ok_or(format!("The component {} does not exist", copy_source))?;
+
+    let mut found_error = false;
+    let mut error_message = String::new();
+
+    let source_component_option = components.get(&copy_source);
+
+    if source_component_option.is_none() {
+        found_error = true;
+        error_message = format!("The component {} does not exist", copy_source);
+        let doenetml_range = match start_doenetml_ind {
+            Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + comp_match.end()}),
+            None => RangeInDoenetML::None
+        };
+        warnings_encountered.push(DoenetMLWarning::ComponentDoesNotExist {
+            comp_name: copy_source.to_string(),
+            doenetml_range,
+        });
+    }
 
     let char_at = |c: usize| string.as_bytes().get(c).map(|c| *c as char);
 
     let name: String;
-    let definition: &ComponentDefinition;
+    let definition_option: Option<&ComponentDefinition>;
     let component_index: Vec<ObjectName>;
     let copy_prop: Option<String>;
     let prop_index: Vec<ObjectName>;
  
     // Handle possible component index: brackets after the component name
     let comp_end;
-    let source_def;
+    let source_def_option;
+
     if char_at(comp_match.end()) == Some('[') {
         // group member
-        let index_match = regex_at(&INDEX, string, comp_match.end() + 1)?;
+        let index_match = regex_at(&INDEX, string, comp_match.end() + 1).map_err(|err| (err, comp_match.end(), false))?;
         let index_str = index_match.as_str();
         let index_end: usize;
         if index_str == "$" {
@@ -923,49 +1030,88 @@ fn macro_comp_ref(
             component_index = vec![ObjectName::String(index_str.trim().to_string())];
             index_end = index_match.end();
         }
-        let close_bracket_match = regex_at(&INDEX_END, string, index_end)?;
+        let close_bracket_match = regex_at(&INDEX_END, string, index_end).map_err(|err| (err, comp_match.end(), false))?;
         comp_end = close_bracket_match.end();
 
-        source_def = match (None, &source_component.definition.replacement_components) {
-            (Some(key), _) => {
-                source_component.definition.batches
-                    .get_key_value_ignore_case(key).unwrap().1
-                    .member_definition
-            },
-            (None, Some(ReplacementComponents::Batch(def)))  => def.member_definition,
-            (None, Some(ReplacementComponents::Collection(def)))  => (def.member_definition)(&source_component.static_attributes),
-            (None, _)  => return Err("index of non-group".to_string()),
+        source_def_option = match source_component_option {
+            Some(source_component) => match (None, &source_component.definition.replacement_components) {
+                (Some(key), _) => {
+                    Some(source_component.definition.batches
+                        .get_key_value_ignore_case(key).unwrap().1
+                        .member_definition)
+                },
+                (None, Some(ReplacementComponents::Batch(def)))  => Some(def.member_definition),
+                (None, Some(ReplacementComponents::Collection(def)))  => Some((def.member_definition)(&source_component.static_attributes)),
+                (None, _)  => {
+                    if !found_error {
+                        found_error = true;
+                        error_message = "index of non-group".to_string();
+
+                        let doenetml_range = match start_doenetml_ind {
+                            Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + comp_end}),
+                            None => RangeInDoenetML::None
+                        };
+                        warnings_encountered.push(DoenetMLWarning::InvalidArrayIndex {
+                            comp_name: copy_source.to_string(),
+                            sv_name: None,
+                            array_index: index_str.trim().to_string(),
+                            doenetml_range,
+                        });
+                    }
+                    None
+                },
+            }
+            None => None
         };
     } else {
         // no component index
         comp_end = comp_match.end();
         component_index = vec![];
-        source_def = source_component.definition;
+        source_def_option = match source_component_option {
+            Some(source_component) => Some(source_component.definition),
+            None => None
+        }
     };
 
     // Handle possible copy prop: dot then state variable
     let macro_end;
     if char_at(comp_end) == Some('.') {
-        let prop_match = regex_at(&PROP, string, comp_end + 1)?;
+        let prop_match = regex_at(&PROP, string, comp_end + 1).map_err(|err| (err, comp_end, false))?;
         let prop = prop_match.as_str();
 
-        let variant = match source_def.state_var_definitions.get(prop) {
-            Some(v) => v,
-            None => source_def.state_var_definitions.get(
-                source_def.array_aliases.get(prop)
-                .ok_or(format!("prop doesn't exist on {:?}", source_def))?
-                .name()
-            ).unwrap(),
+        let variant_option = match source_def_option {
+            Some(source_def) => match source_def.state_var_definitions.get(prop) {
+                Some(v) => Some(v),
+                None => {
+                    match source_def.array_aliases.get(prop) {
+                        Some(array_def) => Some(source_def.state_var_definitions.get(array_def.name()).unwrap()),
+                        None => {
+                            if !found_error {
+                                found_error = true;
+                                error_message = format!("prop {} doesn't exist on {}", prop, source_def.component_type);
+
+                                let doenetml_range = match start_doenetml_ind {
+                                    Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + prop_match.end()}),
+                                    None => RangeInDoenetML::None
+                                };
+                                warnings_encountered.push(DoenetMLWarning::StateVarDoesNotExist {
+                                    comp_name: copy_source.to_string(),
+                                    sv_name: prop.to_string(),
+                                    doenetml_range,
+                                });
+                            }
+                            None
+                        }
+                    }
+                }
+            }
+            None => None
         };
 
         // Handle possible prop index: brackets after the prop name
         if string.as_bytes().get(prop_match.end()) == Some(&b'[') {
 
-            if !variant.is_array() {
-                return Err(format!("{}.{} cannot be indexed", copy_source, prop));
-            }
-
-            let index_match = regex_at(&INDEX, string, prop_match.end() + 1)?;
+            let index_match = regex_at(&INDEX, string, prop_match.end() + 1).map_err(|err| (err, comp_end, false))?;
             let index_str = index_match.as_str().trim();
             let index_end: usize;
             if index_str == "$" {
@@ -978,6 +1124,8 @@ fn macro_comp_ref(
                     map_sources_alias,
                     macro_copy_counter,
                     components_to_add,
+                    start_doenetml_ind,
+                    warnings_encountered
                 )?;
 
                 index_end = index_macro_end;
@@ -987,8 +1135,28 @@ fn macro_comp_ref(
                 index_end = index_match.end();
                 prop_index = vec![ObjectName::String(index_str.to_string())];
             }
-            let close_bracket_match = regex_at(&INDEX_END, string, index_end)?;
+            let close_bracket_match = regex_at(&INDEX_END, string, index_end).map_err(|err| (err, comp_end, false))?;
             macro_end = close_bracket_match.end();
+
+            if let Some(variant) = variant_option {
+                if !variant.is_array() {
+                    if !found_error {
+                        found_error = true;
+                        error_message = format!("{}.{} cannot be indexed", copy_source, prop);
+
+                        let doenetml_range = match start_doenetml_ind {
+                            Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + macro_end}),
+                            None => RangeInDoenetML::None
+                        };
+                        warnings_encountered.push(DoenetMLWarning::InvalidArrayIndex {
+                            comp_name: copy_source.to_string(),
+                            sv_name: Some(prop.to_string()),
+                            array_index: index_str.trim().to_string(),
+                            doenetml_range,
+                        });
+                    }
+                }
+            }
         } else {
             // no index
             macro_end = prop_match.end();
@@ -997,9 +1165,14 @@ fn macro_comp_ref(
 
         let source_comp_sv_name = format!("{}:{}", copy_source, prop);
 
-        definition = &COMPONENT_DEFINITIONS
+        definition_option = match variant_option {
+            Some(variant) => Some(&COMPONENT_DEFINITIONS
             .get(default_component_type_for_state_var(variant))
-            .unwrap();
+            .unwrap()),
+            None => None
+        };
+        
+        
 
         name = name_macro_component(
             &source_comp_sv_name,
@@ -1018,12 +1191,25 @@ fn macro_comp_ref(
             macro_parent,
             macro_copy_counter,
         );
-        definition = source_def;
+        definition_option = source_def_option;
 
         macro_end = comp_end;
     };
 
+
+    if found_error {
+        return Err((error_message, macro_end, true));
+    }
+    
+    // if didn't find an error, then we have a definition
+    let definition = definition_option.unwrap();
+
     let (copy_source, copy_instance) = convert_copy_source_name(Some(copy_source));
+
+    let doenetml_range = match start_doenetml_ind {
+        Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + macro_end}),
+        None => RangeInDoenetML::None
+    };
 
     let macro_copy = MLComponent {
         name,
@@ -1040,6 +1226,8 @@ fn macro_comp_ref(
         static_attributes: HashMap::new(),
 
         definition,
+
+        doenetml_range
     };
     let macro_name = macro_copy.name.clone();
     components_to_add.push(macro_copy);
@@ -1074,8 +1262,8 @@ fn name_macro_component(
 lazy_static! { static ref MACRO_BEGIN: Regex = Regex::new(r"\$").unwrap(); }
 lazy_static! { static ref COMPONENT: Regex   = Regex::new(r"[a-zA-Z_]\w*").unwrap(); }
 lazy_static! { static ref PROP: Regex        = Regex::new(r"[a-zA-Z]\w*").unwrap(); }
-lazy_static! { static ref INDEX: Regex       = Regex::new(r" *(\d+|\$)").unwrap(); }
-lazy_static! { static ref INDEX_END: Regex   = Regex::new(r" *]").unwrap(); }
+lazy_static! { static ref INDEX: Regex       = Regex::new(r"\s*(\d+|\$)").unwrap(); }
+lazy_static! { static ref INDEX_END: Regex   = Regex::new(r"\s*]").unwrap(); }
 lazy_static! { static ref BEGIN_LETTER: Regex= Regex::new(r"^[a-zA-Z]").unwrap(); }
 lazy_static! { static ref CONTAINS_ONLY_NAME_CHARACTERS: Regex= Regex::new(r"^[a-zA-Z0-9_\-]+$").unwrap(); }
 

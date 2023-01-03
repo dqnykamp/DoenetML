@@ -209,17 +209,21 @@ pub enum CollectionMembers {
 pub fn create_doenet_core(
     program: &str,
     existing_essential_data: Option<HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>>,
-) -> Result<(DoenetCore, Vec<DoenetMLWarning>), DoenetMLError> {
+) -> Result<(DoenetCore, Vec<DoenetMLWarning>, Vec<DoenetMLError>), DoenetMLError> {
 
     log!("===== DoenetCore creation =====");
 
     // Create component nodes and attributes
-    let (ml_components, component_attributes, root_component_name, map_sources_alias) =
+    let (ml_components, component_attributes, root_component_name, map_sources_alias, warnings_encountered, errors_encountered) =
         parse_json::create_components_tree_from_json(program)?;
 
     let mut doenet_ml_warnings = vec![];
+    let mut doenet_ml_errors = vec![];
 
-    let component_nodes = convert_ml_components_into_component_nodes(ml_components, map_sources_alias, &mut doenet_ml_warnings)?;
+    doenet_ml_warnings.extend(warnings_encountered);
+    doenet_ml_errors.extend(errors_encountered);
+
+    let component_nodes = convert_ml_components_into_component_nodes(ml_components, map_sources_alias, &mut doenet_ml_warnings, &mut doenet_ml_errors)?;
 
     doenet_ml_warnings.extend(check_for_invalid_childen_component_profiles(&component_nodes));
     check_for_cyclical_copy_sources(&component_nodes)?;
@@ -252,7 +256,7 @@ pub fn create_doenet_core(
         dependencies,
         collection_members,
         essential_data,
-    }, doenet_ml_warnings))
+    }, doenet_ml_warnings, doenet_ml_errors))
 }
 
 
@@ -261,6 +265,7 @@ fn convert_ml_components_into_component_nodes(
     ml_components: HashMap<ComponentName, MLComponent>,
     map_sources_alias: HashMap<String, String>,
     doenet_ml_warnings: &mut Vec<DoenetMLWarning>,
+    doenet_ml_errors: &mut Vec<DoenetMLError>,
 ) -> Result<HashMap<ComponentName, ComponentNode>, DoenetMLError> {
     let mut component_nodes = HashMap::new();
     for (name, ml_component) in ml_components.iter() {
@@ -302,11 +307,18 @@ fn copy_source_for_ml_component(
 
     if let Some(map_source) = map_sources_alias.get(source_comp_name) {
         let source_comp = ml_components
-            .get(map_source)
-            .ok_or(DoenetMLError::ComponentDoesNotExist {
-                comp_name: source_comp_name.clone(),
+            .get(map_source);
+
+        if source_comp.is_none() {
+            doenet_ml_warnings.push(DoenetMLWarning::ComponentDoesNotExist {
+                comp_name: map_source.to_string(),
                 doenetml_range: RangeInDoenetML::None,
-            })?;
+            });
+            return Ok(None);
+        }
+        
+        let source_comp = source_comp.unwrap();
+
         let relative_instance = calculate_relative_instance(ml_components, ml_component, source_comp, vec![]);
         let copy_map_source = ComponentRelative {
             name: map_source.clone(),
@@ -316,11 +328,18 @@ fn copy_source_for_ml_component(
     }
 
     let source_comp = ml_components
-        .get(source_comp_name)
-        .ok_or(DoenetMLError::ComponentDoesNotExist {
-            comp_name: source_comp_name.clone(),
+        .get(source_comp_name);
+
+    if source_comp.is_none() {
+        doenet_ml_warnings.push(DoenetMLWarning::ComponentDoesNotExist {
+            comp_name: source_comp_name.to_string(),
             doenetml_range: RangeInDoenetML::None,
-        })?;
+        });
+        return Ok(None);
+    }
+
+    let source_comp = source_comp.unwrap();
+
     let copy_instance = ml_component.copy_instance.clone().unwrap_or_default();
     let relative_instance = calculate_relative_instance(ml_components, ml_component, source_comp, copy_instance);
     let copy_node_relative = ComponentRelative {
@@ -340,7 +359,8 @@ fn copy_source_for_ml_component(
             if index == 0 {
                 doenet_ml_warnings.push(DoenetMLWarning::PropIndexIsNotPositiveInteger {
                     comp_name: ml_component.name.clone(),
-                    invalid_index: string_value.to_string()
+                    invalid_index: string_value.to_string(),
+                    doenetml_range: RangeInDoenetML::None,
                 });
             }
 
@@ -395,13 +415,18 @@ fn copy_source_for_ml_component(
 
     let source_sv_name = source_def
         .state_var_definitions
-        .get_key_value_ignore_case(copy_prop.as_str())
-        .ok_or(DoenetMLError::StateVarDoesNotExist {
+        .get_key_value_ignore_case(copy_prop.as_str());
+
+    if source_sv_name.is_none() {
+        doenet_ml_warnings.push(DoenetMLWarning::StateVarDoesNotExist {
             comp_name: source_comp.name.clone(),
             sv_name: copy_prop.clone(),
             doenetml_range: RangeInDoenetML::None,
-        })?
-        .0;
+        });
+        return Ok(None);
+    }
+    
+    let source_sv_name = source_sv_name.unwrap().0;
 
     let source_sv_def = source_def
         .state_var_definitions
@@ -420,7 +445,8 @@ fn copy_source_for_ml_component(
             if index == 0 {
                 doenet_ml_warnings.push(DoenetMLWarning::PropIndexIsNotPositiveInteger {
                     comp_name: ml_component.name.clone(),
-                    invalid_index: string_value.to_string()
+                    invalid_index: string_value.to_string(),
+                    doenetml_range: RangeInDoenetML::None,
                 });
             }
 
@@ -3559,6 +3585,7 @@ fn check_for_invalid_childen_component_profiles(component_nodes: &HashMap<Compon
                         parent_comp_name: component.name.clone(),
                         child_comp_name: child_comp.name.clone(),
                         child_comp_type: child_member_def.component_type,
+                        doenetml_range: RangeInDoenetML::None,
                     });
                 }
             }

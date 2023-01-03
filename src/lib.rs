@@ -35,7 +35,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug)]
-pub struct PublicDoenetCore(DoenetCore, pub js_sys::Array);
+pub struct PublicDoenetCore(DoenetCore, pub js_sys::Array, pub js_sys::Array);
 
 
 
@@ -54,12 +54,16 @@ impl PublicDoenetCore {
 
         match core_or_error {
             Err(doenet_ml_error) => Err(doenet_ml_error.to_string()),
-            Ok((core, ml_warnings)) => {
+            Ok((core, ml_warnings, ml_errors)) => {
                 let warnings_array = js_sys::Array::new();
                 for (i, warning) in ml_warnings.iter().enumerate() {
                     warnings_array.set(i as u32, JsValue::from(warning.to_string()));
                 }
-                Ok(PublicDoenetCore(core, warnings_array))
+                let errors_array = js_sys::Array::new();
+                for (i, error) in ml_errors.iter().enumerate() {
+                    errors_array.set(i as u32, JsValue::from(error.to_string()));
+                }
+                Ok(PublicDoenetCore(core, warnings_array, errors_array))
             }
         }
     }   

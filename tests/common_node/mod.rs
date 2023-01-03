@@ -33,13 +33,14 @@ macro_rules! display_doenet_ml_on_failure {
 }
 
 
-pub fn doenet_core_with_no_warnings(data: &str) -> DoenetCore {
-    let (core, warnings) = doenet_core_from(data).expect("DoenetCore creation threw an error");
+pub fn doenet_core_with_no_warnings_errors(data: &str) -> DoenetCore {
+    let (core, warnings, errors) = doenet_core_from(data).expect("DoenetCore creation threw an error");
     assert_eq!(warnings, vec![], "There were DoenetML warning(s)");
+    assert_eq!(errors, vec![], "There were DoenetML error(s)");
     core
 }
 
-pub fn doenet_core_from(data: &str) -> Result<(DoenetCore, Vec<DoenetMLWarning>), DoenetMLError> {
+pub fn doenet_core_from(data: &str) -> Result<(DoenetCore, Vec<DoenetMLWarning>, Vec<DoenetMLError>), DoenetMLError> {
     let parsed = parseAndCompile(data.to_string());
     let program: String = js_sys::JSON::stringify(&parsed).unwrap().into();
     doenet_core::create_doenet_core(&program, None)
@@ -48,7 +49,7 @@ pub fn doenet_core_from(data: &str) -> Result<(DoenetCore, Vec<DoenetMLWarning>)
 pub fn doenet_core_with_essential_data(
     program_str: &str,
     essential_data: HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
-) -> Result<(DoenetCore, Vec<DoenetMLWarning>), DoenetMLError> {
+) -> Result<(DoenetCore, Vec<DoenetMLWarning>, Vec<DoenetMLError>), DoenetMLError> {
     
     let parsed = parseAndCompile(program_str.to_string());
     let program: String = js_sys::JSON::stringify(&parsed).unwrap().into();
