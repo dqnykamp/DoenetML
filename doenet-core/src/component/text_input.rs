@@ -20,12 +20,12 @@ lazy_static! {
                 HashMap::from([
                     ("essential", DependencyInstruction::Essential { prefill: Some("prefill") }),
                     ("immediate", DependencyInstruction::StateVar {
-                        component_ref: None,
-                        state_var: StateVarSlice::Single(StateRef::Basic("immediateValue")),
+                        component_name: None,
+                        state_var_name: "immediateValue",
                     }),
                     ("sync", DependencyInstruction::StateVar {
-                        component_ref: None,
-                        state_var: StateVarSlice::Single(StateRef::Basic("syncImmediateValue")),
+                        component_name: None,
+                        state_var_name: "syncImmediateValue",
                     }),
                 ]),
             determine_state_var_from_dependencies: |dependency_values| {
@@ -147,20 +147,20 @@ lazy_static! {
                     let new_val = args.get("text").expect("No text argument").first().unwrap();
 
                     vec![
-                        (StateRef::Basic("immediateValue"), new_val.clone()),
-                        (StateRef::Basic("syncImmediateValue"), StateVarValue::Boolean(false)),
+                        ("immediateValue", new_val.clone()),
+                        ("syncImmediateValue", StateVarValue::Boolean(false)),
                     ]
                 },
 
                 "updateValue" => {
 
-                    let new_val = resolve_and_retrieve_state_var(&StateRef::Basic("immediateValue"))
+                    let new_val = resolve_and_retrieve_state_var(&"immediateValue")
                         .unwrap().try_into().unwrap();
                     let new_val = StateVarValue::String(new_val);
 
                     vec![
-                        (StateRef::Basic("value"), new_val),
-                        (StateRef::Basic("syncImmediateValue"), StateVarValue::Boolean(true)),
+                        ("value", new_val),
+                        ("syncImmediateValue", StateVarValue::Boolean(true)),
                     ]
 
                 }

@@ -168,6 +168,13 @@ async function createCore(args) {
 
 function handleAction(args) {
 
+  if(args.actionName === "recordVisibilityChange") {
+    postMessage({
+      messageType: "resolveAction",
+      args: { actionId: args.args.actionId }
+    })
+    return;
+  }
 
   let completedActionId = doenetCore.handle_action(JSON.stringify(args));
   

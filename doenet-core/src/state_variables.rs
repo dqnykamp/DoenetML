@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::fmt::Display;
 
-use crate::ComponentRefRelative;
+use crate::ComponentName;
 use crate::component::AttributeName;
 use crate::component::ComponentProfile;
 use crate::component::ComponentType;
@@ -51,131 +50,6 @@ pub struct StateVarDefinition<T> {
     ) -> HashMap<InstructionName, Result<Vec<DependencyValue>, String>>,
 }
 
-#[derive(Debug)]
-pub struct StateVarArrayDefinition<T> {
-
-    pub return_array_dependency_instructions: fn(
-        HashMap<StateVarName, StateVarValue>
-    ) -> HashMap<InstructionName, DependencyInstruction>,
-
-
-
-    pub return_element_dependency_instructions: fn(
-        usize,
-        HashMap<StateVarName, StateVarValue>
-    ) -> HashMap<InstructionName, DependencyInstruction>,
-
-    pub determine_element_from_dependencies: fn(
-        usize,
-        HashMap<InstructionName, Vec<DependencyValue>>
-    ) -> Result<StateVarUpdateInstruction<T>, String>,
-
-    pub request_element_dependencies_to_update_value: fn(
-        usize,
-        T,
-        HashMap<InstructionName, Vec<(DependencySource, Option<StateVarValue>)>>
-    ) -> HashMap<InstructionName, Result<Vec<DependencyValue>, String>>,
-
-
-    pub return_size_dependency_instructions: fn(
-        HashMap<StateVarName, StateVarValue>
-    ) -> HashMap<InstructionName, DependencyInstruction>,
-
-    pub determine_size_from_dependencies: fn(
-        HashMap<InstructionName, Vec<DependencyValue>>
-    ) -> Result<StateVarUpdateInstruction<usize>, String>,
-
-    pub request_size_dependencies_to_update_value: fn(
-        T,
-        HashMap<InstructionName,
-        Vec<(DependencySource, Option<StateVarValue>)>>
-    ) -> HashMap<InstructionName, Result<Vec<DependencyValue>, String>>,
-
-    pub for_renderer: bool,
-
-    pub initial_essential_element_value: T,
-
-}
-
-
-
-/// A single value
-#[derive(Debug, PartialEq, Eq, Hash, Clone, serde::Serialize, enum_as_inner::EnumAsInner)]
-pub enum StateRef {
-    Basic(StateVarName),
-    ArrayElement(StateVarName, usize),
-    SizeOf(StateVarName),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum StateIndex {
-    Basic,
-    Element(usize),
-    SizeOf,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, serde::Serialize, enum_as_inner::EnumAsInner)]
-pub enum StateVarSlice {
-    Single(StateRef),
-    Array(StateVarName),
-}
-
-impl StateVarSlice {
-    pub fn name(&self) -> StateVarName {
-        match self {
-            Self::Single(state_ref) => state_ref.name(),
-            Self::Array(name) => name,
-        }
-    }
-
-    pub fn from_slice_new_name(&self, name: StateVarName) -> StateVarSlice {
-        match self {
-            Self::Single(state_ref) => StateVarSlice::Single(
-                StateRef::from_name_and_index(name, state_ref.index())
-            ),
-            Self::Array(_) => Self::Array(name),
-        }
-    }
-    pub fn specify_index(self, index: StateIndex) -> Option<StateRef> {
-        match (self, index) {
-            (StateVarSlice::Single(n), StateIndex::Basic) => Some(n),
-            (_, StateIndex::Basic) |
-            (StateVarSlice::Single(_), _) => None,
-            (StateVarSlice::Array(n), i) => Some(StateRef::from_name_and_index(n,i)),
-        }
-    }
-}
-
-impl StateRef {
-    pub fn name(&self) -> StateVarName {
-        match self {
-            Self::Basic(name) => name,
-            Self::ArrayElement(name, _) => name,
-            Self::SizeOf(name) => name,
-        }
-    }
-
-    pub fn index(&self) -> StateIndex {
-        match self {
-            Self::Basic(_) => StateIndex::Basic,
-            Self::ArrayElement(_, i) => StateIndex::Element(*i),
-            Self::SizeOf(_) => StateIndex::SizeOf,
-        }
-    }
-
-    pub fn from_name_and_index(name: StateVarName, index: StateIndex) -> StateRef {
-        match index {
-            StateIndex::Element(i) => StateRef::ArrayElement(name, i),
-            StateIndex::SizeOf => StateRef::SizeOf(name),
-            StateIndex::Basic => StateRef::Basic(name),
-        }
-    }
-}
-
-
-
-
-
 
 
 impl<T> Default for StateVarDefinition<T>
@@ -198,37 +72,6 @@ impl<T> Default for StateVarDefinition<T>
 }
 
 
-impl<T> Default for StateVarArrayDefinition<T>
-    where T: Default
-{
-    fn default() -> Self {
-        StateVarArrayDefinition {
-            return_array_dependency_instructions: |_| HashMap::new(),
-
-            return_element_dependency_instructions: |_, _| HashMap::new(),
-            determine_element_from_dependencies: |_, _| Ok(StateVarUpdateInstruction::SetValue(T::default())),
-            request_element_dependencies_to_update_value: |_, _, _| {
-                log!("DEFAULT REQUEST_ELEMENT_DEPENDENCIES_TO_UPDATE_VALUE DOES NOTHING");
-                HashMap::new()
-            },
-
-            return_size_dependency_instructions: |_| HashMap::new(),
-            determine_size_from_dependencies: |_| Ok(StateVarUpdateInstruction::SetValue(0)),
-            request_size_dependencies_to_update_value: |_, _| {
-                log!("DEFAULT REQUEST_SIZE_DEPENDENCIES_TO_UPDATE_VALUE DOES NOTHING");
-                HashMap::new()
-            },
-            for_renderer: false, 
-            initial_essential_element_value: T::default(),
-
-        }
-    }
-
-}
-
-
-
-
 
 
 /// Since `StateVarDefinition` is generic, this enum is needed to store one in a HashMap.
@@ -238,25 +81,7 @@ pub enum StateVarVariant {
     Boolean(StateVarDefinition<bool>),
     Number(StateVarDefinition<f64>),
     Integer(StateVarDefinition<i64>),
-    StringArray(StateVarArrayDefinition<String>),
-    NumberArray(StateVarArrayDefinition<f64>),
-    // Single(StateVarVariantSingle),
-    // Array(StateVarVariantArray),
 }
-
-// #[derive(Debug)]
-// pub enum StateVarVariantSingle {
-//     String(StateVarDefinition<String>),
-//     Boolean(StateVarDefinition<bool>),
-//     Number(StateVarDefinition<f64>),
-//     Integer(StateVarDefinition<i64>),
-// }
-
-
-// #[derive(Debug)]
-// pub enum StateVarVariantArray {
-//     NumberArray(StateVarArrayDefinition<f64>),
-// }
 
 
 /// This can contain the value of a state variable of any type,
@@ -286,19 +111,14 @@ pub enum DependencyInstruction {
         parse_into_expression: bool,
     },
     StateVar {
-        component_ref: Option<ComponentRefRelative>,
-        state_var: StateVarSlice,
-    },
-    CorrespondingElements {
-        component_ref: Option<ComponentRefRelative>,
-        array_state_var_name: StateVarName,
+        component_name: Option<ComponentName>,
+        state_var_name: StateVarName,
     },
     Parent {
-        state_var: StateVarName,
+        state_var_name: StateVarName,
     },
     Attribute {
         attribute_name: AttributeName,
-        index: StateIndex,
     },
     Essential {
         /// Use the string of this attribute
@@ -306,11 +126,6 @@ pub enum DependencyInstruction {
     },
 
 
-    // StateVarArrayDynamicElement {
-    //     component_name: ComponentName,
-    //     state_var: StateVarName,
-    //     index_state_var: StateRef,
-    // }
 }
 
 
@@ -694,8 +509,6 @@ impl StateVarVariant {
                 (def.return_dependency_instructions)(prerequisite_state_values),
             Self::Integer(def) =>
                 (def.return_dependency_instructions)(prerequisite_state_values),
-
-            _ => unreachable!(),
         }
     }
 
@@ -737,14 +550,11 @@ impl StateVarVariant {
                     SetValue(val) => SetValue(StateVarValue::Boolean(val)),
                 })
             },
-
-            _ => unreachable!(),
         }
     }
 
     pub fn request_dependencies_to_update_value(
         &self,
-        state_ref: &StateRef,
         desired_value: StateVarValue,
         dependency_sources: HashMap<InstructionName, Vec<(DependencySource, Option<StateVarValue>)>>
     ) -> Result<HashMap<InstructionName, Result<Vec<DependencyValue>, String>>, String> {
@@ -783,148 +593,9 @@ impl StateVarVariant {
                 ))
             },
 
-            Self::NumberArray(def) => {
-                match state_ref {
-                    StateRef::ArrayElement(_, i) => {
-                        Ok((def.request_element_dependencies_to_update_value)(
-                            *i,
-                            desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                                format!("Requested NumberArray element be updated to {:#?}", desired_value)
-                            )?,
-                            dependency_sources,
-                        ))
-                    },
-                    StateRef::SizeOf(_) => {
-                        Ok((def.request_size_dependencies_to_update_value)(
-                            desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                                format!("Requested NumberArray size be updated to {:#?}", desired_value)
-                            )?,
-                            dependency_sources,
-                        ))
-                    }
-                    StateRef::Basic(_) => panic!("reference does not match definition"),
-                }
-            },
-
-            Self::StringArray(def) => {
-                match state_ref {
-                    StateRef::ArrayElement(_, i) => {
-                        Ok((def.request_element_dependencies_to_update_value)(
-                            *i,
-                            desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                                format!("Requested StringArray element be updated to {:#?}", desired_value)
-                            )?,
-                            dependency_sources,
-                        ))
-                    },
-                    StateRef::SizeOf(_) => {
-                        Ok((def.request_size_dependencies_to_update_value)(
-                            desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                                format!("Requested StringArray size be updated to {:#?}", desired_value)
-                            )?,
-                            dependency_sources,
-                        ))
-                    }
-                    StateRef::Basic(_) => panic!("reference does not match definition"),
-                }
-            },
 
         }       
     }
-
-
-
-    // Array specific functions
-
-    pub fn return_array_dependency_instructions(&self,
-        prereq_state_values: HashMap<StateVarName, StateVarValue>)
-         -> HashMap<InstructionName, DependencyInstruction> {
-
-        match self {
-            Self::NumberArray(def) => (def.return_array_dependency_instructions)(prereq_state_values),
-            Self::StringArray(def) => (def.return_array_dependency_instructions)(prereq_state_values),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn return_element_dependency_instructions(&self,
-        index: usize,
-        prereq_state_values: HashMap<StateVarName, StateVarValue>)
-         -> HashMap<InstructionName, DependencyInstruction> {
-
-        match self {
-            Self::NumberArray(def) => (def.return_element_dependency_instructions)(index, prereq_state_values),
-            Self::StringArray(def) => (def.return_element_dependency_instructions)(index, prereq_state_values),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn return_size_dependency_instructions(&self,
-        prereq_state_values: HashMap<StateVarName, StateVarValue>)
-         -> HashMap<InstructionName, DependencyInstruction> {
-
-        match self {
-            Self::NumberArray(def) => (def.return_size_dependency_instructions)(prereq_state_values),
-            Self::StringArray(def) => (def.return_size_dependency_instructions)(prereq_state_values),
-            _ => unreachable!(),
-        }
-    }
-
-    
-    pub fn determine_size_from_dependencies(&self,
-        dependency_values: HashMap<InstructionName, Vec<DependencyValue>>
-    ) -> Result<StateVarUpdateInstruction<StateVarValue>, String> {
-
-        use StateVarUpdateInstruction::*;
-
-        match self {
-            Self::NumberArray(def) => {
-                let instruction = (def.determine_size_from_dependencies)(dependency_values)?;
-                Ok(match instruction {                    
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::Integer(val as i64)),
-                })
-            },
-            Self::StringArray(def) => {
-                let instruction = (def.determine_size_from_dependencies)(dependency_values)?;
-                Ok(match instruction {                    
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::Integer(val as i64)),
-                })
-            },
-
-            _ => unreachable!(),
-        }
-    }
-
-
-    pub fn determine_element_from_dependencies(&self,
-        id: usize, dependency_values: HashMap<InstructionName, Vec<DependencyValue>>
-    ) -> Result<StateVarUpdateInstruction<StateVarValue>, String> {
-
-        use StateVarUpdateInstruction::*;
-
-        match self {
-            Self::NumberArray(def) => {
-                let instruction = (def.determine_element_from_dependencies)(id, dependency_values)?;
-                Ok(match instruction {                    
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::Number(val)),
-                })
-            },
-            Self::StringArray(def) => {
-                let instruction = (def.determine_element_from_dependencies)(id, dependency_values)?;
-                Ok(match instruction {                    
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::String(val)),
-                })
-            },
-
-            _ => unreachable!(),
-        }
-    }
-
-
 
 
 
@@ -938,8 +609,6 @@ impl StateVarVariant {
             Self::Integer(def) => StateVarValue::Integer(def.initial_essential_value),
             Self::Number(def) =>  StateVarValue::Number(def.initial_essential_value),
             Self::Boolean(def) => StateVarValue::Boolean(def.initial_essential_value),
-            Self::NumberArray(def) => StateVarValue::Number(def.initial_essential_element_value),
-            Self::StringArray(def) => StateVarValue::String(def.initial_essential_element_value.clone()),
         }
     }
 
@@ -950,40 +619,13 @@ impl StateVarVariant {
             Self::Integer(def) => def.for_renderer,
             Self::Number(def) =>  def.for_renderer,
             Self::Boolean(def) => def.for_renderer,
-            Self::NumberArray(def) => def.for_renderer,
-            Self::StringArray(def) => def.for_renderer,
         }
     }
 
 
-    pub fn is_array(&self) -> bool {
-        match self {
-            Self::NumberArray(_) |
-            Self::StringArray(_) => true,
-            _ => false,
-        }
-    }
 
 }
 
 
 
 
-
-impl Display for StateRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Basic(sv_name) => write!(f, "{}", sv_name),
-            Self::SizeOf(sv_name) => write!(f, "{}(size)", sv_name),
-            Self::ArrayElement(sv_name, i) => write!(f, "{}[{}]", sv_name, i),
-        }
-    }
-}
-impl Display for StateVarSlice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Single(sv_ref) => write!(f, "{}", sv_ref),
-            Self::Array(sv_name) => write!(f, "{}(array)", sv_name),
-        }
-    }
-}

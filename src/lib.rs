@@ -88,9 +88,9 @@ impl PublicDoenetCore {
 
 
 
-    pub fn handle_action(&self, action: &str) -> String {
+    pub fn handle_action(&mut self, action: &str) -> String {
 
-        let completed_action_id = doenet_core::handle_action_from_json(&self.0, action);
+        let completed_action_id = doenet_core::handle_action_from_json(&mut self.0, action);
         completed_action_id
     }
 

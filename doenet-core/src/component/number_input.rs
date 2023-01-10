@@ -24,16 +24,16 @@ lazy_static! {
             return_dependency_instructions: |_|
                 HashMap::from([
                     ("last", DependencyInstruction::StateVar {
-                        component_ref: None,
-                        state_var: StateVarSlice::Single(StateRef::Basic("lastValue")),
+                        component_name: None,
+                        state_var_name: "lastValue",
                     }),
                     ("immediate", DependencyInstruction::StateVar {
-                        component_ref: None,
-                        state_var: StateVarSlice::Single(StateRef::Basic("immediateValue")),
+                        component_name: None,
+                        state_var_name: "immediateValue",
                     }),
                     ("sync", DependencyInstruction::StateVar {
-                        component_ref: None,
-                        state_var: StateVarSlice::Single(StateRef::Basic("syncImmediateValue")),
+                        component_name: None,
+                        state_var_name: "syncImmediateValue",
                     }),
                 ]),
             determine_state_var_from_dependencies: |dependency_values| {
@@ -84,8 +84,8 @@ lazy_static! {
             return_dependency_instructions: |_| {
                 HashMap::from([
                     ("string", DependencyInstruction::StateVar {
-                        component_ref: None,
-                        state_var: StateVarSlice::Single(StateRef::Basic("rawRendererValue")),
+                        component_name: None,
+                        state_var_name: "rawRendererValue",
                     }),
                     // ("sync", DependencyInstruction::StateVar {
                     //     component_ref: None,
@@ -216,20 +216,20 @@ lazy_static! {
                     let new_val = args.get("text").expect("No text argument").first().unwrap();
 
                     vec![
-                        (StateRef::Basic("rawRendererValue"), new_val.clone()),
-                        (StateRef::Basic("syncImmediateValue"), StateVarValue::Boolean(false)),
+                        ("rawRendererValue", new_val.clone()),
+                        ("syncImmediateValue", StateVarValue::Boolean(false)),
                     ]
                 },
 
                 "updateValue" => {
 
-                    let new_val = resolve_and_retrieve_state_var(&StateRef::Basic("immediateValue"))
+                    let new_val = resolve_and_retrieve_state_var(&"immediateValue")
                         .unwrap().try_into().unwrap();
                     let new_val = StateVarValue::Number(new_val);
 
                     vec![
-                        (StateRef::Basic("lastValue"), new_val),
-                        (StateRef::Basic("syncImmediateValue"), StateVarValue::Boolean(true)),
+                        ("lastValue", new_val),
+                        ("syncImmediateValue", StateVarValue::Boolean(true)),
                     ]
                 }
 

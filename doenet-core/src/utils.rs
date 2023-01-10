@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use crate::ComponentName;
 use crate::ComponentNode;
 use crate::DependencyKey;
-use crate::StateForStateVar;
+use crate::StateVar;
 use crate::Dependency;
 use crate::component::*;
-use crate::state::State;
 use crate::state_variables::StateVarName;
 use crate::state::EssentialStateVar;
 use crate::EssentialDataOrigin;
@@ -54,7 +53,7 @@ pub(crate) use log_debug;
 /// List components and children in a JSON array
 pub fn json_components(
     components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, HashMap<StateVarName, StateForStateVar>>
+    component_states: &HashMap<ComponentName, HashMap<StateVarName, StateVar>>
 ) -> Value {
 
     let json_components: Map<String, Value> = components
@@ -72,7 +71,7 @@ pub fn json_components(
 
 pub fn package_subtree_as_json(
     components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, HashMap<StateVarName, StateForStateVar>>,
+    component_states: &HashMap<ComponentName, HashMap<StateVarName, StateVar>>,
     component: &ComponentNode
 ) -> Value {
 
@@ -109,10 +108,6 @@ pub fn package_subtree_as_json(
             Some(CopySource::StateVar(component_slice_relative)) => Value::String(
                 format!("{:?}", component_slice_relative)
             ),
-            Some(CopySource::DynamicElement(source_name, math_expression, ..)) => Value::String(
-                format!("{:?} {:?}", source_name, math_expression)
-            ),
-            Some(CopySource::MapSources(sources_name)) => Value::String(sources_name.to_string()),
             None => Value::Null,
         });
 
@@ -128,41 +123,11 @@ pub fn package_subtree_as_json(
     for &state_var_name in component.definition.state_var_definitions.keys() {
 
         let state_for_state_var = component_state.get(state_var_name).unwrap();
-        match state_for_state_var {
-            StateForStateVar::Single(state_var) => {
-                my_json_props.insert(
-                    format!("sv: {}", state_var_name),
-                    serde_json::Value::Array(state_var.all_instances()
-                        .iter().map(|x| serde_json::Value::from(x)).collect())
-                );
-            },
+        my_json_props.insert(
+            format!("sv: {}", state_var_name),
+            serde_json::Value::from(state_for_state_var)
+        );
 
-
-            StateForStateVar::Array { size, elements, .. } => {
-                my_json_props.insert(
-
-                    format!("sv: {} size", state_var_name),
-        
-                    serde_json::Value::Array(size.all_instances()
-                        .iter().map(|x| serde_json::Value::from(x)).collect())
-                );
-
-                for (instance, elem) in elements.all_instances().iter().enumerate() {
-                    for (id, element) in elem.iter().enumerate() {
-                        my_json_props.insert(
-
-                            format!("sv ({}): {} element {}", instance, state_var_name, id),
-
-                            match element.get_state() {
-                                State::Resolved(value) => value.into(),
-                                State::Stale => Value::Null,
-                            }
-                        );
-                    }
-                }
-            }
-
-        }
     }
 
     Value::Object(my_json_props)

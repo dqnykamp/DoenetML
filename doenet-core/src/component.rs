@@ -1,5 +1,4 @@
-use crate::{CollectionMembers, ComponentRefRelative, ComponentRefStateRelative, ComponentNode, ComponentName, ComponentRefStateArrayRelative, ComponentRelative};
-use crate::math_expression::MathExpression;
+use crate::{ComponentRefState, ComponentName};
 use enum_as_inner::EnumAsInner;
 use serde::Serialize;
 use crate::state_variables::*;
@@ -15,17 +14,17 @@ pub mod boolean;
 pub mod p;
 pub mod number_input;
 pub mod boolean_input;
-pub mod sequence;
-pub mod graph;
-pub mod point;
-pub mod collect;
+// pub mod sequence;
+// pub mod graph;
+// pub mod point;
+// pub mod collect;
 pub mod section;
-pub mod line;
-pub mod map;
-pub mod template;
-pub mod sources;
-pub mod conditional_content;
-pub mod case;
+// pub mod line;
+// pub mod map;
+// pub mod template;
+// pub mod sources;
+// pub mod conditional_content;
+// pub mod case;
 pub mod _error;
 
 lazy_static! {
@@ -40,17 +39,17 @@ lazy_static! {
             &crate::p                  ::MY_COMPONENT_DEFINITION,
             &crate::number_input       ::MY_COMPONENT_DEFINITION,
             &crate::boolean_input      ::MY_COMPONENT_DEFINITION,
-            &crate::sequence           ::MY_COMPONENT_DEFINITION,
-            &crate::graph              ::MY_COMPONENT_DEFINITION,
-            &crate::point              ::MY_COMPONENT_DEFINITION,
-            &crate::collect            ::MY_COMPONENT_DEFINITION,
+            // &crate::sequence           ::MY_COMPONENT_DEFINITION,
+            // &crate::graph              ::MY_COMPONENT_DEFINITION,
+            // &crate::point              ::MY_COMPONENT_DEFINITION,
+            // &crate::collect            ::MY_COMPONENT_DEFINITION,
             &crate::section            ::MY_COMPONENT_DEFINITION,
-            &crate::line               ::MY_COMPONENT_DEFINITION,
-            &crate::map                ::MY_COMPONENT_DEFINITION,
-            &crate::template           ::MY_COMPONENT_DEFINITION,
-            &crate::sources            ::MY_COMPONENT_DEFINITION,
-            &crate::conditional_content::MY_COMPONENT_DEFINITION,
-            &crate::case               ::MY_COMPONENT_DEFINITION,
+            // &crate::line               ::MY_COMPONENT_DEFINITION,
+            // &crate::map                ::MY_COMPONENT_DEFINITION,
+            // &crate::template           ::MY_COMPONENT_DEFINITION,
+            // &crate::sources            ::MY_COMPONENT_DEFINITION,
+            // &crate::conditional_content::MY_COMPONENT_DEFINITION,
+            // &crate::case               ::MY_COMPONENT_DEFINITION,
             &crate::_error               ::MY_COMPONENT_DEFINITION,
         ];
 
@@ -64,11 +63,6 @@ pub type ComponentType = &'static str;
 
 /// camelCase
 pub type AttributeName = &'static str;
-
-/// camelCase
-pub type BatchName = &'static str;
-
-
 
 
 /// How a CopySource affects its component
@@ -96,10 +90,8 @@ pub type BatchName = &'static str;
 /// - If the component type has no primary input, a StateVar CopySource will not work.
 #[derive(Debug, Clone)]
 pub enum CopySource {
-    Component(ComponentRefRelative),
-    StateVar(ComponentRefStateRelative),
-    MapSources(ComponentRelative),
-    DynamicElement(ComponentRefStateArrayRelative, MathExpression, Vec<ComponentName>),
+    Component(ComponentName),
+    StateVar(ComponentRefState),
 }
 
 
@@ -127,15 +119,15 @@ pub struct ComponentDefinition {
 
     pub static_attribute_names: Vec<AttributeName>,
 
-    pub array_aliases: HashMap<&'static str, StateRef>,
+    pub array_aliases: HashMap<&'static str, StateVarName>,
 
     /// Process an action and return the state variables to change.
     /// The update requests will be processed in the order returned.
     pub on_action: for<'a> fn(
         action_name: &str,
         args: HashMap<String, Vec<StateVarValue>>,
-        resolve_and_retrieve_state_var: &'a dyn Fn(&'a StateRef) -> Option<StateVarValue>
-    ) -> Vec<(StateRef, StateVarValue)>,
+        resolve_and_retrieve_state_var: &'a dyn Fn(&'a StateVarName) -> Option<StateVarValue>
+    ) -> Vec<(StateVarName, StateVarValue)>,
 
     pub should_render_children: bool,
 
@@ -154,58 +146,13 @@ pub struct ComponentDefinition {
     /// If specified, the component's parent will treat this as multiple components.
     pub replacement_components: Option<ReplacementComponents>,
 
-    /// These collections that are not used as replacement children.
-    pub batches: HashMap<BatchName, BatchDefinition>,
-
     pub component_type: ComponentType,
 
 }
 
-/// A collection is a way to group several existing components of the same type under one component
-/// It is like a CopySource with multiple sources.
-pub struct CollectionDefinition {
-    pub collection_members: fn(
-        node: &ComponentNode,
-        component_nodes: &HashMap<ComponentName, ComponentNode>,
-    ) -> Vec<CollectionMembersOrCollection>,
-
-    pub member_definition: fn(
-        static_attributes: &HashMap<AttributeName, String>,
-    ) -> &'static ComponentDefinition,
-}
-
-pub enum CollectionMembersOrCollection {
-    Members(CollectionMembers),
-    Collection(ComponentRelative),
-}
-
-/// A batch is a way to make one component appear like several non-existent components
-/// For example, a <sequence> has a batch of <number> components which it sends to the renderer instead of itself.
-/// These non-existent components do not exist as ComponentNodes, and they don't have any ComponentState either.
-/// They derive all their state from the one actual component's state.
-// - ex: <line/> has a batch named "points"
-pub struct BatchDefinition {
-
-    /// Component definition of the batch members. All batch members share the same component type.
-    pub member_definition: &'static ComponentDefinition,
-
-    /// A reference to a state var which stores the number of members in this batch.
-    /// The numbers of members can change, so it needs to be stored as a state var.
-    pub size: StateRef,
-
-    /// Route a supposed state var of a member component to the actual component's state var
-    pub member_state_var:
-        for<'a> fn(
-            index: usize,
-            state_var_slice: &'a StateVarSlice,
-            // state_var_resolver: &'a dyn Fn(&'a StateRef) -> Option<StateVarValue>,
-        ) -> Option<StateVarSlice>,
-}
 
 
 pub enum ReplacementComponents {
-    Collection(CollectionDefinition),
-    Batch(BatchDefinition),
     // Unlike the previous, Children cannot form a component group
     // because they may be of different types.
     Children,
@@ -213,34 +160,15 @@ pub enum ReplacementComponents {
 
 
 impl ComponentDefinition {
-    pub fn unwrap_batch_def(&self, name: &Option<BatchName>) -> &BatchDefinition{
-        match name {
-            Some(n) => self.batches.get(n).unwrap(),
-            None => match &self.replacement_components {
-                Some(ReplacementComponents::Batch(def)) => def,
-                _ => panic!(),
-            }
-        }
-        
-    }
-    pub fn unwrap_collection_def(&self) -> &CollectionDefinition {
-        match &self.replacement_components {
-            Some(ReplacementComponents::Collection(def)) => def,
-            _ => panic!(),
-        }
-    }
-
 
     /// Returns component definition of members, or itself if there are no replacement components
     /// Pass the static_attributes as a parameter
     pub fn definition_as_replacement_children(
         &self,
-        static_attributes: &HashMap<AttributeName, String>,
+        _static_attributes: &HashMap<AttributeName, String>,
     ) -> Option<&ComponentDefinition> {
 
         match &self.replacement_components {
-            Some(ReplacementComponents::Batch(def))  => Some(def.member_definition),
-            Some(ReplacementComponents::Collection(def))  => Some((def.member_definition)(static_attributes)),
             Some(ReplacementComponents::Children)  => None,
             None  => Some(self),
         }        
@@ -249,24 +177,13 @@ impl ComponentDefinition {
     pub fn component_profile_match(
         &self,
         desired_profiles: &Vec<ComponentProfile>,
-    ) -> Option<StateVarSlice> {
+    ) -> Option<StateVarName> {
         for profile in self.component_profiles.iter() {
             if desired_profiles.contains(&profile.0) {
 
                 let profile_state_var = profile.1;
 
-                let sv_def = self
-                    .state_var_definitions
-                    .get(&profile_state_var)
-                    .unwrap();
-
-                let profile_sv_slice = if sv_def.is_array() {
-                    StateVarSlice::Array(profile_state_var)
-                } else {
-                    StateVarSlice::Single(StateRef::Basic(profile_state_var))
-                };
-
-                return Some(profile_sv_slice);
+                return Some(profile_state_var);
             }
         }
         None
@@ -298,7 +215,6 @@ impl Default for ComponentDefinition {
             action_names: || Vec::new(),
             on_action: |_, _, _| vec![],
             replacement_components: None,
-            batches: HashMap::new(),
             component_type: "default_invalid",
         }
     }

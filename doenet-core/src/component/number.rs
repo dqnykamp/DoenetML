@@ -59,8 +59,8 @@ lazy_static! {
 
             return_dependency_instructions: |_| {
                 let instruction = DependencyInstruction::StateVar {
-                    component_ref: None,
-                    state_var: StateVarSlice::Single(StateRef::Basic("value")),
+                    component_name: None,
+                    state_var_name: "value",
                 };
             
                 HashMap::from([("value_sv", instruction)]) 

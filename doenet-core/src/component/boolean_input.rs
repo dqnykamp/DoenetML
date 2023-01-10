@@ -62,7 +62,7 @@ lazy_static! {
                     let new_val = args.get("boolean").expect("No boolean argument").first().unwrap();
 
                     vec![(
-                        StateRef::Basic("value"),
+                        "value",
                         new_val.clone()
                     )]
                 }

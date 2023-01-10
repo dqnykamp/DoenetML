@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{state_variables::*, math_expression::MathExpression, utils::{log_debug, log}, component::{CollectionMembersOrCollection, ReplacementComponents}, CollectionMembers};
+use crate::{state_variables::*, math_expression::MathExpression, utils::{log}};
 
 
 
@@ -15,7 +15,6 @@ macro_rules! number_definition_from_attribute {
                 return_dependency_instructions: |_| {
                     let attribute = DependencyInstruction::Attribute{
                         attribute_name: $attribute,
-                        index: crate::state_variables::StateIndex::Basic,
                     };
                     HashMap::from([("attribute", attribute)])
                 },
@@ -63,7 +62,6 @@ macro_rules! integer_definition_from_attribute {
                 return_dependency_instructions: |_| {
                     let attribute = DependencyInstruction::Attribute{
                         attribute_name: $attribute,
-                        index: crate::state_variables::StateIndex::Basic,
                     };
                     HashMap::from([("attribute", attribute)])
                 },
@@ -97,67 +95,6 @@ macro_rules! integer_definition_from_attribute {
 }
 pub(crate) use integer_definition_from_attribute;
 
-macro_rules! number_array_definition_from_attribute {
-    ( $attribute:expr, $default:expr, $default_size:expr) => {
-        {
-            StateVarVariant::NumberArray(StateVarArrayDefinition {
-
-                initial_essential_element_value: $default,
-
-                return_element_dependency_instructions: |i, _| {
-                    let attribute = DependencyInstruction::Attribute{
-                        attribute_name: $attribute,
-                        index: crate::state_variables::StateIndex::Element(i),
-                    };
-                    HashMap::from([("attribute", attribute)])
-                },
-
-                determine_element_from_dependencies: |_, dependency_values| {
-                    let (attribute, _) = dependency_values.dep_value("attribute")?;
-                    if attribute.len() > 0 {
-
-                        match DETERMINE_NUMBER(attribute) {
-                            Ok(x) => Ok(SetValue(x)),
-                            Err(msg) => {
-                                crate::utils::log!("Error determing number: {}", msg);
-                                Ok(SetValue(f64::NAN))
-                            },
-                        }
-                    } else {
-                        Ok ( crate::state_variables::StateVarUpdateInstruction::SetValue($default) )
-                    }
-                },
-
-                return_size_dependency_instructions: |_| {
-                    let attribute = DependencyInstruction::Attribute{
-                        attribute_name: $attribute,
-                        index: crate::state_variables::StateIndex::SizeOf,
-                    };
-                    HashMap::from([("attribute", attribute)])
-                },
-
-                determine_size_from_dependencies: |dependency_values| {
-                    let size_value = dependency_values.dep_value("attribute")?
-                        .has_exactly_one_element()?
-                        .into_number()?;
-
-                    Ok(SetValue(size_value as usize))
-                },
-
-                request_element_dependencies_to_update_value: |_, desired_value, sources| {
-                    let attribute_sources = sources.get("attribute")
-                        .expect("No instruction named 'attribute'");
-                    HashMap::from([
-                        ("attribute", DETERMINE_NUMBER_DEPENDENCIES(desired_value, attribute_sources))
-                    ])
-                },
-
-                ..Default::default()
-            })
-        }
-    }
-}
-pub(crate) use number_array_definition_from_attribute;
 
 macro_rules! boolean_definition_from_attribute {
     ( $attribute:expr, $default:expr ) => {
@@ -170,7 +107,6 @@ macro_rules! boolean_definition_from_attribute {
                 return_dependency_instructions: |_| {
                     let attribute = DependencyInstruction::Attribute{
                         attribute_name: $attribute,
-                        index: crate::state_variables::StateIndex::Basic,
                     };
                     HashMap::from([("attribute", attribute)])
                 },
@@ -207,7 +143,6 @@ macro_rules! string_definition_from_attribute {
                 return_dependency_instructions: |_| {
                     let attribute = DependencyInstruction::Attribute{
                         attribute_name: $attribute,
-                        index: crate::state_variables::StateIndex::Basic,
                     };
                     HashMap::from([("attribute", attribute)])
                 },
@@ -397,11 +332,10 @@ pub fn HIDDEN_DEFAULT_DEFINITION() -> StateVarVariant {
         return_dependency_instructions: |_| {
             HashMap::from([
                 ("parent_hidden", DependencyInstruction::Parent {
-                    state_var: "hidden",
+                    state_var_name: "hidden",
                 }),
                 ("my_hide", DependencyInstruction::Attribute {
                     attribute_name: "hide",
-                    index: crate::state_variables::StateIndex::Basic,
                 }),
             ])
         },
@@ -440,8 +374,8 @@ pub fn TEXT_DEFAULT_DEFINITION() -> StateVarVariant {
 
         return_dependency_instructions: |_| {        
             HashMap::from([("value_of_value", DependencyInstruction::StateVar {
-                component_ref: None,
-                state_var: StateVarSlice::Single(StateRef::Basic("value"))
+                component_name: None,
+                state_var_name: "value"
             })])
         },
 
@@ -733,42 +667,19 @@ pub fn DETERMINE_STRING(dependency_values: Vec<DependencyValue>)
 }
 
 
-pub fn members_from_children_of_type(
-    component_nodes: &HashMap<crate::ComponentName, crate::ComponentNode>,
-    node: &crate::ComponentNode,
-    component_type: crate::ComponentType,
-) -> Vec<CollectionMembersOrCollection> {
-    get_children_of_type(component_nodes, node, component_type, true).map(|c|
-        match c.definition.replacement_components {
-            Some(ReplacementComponents::Batch(_)) =>
-                CollectionMembersOrCollection::Members(CollectionMembers::Batch(crate::ComponentRelative::same_instance(c.name.clone()))),
-            Some(ReplacementComponents::Collection(_)) =>
-                CollectionMembersOrCollection::Collection(crate::ComponentRelative::same_instance(c.name.clone())),
-            Some(ReplacementComponents::Children) =>
-                todo!(),
-            None => CollectionMembersOrCollection::Members(CollectionMembers::Component(crate::ComponentRelative::same_instance(c.name.clone()))),
-        }
-    ).collect()
-}
 
 pub fn get_children_of_type<'a>(
     component_nodes: &'a HashMap<crate::ComponentName, crate::ComponentNode>,
     node: &'a crate::ComponentNode,
     component_type: crate::ComponentType,
-    include_groups: bool,
+    _include_groups: bool,
 ) -> impl Iterator<Item=&'a crate::ComponentNode> {
     crate::get_child_nodes_including_copy(component_nodes, node).into_iter().filter_map(move |(n, _)|
         match n {
             crate::component::ObjectName::String(_) => None,
             crate::component::ObjectName::Component(c) => {
                 let comp = component_nodes.get(c).unwrap();
-                let child_type = match (include_groups, &comp.definition.replacement_components) {
-                    (true, Some(ReplacementComponents::Collection(def))) =>
-                        (def.member_definition)(&node.static_attributes).component_type,
-                    (true, Some(ReplacementComponents::Batch(def))) =>
-                        def.member_definition.component_type,
-                    _ => comp.definition.component_type,
-                };
+                let child_type = comp.definition.component_type;
                 (child_type.to_lowercase() == component_type.to_lowercase())
                     .then(|| component_nodes.get(c).unwrap())
             },

@@ -1,9 +1,9 @@
 use serde::{Serialize, Deserialize};
 
-use crate::utils::{log_json, log_debug, log};
+use crate::utils::{log_json, log};
 use crate::{Action, ComponentName};
 use crate::component::{COMPONENT_DEFINITIONS, ComponentType, ComponentDefinition,
-KeyValueIgnoreCase, AttributeName, ObjectName, ReplacementComponents};
+KeyValueIgnoreCase, AttributeName, ObjectName };
 
 use crate::ComponentChild;
 use lazy_static::lazy_static;
@@ -1018,51 +1018,23 @@ fn macro_comp_ref(
     let source_def_option;
 
     if char_at(comp_match.end()) == Some('[') {
-        // group member
-        let index_match = regex_at(&INDEX, string, comp_match.end() + 1).map_err(|err| (err, comp_match.end(), false))?;
-        let index_str = index_match.as_str();
-        let index_end: usize;
-        if index_str == "$" {
-            // dynamic component index
-            panic!("dynamic component index not implemented");
-        } else {
-            // static component index
-            component_index = vec![ObjectName::String(index_str.trim().to_string())];
-            index_end = index_match.end();
-        }
-        let close_bracket_match = regex_at(&INDEX_END, string, index_end).map_err(|err| (err, comp_match.end(), false))?;
-        comp_end = close_bracket_match.end();
+        // // group member
+        // let index_match = regex_at(&INDEX, string, comp_match.end() + 1).map_err(|err| (err, comp_match.end(), false))?;
+        // let index_str = index_match.as_str();
+        // let index_end: usize;
+        // if index_str == "$" {
+        //     // dynamic component index
+        //     unimplemented!("dynamic component index not implemented");
+        // } else {
+        //     // static component index
+        //     component_index = vec![ObjectName::String(index_str.trim().to_string())];
+        //     index_end = index_match.end();
+        // }
+        // let close_bracket_match = regex_at(&INDEX_END, string, index_end).map_err(|err| (err, comp_match.end(), false))?;
+        // comp_end = close_bracket_match.end();
 
-        source_def_option = match source_component_option {
-            Some(source_component) => match (None, &source_component.definition.replacement_components) {
-                (Some(key), _) => {
-                    Some(source_component.definition.batches
-                        .get_key_value_ignore_case(key).unwrap().1
-                        .member_definition)
-                },
-                (None, Some(ReplacementComponents::Batch(def)))  => Some(def.member_definition),
-                (None, Some(ReplacementComponents::Collection(def)))  => Some((def.member_definition)(&source_component.static_attributes)),
-                (None, _)  => {
-                    if !found_error {
-                        found_error = true;
-                        error_message = "index of non-group".to_string();
+        unimplemented!("Have not implemented array index");
 
-                        let doenetml_range = match start_doenetml_ind {
-                            Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + comp_end}),
-                            None => RangeInDoenetML::None
-                        };
-                        warnings_encountered.push(DoenetMLWarning::InvalidArrayIndex {
-                            comp_name: copy_source.to_string(),
-                            sv_name: None,
-                            array_index: index_str.trim().to_string(),
-                            doenetml_range,
-                        });
-                    }
-                    None
-                },
-            }
-            None => None
-        };
     } else {
         // no component index
         comp_end = comp_match.end();
@@ -1083,26 +1055,21 @@ fn macro_comp_ref(
             Some(source_def) => match source_def.state_var_definitions.get(prop) {
                 Some(v) => Some(v),
                 None => {
-                    match source_def.array_aliases.get(prop) {
-                        Some(array_def) => Some(source_def.state_var_definitions.get(array_def.name()).unwrap()),
-                        None => {
-                            if !found_error {
-                                found_error = true;
-                                error_message = format!("prop {} doesn't exist on {}", prop, source_def.component_type);
+                    if !found_error {
+                        found_error = true;
+                        error_message = format!("prop {} doesn't exist on {}", prop, source_def.component_type);
 
-                                let doenetml_range = match start_doenetml_ind {
-                                    Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + prop_match.end()}),
-                                    None => RangeInDoenetML::None
-                                };
-                                warnings_encountered.push(DoenetMLWarning::StateVarDoesNotExist {
-                                    comp_name: copy_source.to_string(),
-                                    sv_name: prop.to_string(),
-                                    doenetml_range,
-                                });
-                            }
-                            None
-                        }
+                        let doenetml_range = match start_doenetml_ind {
+                            Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + prop_match.end()}),
+                            None => RangeInDoenetML::None
+                        };
+                        warnings_encountered.push(DoenetMLWarning::StateVarDoesNotExist {
+                            comp_name: copy_source.to_string(),
+                            sv_name: prop.to_string(),
+                            doenetml_range,
+                        });
                     }
+                    None
                 }
             }
             None => None
@@ -1138,23 +1105,21 @@ fn macro_comp_ref(
             let close_bracket_match = regex_at(&INDEX_END, string, index_end).map_err(|err| (err, comp_end, false))?;
             macro_end = close_bracket_match.end();
 
-            if let Some(variant) = variant_option {
-                if !variant.is_array() {
-                    if !found_error {
-                        found_error = true;
-                        error_message = format!("{}.{} cannot be indexed", copy_source, prop);
+            if let Some(_variant) = variant_option {
+                if !found_error {
+                    found_error = true;
+                    error_message = format!("{}.{} cannot be indexed", copy_source, prop);
 
-                        let doenetml_range = match start_doenetml_ind {
-                            Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + macro_end}),
-                            None => RangeInDoenetML::None
-                        };
-                        warnings_encountered.push(DoenetMLWarning::InvalidArrayIndex {
-                            comp_name: copy_source.to_string(),
-                            sv_name: Some(prop.to_string()),
-                            array_index: index_str.trim().to_string(),
-                            doenetml_range,
-                        });
-                    }
+                    let doenetml_range = match start_doenetml_ind {
+                        Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + macro_end}),
+                        None => RangeInDoenetML::None
+                    };
+                    warnings_encountered.push(DoenetMLWarning::InvalidArrayIndex {
+                        comp_name: copy_source.to_string(),
+                        sv_name: Some(prop.to_string()),
+                        array_index: index_str.trim().to_string(),
+                        doenetml_range,
+                    });
                 }
             }
         } else {
@@ -1241,9 +1206,7 @@ fn default_component_type_for_state_var(component: &StateVarVariant)
     match component {
         StateVarVariant::Boolean(_) => "boolean",
         StateVarVariant::Integer(_) => "number",
-        StateVarVariant::NumberArray(_) |
         StateVarVariant::Number(_) => "number",
-        StateVarVariant::StringArray(_) |
         StateVarVariant::String(_) => "text",
     }
 }
