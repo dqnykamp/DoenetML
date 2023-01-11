@@ -2,11 +2,10 @@ use std::collections::HashMap;
 
 use crate::ComponentName;
 use crate::ComponentNode;
-use crate::DependencyKey;
 use crate::StateVar;
 use crate::Dependency;
 use crate::component::*;
-use crate::state_variables::StateVarName;
+use crate::state_variables::{StateVarName,InstructionName};
 use crate::state::EssentialStateVar;
 use crate::EssentialDataOrigin;
 
@@ -150,18 +149,21 @@ pub fn package_subtree_as_json(
 
 
 pub fn json_dependencies<'a>(
-    dependencies: &'a HashMap<DependencyKey, Vec<Dependency>>,
+    dependencies: &'a HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
 ) -> HashMap<String, HashMap<String, &'a Vec<Dependency>>> {
 
     let mut display_deps = HashMap::new();
 
-    for (key, deps) in dependencies {
-        let DependencyKey(component, state_var, instruction_name) = key;
-        let display_key = format!("{}:{} \"{}\"", component, state_var, instruction_name);
 
-        display_deps.entry(component.clone()).or_insert(HashMap::new())
-            .entry(display_key).or_insert(deps.clone());
+    for (component_name, dependencies) in dependencies.iter() {
+        for (state_var_name, dependencies) in dependencies.iter() {
+            for (instruction_name, dependencies) in dependencies.iter() {
+                let display_key = format!("{}:{} \"{}\"", component_name, state_var_name, instruction_name);
 
+                display_deps.entry(component_name.clone()).or_insert(HashMap::new())
+                    .entry(display_key).or_insert(dependencies.clone());
+            }
+        }
     }
 
     display_deps

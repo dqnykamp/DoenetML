@@ -1,8 +1,8 @@
 use enum_as_inner::EnumAsInner;
-use serde::{Serialize};
+use serde::Serialize;
 
-use crate::{state_variables::*};
-use std::{cell::{RefCell}, fmt};
+use crate::state_variables::*;
+use std::{cell::RefCell, fmt};
 use self::State::*;
 
 #[derive(Clone)]
@@ -31,15 +31,17 @@ enum ValueTypeProtector {
 
 #[derive(Debug, Clone, PartialEq, EnumAsInner)]
 pub enum State<T> {
+    Fresh(T),
     Stale,
-    Resolved(T),
+    Unresolved,
 }
 
 impl From<&StateVar> for serde_json::Value {
     fn from(state: &StateVar) -> serde_json::Value {
         match state.get_state() {
-            State::Resolved(value) => value.into(),
+            State::Fresh(value) => value.into(),
             State::Stale => serde_json::Value::Null,
+            State::Unresolved => serde_json::Value::Null,
         }
     }
 }
@@ -91,32 +93,30 @@ impl StateVar {
 
         match type_protector {
             ValueTypeProtector::String(value_option) => match value_option {
-                Resolved(val) => Resolved(StateVarValue::String(val.clone())),
-                Stale => Stale
+                Fresh(val) => Fresh(StateVarValue::String(val.clone())),
+                Stale => Stale,
+                Unresolved => Unresolved
             },
             ValueTypeProtector::Number(value_option) => match value_option {
-                Resolved(val) => Resolved(StateVarValue::Number(val.clone())),
-                Stale => Stale
+                Fresh(val) => Fresh(StateVarValue::Number(val.clone())),
+                Stale => Stale,
+                Unresolved => Unresolved
             },
             ValueTypeProtector::Boolean(value_option) => match value_option {
-                Resolved(val) => Resolved(StateVarValue::Boolean(val.clone())),
-                Stale => Stale
+                Fresh(val) => Fresh(StateVarValue::Boolean(val.clone())),
+                Stale => Stale,
+                Unresolved => Unresolved
             },
             ValueTypeProtector::Integer(value_option) => match value_option {
-                Resolved(val) => Resolved(StateVarValue::Integer(val.clone())),
-                Stale => Stale
+                Fresh(val) => Fresh(StateVarValue::Integer(val.clone())),
+                Stale => Stale,
+                Unresolved => Unresolved
             }
         }
     }
 
 
 
-    pub fn copy_value_if_resolved(&self) -> Option<StateVarValue> {
-        match self.get_state() {
-            State::Resolved(value) => Some(value),
-            State::Stale => None,
-        }
-    }
 }
 
 
@@ -172,16 +172,16 @@ impl ValueTypeProtector {
 
         match self {
             ValueTypeProtector::String(state) => {                
-                *state = Resolved(new_value.clone().try_into()?);
+                *state = Fresh(new_value.clone().try_into()?);
             },
             ValueTypeProtector::Integer(state) => {
-                *state = Resolved(new_value.clone().try_into()?);
+                *state = Fresh(new_value.clone().try_into()?);
             },
             ValueTypeProtector::Number(state) => {
-                *state = Resolved(new_value.clone().try_into()?);
+                *state = Fresh(new_value.clone().try_into()?);
             },
             ValueTypeProtector::Boolean(state) => {
-                *state = Resolved(new_value.clone().try_into()?);
+                *state = Fresh(new_value.clone().try_into()?);
             }
         }
 

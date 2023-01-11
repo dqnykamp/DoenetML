@@ -11,6 +11,7 @@ use regex::Regex;
 
 use std::collections::HashMap;
 use std::fmt::Display;
+use instant::Instant;
 
 use crate::state_variables::*;
 
@@ -331,12 +332,12 @@ pub fn create_components_tree_from_json(program: &str)
         ), DoenetMLError> {
 
     // log!("Parsing string for component tree: {}", program);
+    let start = Instant::now();
 
     // This fails if there is a problem with the parser, not the input doenetML.
     // Panic - it's not a DoenetML error.
     let component_tree: Vec<ComponentOrString> = serde_json::from_str(program)
         .expect("Error extracting json");
-
 
     // TODO: if find a document child, shouldn't ignore all other children
 
@@ -356,7 +357,9 @@ pub fn create_components_tree_from_json(program: &str)
         });
 
     log_json!(format!("Parsed JSON into tree"), component_tree);
-
+    log!("parsed into tree: {:?}", start.elapsed());
+    let start = Instant::now();
+    
     let mut components: HashMap<ComponentName, MLComponent> = HashMap::new();
     let mut attributes: HashMap<ComponentName, HashMap<AttributeName, String>> = HashMap::new();
     let mut component_indices: HashMap<ComponentName, Option<String>> = HashMap::new();
@@ -381,6 +384,8 @@ pub fn create_components_tree_from_json(program: &str)
     )?;
 
     
+
+
     // Determine <sources>'s componentType static attribute, if not specified
     // TODO: <sources> inside <sources>
     // TODO: <sources> with copySource another <sources>
@@ -409,6 +414,8 @@ pub fn create_components_tree_from_json(program: &str)
     }
 
 
+    log!("created initial ML components: {:?}", start.elapsed());
+    let start = Instant::now();
 
     let (replacement_children, macro_components, attributes_parsed, prop_indices_parsed, component_indices_parsed) =
  
@@ -420,6 +427,11 @@ pub fn create_components_tree_from_json(program: &str)
             &map_sources_alias,
             &mut warnings_encountered,
         );
+
+
+    
+    log!("parsed attributes and macros: {:?}", start.elapsed());
+    let start = Instant::now();
 
     // log_debug!("Components to add from macros: {:#?}", components_to_add);
     // log_debug!("Replacement children {:#?}", replacement_children);
@@ -456,6 +468,13 @@ pub fn create_components_tree_from_json(program: &str)
     .chain(
         macro_components.into_iter().map(|c| (c.name.clone(), c))
     ).collect();
+
+
+
+    log!("added replacements to ML components: {:?}", start.elapsed());
+
+    // log!("ML components: {:#?}", components);
+
 
     Ok((components, attributes_parsed, root_component_name, map_sources_alias, warnings_encountered, errors_encountered))
 }

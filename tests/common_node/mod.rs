@@ -117,7 +117,7 @@
 
 //         },
 //         _ => {
-//             assert_eq!(State::Resolved(value), state, "Incorrect value from [{}]:[{}]", comp_name, sv_ref);
+//             assert_eq!(State::Fresh(value), state, "Incorrect value from [{}]:[{}]", comp_name, sv_ref);
 //         },
 //     }
 // }
@@ -201,7 +201,7 @@
 //     match state_value {
 //         StateForStateVar::Array { size, elements, .. } => {
 
-//             let size_value = if let State::Resolved(val) = size.instance(map).get_state() {
+//             let size_value = if let State::Fresh(val) = size.instance(map).get_state() {
 //                 let val: i64 = val.try_into().unwrap();
 //                 val as usize
 //             } else {
@@ -209,7 +209,7 @@
 //             };
 
 //             let state_values = elements.instance(map).iter().map(|elem| {
-//                 if let State::Resolved(elem_val) = elem.get_state() {
+//                 if let State::Fresh(elem_val) = elem.get_state() {
 //                     elem_val
 //                 } else {
 //                     panic!()
