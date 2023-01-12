@@ -9,7 +9,7 @@ use super::*;
 
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
 
         use StateVarUpdateInstruction::*;
 

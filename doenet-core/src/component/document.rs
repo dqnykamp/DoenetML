@@ -11,80 +11,80 @@ use super::*;
 
 lazy_static! {
 
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
         use StateVarUpdateInstruction::*;
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
         
-        state_var_definitions.insert("submitLabel", StateVarVariant::String(StateVarDefinition {
+        ("submitLabel", StateVarVariant::String(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue("Check Work".to_string())),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("submitLabelNoCorrectness", StateVarVariant::String(StateVarDefinition {
+        ("submitLabelNoCorrectness", StateVarVariant::String(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue("Submit Response".to_string())),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("hidden", StateVarVariant::Boolean(Default::default()));
+        ("hidden", StateVarVariant::Boolean(Default::default())),
 
-        state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());
+        ("disabled", DISABLED_DEFAULT_DEFINITION()),
 
-        state_var_definitions.insert("fixed", FIXED_DEFAULT_DEFINITION());
+        ("fixed", FIXED_DEFAULT_DEFINITION()),
 
-        // state_var_definitions.insert("titleChildName", StateVarVariant::String(StateVarDefinition {
+        // ("titleChildName", StateVarVariant::String(StateVarDefinition {
         //     determine_state_var_from_dependencies: |_| Ok(SetValue("Submit Response")),
         //     for_renderer: true,
         //     ..Default::default()
-        // })); 
+        // })),
 
         
-        state_var_definitions.insert("title", StateVarVariant::String(StateVarDefinition {
+        ("title", StateVarVariant::String(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue("".to_string())),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("level", StateVarVariant::Number(StateVarDefinition {
+        ("level", StateVarVariant::Number(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue(0.0)),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("justSubmitted", StateVarVariant::Boolean(StateVarDefinition {
+        ("justSubmitted", StateVarVariant::Boolean(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue(true)),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("showCorrectness", StateVarVariant::Boolean(StateVarDefinition {
+        ("showCorrectness", StateVarVariant::Boolean(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue(true)),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("creditAchieved", StateVarVariant::Number(StateVarDefinition {
+        ("creditAchieved", StateVarVariant::Number(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue(1.0)),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("createSubmitAllButton", StateVarVariant::Boolean(StateVarDefinition {
+        ("createSubmitAllButton", StateVarVariant::Boolean(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue(false)),
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
 
-        state_var_definitions.insert("suppressAnswerSubmitButtons", StateVarVariant::Boolean(StateVarDefinition {
+        ("suppressAnswerSubmitButtons", StateVarVariant::Boolean(StateVarDefinition {
             determine_state_var_from_dependencies: |_| Ok(SetValue(false)),
             for_renderer: true,
             ..Default::default()
-        }));        
+        })),
 
-        return state_var_definitions
+        ]
     };
 }
 
@@ -95,6 +95,8 @@ lazy_static! {
         component_type: "document",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![],
 

@@ -12,26 +12,23 @@ use crate::ComponentProfile;
 
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
         use StateVarUpdateInstruction::*;
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
         
-        state_var_definitions.insert("value", StateVarVariant::Number(StateVarDefinition {
+        ("value", StateVarVariant::Number(StateVarDefinition {
             for_renderer: true,
 
-            return_dependency_instructions: |_| {
-
-                HashMap::from([
-                    ("children", DependencyInstruction::Child {
-                        desired_profiles: vec![ComponentProfile::Number],
-                        parse_into_expression: true,
-                    }),
-                ])
-            },
+            dependency_instructions: vec![
+                DependencyInstruction::Child {
+                    desired_profiles: vec![ComponentProfile::Number],
+                    parse_into_expression: true,
+                }
+            ],
 
             determine_state_var_from_dependencies: |dependency_values| {
-                let (children, _) = dependency_values.dep_value("children")?;
+                let children = &dependency_values[0];
 
                 // let (expression, numerical_values) = split_dependency_values_into_math_expression_and_values(children)?;
 
@@ -45,31 +42,28 @@ lazy_static! {
             },
 
             request_dependencies_to_update_value: |desired_value, dependency_sources| {
-                let children_sources = dependency_sources.get("children").unwrap();
-                HashMap::from([
-                    ("children", DETERMINE_NUMBER_DEPENDENCIES(desired_value, children_sources))
-                ])
+                let children_sources = &dependency_sources[0];
+                vec![
+                    (0, DETERMINE_NUMBER_DEPENDENCIES(desired_value, children_sources))
+                ]
             },
 
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("text", StateVarVariant::String(StateVarDefinition {
+        ("text", StateVarVariant::String(StateVarDefinition {
             for_renderer: true,
 
-            return_dependency_instructions: |_| {
-                let instruction = DependencyInstruction::StateVar {
+            dependency_instructions: vec![
+                DependencyInstruction::StateVar {
                     component_name: None,
                     state_var_name: "value",
-                };
-            
-                HashMap::from([("value_sv", instruction)]) 
-            },
+                }
+            ],
 
             determine_state_var_from_dependencies: |dependency_values| {
 
-                let value: Option<f64> = dependency_values.dep_value("value_sv")?
-                    .has_zero_or_one_elements()?
+                let value: Option<f64> = dependency_values[0].get(0)
                     .into_if_exists()?;
 
                 Ok(SetValue(
@@ -79,12 +73,13 @@ lazy_static! {
             },
 
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
-        state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());
+        ("hidden", HIDDEN_DEFAULT_DEFINITION()),
+        ("disabled", DISABLED_DEFAULT_DEFINITION()),
 
-        return state_var_definitions
+        ]
+
     };
 }
 
@@ -95,13 +90,15 @@ lazy_static! {
         component_type: "number",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![
             "hide",
             "disabled",
         ],
 
-        primary_input_state_var: Some("value"),
+        primary_input_state_var_ind: Some(0),
 
         component_profiles: vec![
             (ComponentProfile::Number, "value"),

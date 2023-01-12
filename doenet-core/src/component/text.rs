@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::*;
 use crate::base_definitions::*;
 
@@ -11,38 +9,36 @@ use lazy_static::lazy_static;
 
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
         use StateVarUpdateInstruction::*;
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
 
-        state_var_definitions.insert("value",StateVarVariant::String(StateVarDefinition {
+            ("value",StateVarVariant::String(StateVarDefinition {
 
-            return_dependency_instructions: |_| {
-                let instruction = DependencyInstruction::Child {
+                dependency_instructions: vec![DependencyInstruction::Child {
                     desired_profiles: vec![ComponentProfile::Text],
                     parse_into_expression: false,
-                };
-            
-                HashMap::from([("children_value_svs", instruction)])
-            },
+                }],
+                
 
-            determine_state_var_from_dependencies: |dependency_values| {
-                let textlike_children = dependency_values.get("children_value_svs").unwrap();
-                DETERMINE_STRING(textlike_children.clone()).map(|x| SetValue(x))
-            },
+                determine_state_var_from_dependencies: |dependency_values| {
+                    let textlike_children = &dependency_values[0];
+                    DETERMINE_STRING(textlike_children).map(|x| SetValue(x))
+                },
 
-            ..Default::default()
-        }));
+                ..Default::default()
+            })),
 
 
-        state_var_definitions.insert("text", TEXT_DEFAULT_DEFINITION());
+            ("text", TEXT_DEFAULT_DEFINITION()),
 
-        state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
-        state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());
-        state_var_definitions.insert("fixed", FIXED_DEFAULT_DEFINITION());
+            ("hidden", HIDDEN_DEFAULT_DEFINITION()),
+            ("disabled", DISABLED_DEFAULT_DEFINITION()),
+            ("fixed", FIXED_DEFAULT_DEFINITION()),
 
-        return state_var_definitions
+        ]
+
     };
 }
 
@@ -54,13 +50,15 @@ lazy_static! {
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
 
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
+
         attribute_names: vec![
             "hide",
             "disabled",
             "fixed",
         ],
 
-        primary_input_state_var: Some("value"),
+        primary_input_state_var_ind: Some(0),
 
         component_profiles: vec![
             (ComponentProfile::Text, "value")

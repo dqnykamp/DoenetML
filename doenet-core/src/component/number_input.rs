@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use lazy_static::lazy_static;
 
+use crate::utils::{log};
+
 
 use super::*;
 use crate::base_definitions::*;
@@ -13,38 +15,34 @@ use crate::ComponentProfile;
 
 lazy_static! {
 
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
 
         use StateVarUpdateInstruction::*;
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
 
-        state_var_definitions.insert("value", StateVarVariant::Number(StateVarDefinition {
+        ("value", StateVarVariant::Number(StateVarDefinition {
             initial_essential_value: f64::NAN,
-            return_dependency_instructions: |_|
-                HashMap::from([
-                    ("last", DependencyInstruction::StateVar {
-                        component_name: None,
-                        state_var_name: "lastValue",
-                    }),
-                    ("immediate", DependencyInstruction::StateVar {
-                        component_name: None,
-                        state_var_name: "immediateValue",
-                    }),
-                    ("sync", DependencyInstruction::StateVar {
-                        component_name: None,
-                        state_var_name: "syncImmediateValue",
-                    }),
-                ]),
+            dependency_instructions: vec![
+                DependencyInstruction::StateVar {
+                    component_name: None,
+                    state_var_name: "lastValue",
+                },
+                DependencyInstruction::StateVar {
+                    component_name: None,
+                    state_var_name: "immediateValue",
+                },
+                DependencyInstruction::StateVar {
+                    component_name: None,
+                    state_var_name: "syncImmediateValue",
+                },
+            ],
             determine_state_var_from_dependencies: |dependency_values| {
-                let essential_value = dependency_values.dep_value("last")?
-                    .has_exactly_one_element()?
+                let essential_value = dependency_values[0][0]
                     .into_number()?;
-                let immediate_value = dependency_values.dep_value("immediate")?
-                    .has_exactly_one_element()?
+                let immediate_value = dependency_values[1][0]
                     .into_number()?;
-                let sync_values = dependency_values.dep_value("sync")?
-                    .has_exactly_one_element()?
+                let sync_values = dependency_values[2][0]
                     .into_bool()?;
 
                 let value: f64 =
@@ -56,56 +54,53 @@ lazy_static! {
                 Ok(SetValue(value))
             } ,
             request_dependencies_to_update_value: |desired_value, sources| {
-                HashMap::from([
-                    ("last", Ok(vec![
+                vec![
+                    (0, Ok(vec![
                         DependencyValue {
-                            source: sources.get("last").unwrap().first().unwrap().0.clone(),
+                            source: sources[0][0].0.clone(),
                             value: desired_value.clone().into(),
                         }
                     ])),
-                    ("sync", Ok(vec![
+                    (1, Ok(vec![
                         DependencyValue {
-                            source: sources.get("sync").unwrap().first().unwrap().0.clone(),
+                            source: sources[1][0].0.clone(),
+                            value: desired_value.clone().into(),
+                        }
+                    ])),
+                    (2, Ok(vec![
+                        DependencyValue {
+                            source: sources[2][0].0.clone(),
                             value: StateVarValue::Boolean(true),
                         }
                     ])),
-                    ("immediate", Ok(vec![
-                        DependencyValue {
-                            source: sources.get("immediate").unwrap().first().unwrap().0.clone(),
-                            value: desired_value.clone().into(),
-                        }
-                    ])),
-                ])
+                ]
             },
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("immediateValue", StateVarVariant::Number(StateVarDefinition {
-            return_dependency_instructions: |_| {
-                HashMap::from([
-                    ("string", DependencyInstruction::StateVar {
-                        component_name: None,
-                        state_var_name: "rawRendererValue",
-                    }),
-                    // ("sync", DependencyInstruction::StateVar {
-                    //     component_ref: None,
-                    //     state_var: StateVarSlice::Single(StateRef::Basic("syncImmediateValue")),
-                    // }),
-                ])
-            },
+        ("immediateValue", StateVarVariant::Number(StateVarDefinition {
+            dependency_instructions: vec![
+                DependencyInstruction::StateVar {
+                    component_name: None,
+                    state_var_name: "rawRendererValue",
+                },
+                // ("sync", DependencyInstruction::StateVar {
+                //     component_ref: None,
+                //     state_var: StateVarSlice::Single(StateRef::Basic("syncImmediateValue")),
+                // }),
+            ],
             determine_state_var_from_dependencies: |dependency_values| {
-                let string_value = dependency_values.dep_value("string")?
-                    .has_exactly_one_element()?
+                let string_value = dependency_values[0][0]
                     .into_string()?;
                 let value: f64 = string_value.parse().unwrap_or(f64::NAN);
 
                 Ok(SetValue(value))
             },
             request_dependencies_to_update_value: |desired_value, sources| {
-                HashMap::from([
-                    ("string", Ok(vec![
+                vec![
+                    (0, Ok(vec![
                         DependencyValue {
-                            source: sources.get("string").unwrap().first().unwrap().0.clone(),
+                            source: sources[0][0].0.clone(),
                             value: desired_value.to_string().into(),
                         }
                     ])),
@@ -115,69 +110,65 @@ lazy_static! {
                     //         value: StateVarValue::Boolean(false),
                     //     }
                     // ])),
-                ])
+                ]
             },
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("lastValue", StateVarVariant::Number(StateVarDefinition {
-             return_dependency_instructions: |_|
-                 HashMap::from([
-                     ("essential", DependencyInstruction::Essential { prefill: Some("prefill") }),
-                 ]),
+        ("lastValue", StateVarVariant::Number(StateVarDefinition {
+            dependency_instructions: vec![
+                DependencyInstruction::Essential { prefill: Some("prefill") }
+            ],
             determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
             request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
             initial_essential_value: f64::NAN,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("syncImmediateValue", StateVarVariant::Boolean(StateVarDefinition {
-            return_dependency_instructions: USE_ESSENTIAL_DEPENDENCY_INSTRUCTION,
+        ("syncImmediateValue", StateVarVariant::Boolean(StateVarDefinition {
+            dependency_instructions: USE_ESSENTIAL_DEPENDENCY_INSTRUCTION(),
             determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
             request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
             initial_essential_value: true,
             ..Default::default()
-        }));
+        })),
 
-         state_var_definitions.insert("rawRendererValue", StateVarVariant::String(StateVarDefinition {
+         ("rawRendererValue", StateVarVariant::String(StateVarDefinition {
              for_renderer: true,
-             return_dependency_instructions: |_|
-                 HashMap::from([
-                     ("essential", DependencyInstruction::Essential { prefill: Some("prefill") }),
-                 ]),
+             dependency_instructions: vec![
+                DependencyInstruction::Essential { prefill: Some("prefill") }
+            ],
              determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
              request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
              ..Default::default()
-         }));
+         })),
 
 
-        state_var_definitions.insert("expanded", StateVarVariant::Boolean(StateVarDefinition {
+        ("expanded", StateVarVariant::Boolean(StateVarDefinition {
             for_renderer: true,
             determine_state_var_from_dependencies: |_| Ok(SetValue(false)),
             ..Default::default()
             
-        }));
+        })),
 
-        state_var_definitions.insert("size", StateVarVariant::Number(StateVarDefinition {
-
-
+        ("size", StateVarVariant::Number(StateVarDefinition {
             determine_state_var_from_dependencies: |_| {
                 Ok(SetValue(10.0))
             },
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("width", StateVarVariant::Number(StateVarDefinition {
+        ("width", StateVarVariant::Number(StateVarDefinition {
             for_renderer: true,
             determine_state_var_from_dependencies: |_| Ok(SetValue(600.0)),
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
-        state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());
+        ("hidden", HIDDEN_DEFAULT_DEFINITION()),
+        ("disabled", DISABLED_DEFAULT_DEFINITION()),
 
-        return state_var_definitions
+        ]
     };
 
 
@@ -190,6 +181,8 @@ lazy_static! {
         component_type: "numberInput",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![
             "hide",
@@ -216,20 +209,20 @@ lazy_static! {
                     let new_val = args.get("text").expect("No text argument").first().unwrap();
 
                     vec![
-                        ("rawRendererValue", new_val.clone()),
-                        ("syncImmediateValue", StateVarValue::Boolean(false)),
+                        (4, new_val.clone()),
+                        (3, StateVarValue::Boolean(false)),
                     ]
                 },
 
                 "updateValue" => {
 
-                    let new_val = resolve_and_retrieve_state_var(&"immediateValue")
+                    let new_val = resolve_and_retrieve_state_var(1)
                         .unwrap().try_into().unwrap();
                     let new_val = StateVarValue::Number(new_val);
 
                     vec![
-                        ("lastValue", new_val),
-                        ("syncImmediateValue", StateVarValue::Boolean(true)),
+                        (2, new_val),
+                        (3, StateVarValue::Boolean(true)),
                     ]
                 }
 

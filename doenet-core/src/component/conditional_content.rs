@@ -6,7 +6,7 @@ use super::*;
 
 
 lazy_static!{
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
         let mut state_var_definitions = HashMap::new();
         state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
         state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());

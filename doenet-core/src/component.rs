@@ -13,7 +13,7 @@ pub mod document;
 pub mod boolean;
 pub mod p;
 pub mod number_input;
-pub mod boolean_input;
+// pub mod boolean_input;
 // pub mod sequence;
 // pub mod graph;
 // pub mod point;
@@ -38,7 +38,7 @@ lazy_static! {
             &crate::boolean            ::MY_COMPONENT_DEFINITION,
             &crate::p                  ::MY_COMPONENT_DEFINITION,
             &crate::number_input       ::MY_COMPONENT_DEFINITION,
-            &crate::boolean_input      ::MY_COMPONENT_DEFINITION,
+            // &crate::boolean_input      ::MY_COMPONENT_DEFINITION,
             // &crate::sequence           ::MY_COMPONENT_DEFINITION,
             // &crate::graph              ::MY_COMPONENT_DEFINITION,
             // &crate::point              ::MY_COMPONENT_DEFINITION,
@@ -106,7 +106,9 @@ pub enum ComponentProfile {
 
 /// The definition of a component type.
 pub struct ComponentDefinition {
-    pub state_var_definitions: &'static HashMap<StateVarName, StateVarVariant>,
+    pub state_var_definitions: &'static Vec<(StateVarName, StateVarVariant)>,
+
+    pub state_var_index_map: HashMap<StateVarName, usize>,
 
     /// An ordered list of which profiles this component fulfills, along with the name of the
     /// state variable that fulfills it.
@@ -126,8 +128,8 @@ pub struct ComponentDefinition {
     pub on_action: for<'a> fn(
         action_name: &str,
         args: HashMap<String, Vec<StateVarValue>>,
-        resolve_and_retrieve_state_var: &'a dyn Fn(&'a StateVarName) -> Option<StateVarValue>
-    ) -> Vec<(StateVarName, StateVarValue)>,
+        resolve_and_retrieve_state_var: &'a dyn Fn(usize) -> Option<StateVarValue>
+    ) -> Vec<(usize, StateVarValue)>,
 
     pub should_render_children: bool,
 
@@ -139,7 +141,7 @@ pub struct ComponentDefinition {
 
     /// The primary input is a state variable, except it gets overridden if 
     /// the component is being copied from another state var
-    pub primary_input_state_var: Option<StateVarName>,
+    pub primary_input_state_var_ind: Option<usize>,
 
     pub renderer_type: RendererType,
 
@@ -193,8 +195,8 @@ impl ComponentDefinition {
 
 use crate::lazy_static;
 lazy_static! {
-    static ref EMPTY_STATE_VARS: HashMap<StateVarName, StateVarVariant> = {
-        HashMap::new()
+    static ref EMPTY_STATE_VARS: Vec<(StateVarName, StateVarVariant)> = {
+        Vec::new()
     };
 }
 
@@ -203,13 +205,14 @@ impl Default for ComponentDefinition {
     fn default() -> Self {
         ComponentDefinition {
             state_var_definitions: &EMPTY_STATE_VARS,
+            state_var_index_map: HashMap::new(),
             attribute_names: Vec::new(),
             static_attribute_names: Vec::new(),
             array_aliases: HashMap::new(),
             should_render_children: false,
             display_errors: false,
             renderer_type: RendererType::Myself,
-            primary_input_state_var: None,
+            primary_input_state_var_ind: None,
             component_profiles: vec![],
             valid_children_profiles: ValidChildTypes::ValidProfiles(vec![]),
             action_names: || Vec::new(),
@@ -226,7 +229,7 @@ impl Debug for ComponentDefinition {
             .field("state_var_definitions", &self.state_var_definitions)
             .field("should_render_children", &self.should_render_children)
             .field("renderer_type", &self.renderer_type)
-            .field("primary_input_state_var", &self.primary_input_state_var)
+            .field("primary_input_state_var_ind", &self.primary_input_state_var_ind)
             .field("primary_output_traits", &self.component_profiles)
             .field("action_names", &(self.action_names)())
             .finish()

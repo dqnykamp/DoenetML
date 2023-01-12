@@ -1071,8 +1071,8 @@ fn macro_comp_ref(
         let prop = prop_match.as_str();
 
         let variant_option = match source_def_option {
-            Some(source_def) => match source_def.state_var_definitions.get(prop) {
-                Some(v) => Some(v),
+            Some(source_def) => match source_def.state_var_index_map.get(prop) {
+                Some(v) => Some(&source_def.state_var_definitions[*v].1),
                 None => {
                     if !found_error {
                         found_error = true;

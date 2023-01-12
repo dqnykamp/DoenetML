@@ -12,35 +12,33 @@ use crate::ComponentProfile;
 
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
         use StateVarUpdateInstruction::*;
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
         
-        state_var_definitions.insert("value", StateVarVariant::Boolean(StateVarDefinition {
+        ("value", StateVarVariant::Boolean(StateVarDefinition {
 
-            return_dependency_instructions: |_| {
-                let child_instruct = DependencyInstruction::Child {
+            dependency_instructions: vec![
+                DependencyInstruction::Child {
                     desired_profiles: vec![ComponentProfile::Boolean, ComponentProfile::Text],
 
                     parse_into_expression: true,
-                };
-
-                HashMap::from([("all_my_children", child_instruct)])
-            },
+                }
+            ],
 
             determine_state_var_from_dependencies: |dependency_values| {
-                let (children, _) = dependency_values.dep_value("all_my_children")?;
+                let children = &dependency_values[0];
                 DETERMINE_BOOLEAN(children).map(|x| SetValue(x))
             },
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
-        state_var_definitions.insert("text", TEXT_DEFAULT_DEFINITION());
+        ("hidden", HIDDEN_DEFAULT_DEFINITION()),
+        ("text", TEXT_DEFAULT_DEFINITION()),
 
-        return state_var_definitions
+        ]
     };
 }
 
@@ -51,12 +49,14 @@ lazy_static! {
         component_type: "boolean",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![
             "hide",
         ],
 
-        primary_input_state_var: Some("value"),
+        primary_input_state_var_ind: Some(0),
 
         component_profiles: vec![
             (ComponentProfile::Boolean, "value"),

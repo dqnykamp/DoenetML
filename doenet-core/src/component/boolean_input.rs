@@ -11,26 +11,24 @@ use crate::ComponentProfile;
 
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
 
-        let mut state_var_definitions = HashMap::new();
-
-        state_var_definitions.insert("value", StateVarVariant::Boolean(StateVarDefinition {
+        vec![
+            ("value", StateVarVariant::Boolean(StateVarDefinition {
         
-            return_dependency_instructions: USE_ESSENTIAL_DEPENDENCY_INSTRUCTION,
+            dependency_instructions: USE_ESSENTIAL_DEPENDENCY_INSTRUCTION,
             determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
             request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
 
             for_renderer: true,
 
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
+        ("hidden", HIDDEN_DEFAULT_DEFINITION()),
 
-        state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());
-
-        return state_var_definitions
+        ("disabled", DISABLED_DEFAULT_DEFINITION()),
+        ]
     };
 }
 
@@ -41,13 +39,15 @@ lazy_static! {
         component_type: "booleanInput",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![
             "hide",
             "disabled",
         ],
 
-        primary_input_state_var: Some("value"),
+        primary_input_state_var_ind: Some(0),
 
         component_profiles: vec![
             (ComponentProfile::Boolean, "value")
@@ -62,7 +62,7 @@ lazy_static! {
                     let new_val = args.get("boolean").expect("No boolean argument").first().unwrap();
 
                     vec![(
-                        "value",
+                        0,
                         new_val.clone()
                     )]
                 }

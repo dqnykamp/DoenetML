@@ -52,15 +52,15 @@ pub(crate) use log_debug;
 /// List components and children in a JSON array
 pub fn json_components(
     components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, HashMap<StateVarName, StateVar>>
+    component_states: &HashMap<ComponentName, Vec<StateVar>>
 ) -> Value {
 
     let json_components: Map<String, Value> = components
         .values()
         .map(|component| (component.name.to_string(),
                 package_subtree_as_json(
-                    &components,
-                    &&component_states,
+                    components,
+                    component_states,
                     component)))
         .collect();
 
@@ -70,7 +70,7 @@ pub fn json_components(
 
 pub fn package_subtree_as_json(
     components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, HashMap<StateVarName, StateVar>>,
+    component_states: &HashMap<ComponentName, Vec<StateVar>>,
     component: &ComponentNode
 ) -> Value {
 
@@ -119,9 +119,9 @@ pub fn package_subtree_as_json(
 
     let component_state = component_states.get(&component.name).unwrap();
 
-    for &state_var_name in component.definition.state_var_definitions.keys() {
+    for (state_var_name, state_var_ind) in component.definition.state_var_index_map.iter() {
 
-        let state_for_state_var = component_state.get(state_var_name).unwrap();
+        let state_for_state_var = &component_state[*state_var_ind];
         my_json_props.insert(
             format!("sv: {}", state_var_name),
             serde_json::Value::from(state_for_state_var)

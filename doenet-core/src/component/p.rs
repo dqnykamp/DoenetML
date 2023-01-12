@@ -9,14 +9,14 @@ use lazy_static::lazy_static;
 
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
 
-        state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
-        state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());
+        ("hidden", HIDDEN_DEFAULT_DEFINITION()),
+        ("disabled", DISABLED_DEFAULT_DEFINITION()),
 
-        return state_var_definitions
+        ]
     };
 }
 
@@ -27,6 +27,8 @@ lazy_static! {
         component_type: "p",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![
             "hide",

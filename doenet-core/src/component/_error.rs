@@ -8,30 +8,27 @@ use crate::ComponentProfile;
 use lazy_static::lazy_static;
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
         use StateVarUpdateInstruction::*;
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
 
-        state_var_definitions.insert("start_index", integer_definition_from_attribute!("start_index", 0));
-        state_var_definitions.insert("end_index", integer_definition_from_attribute!("end_index", 0));
+        ("start_index", integer_definition_from_attribute!("start_index", 0)),
+        ("end_index", integer_definition_from_attribute!("end_index", 0)),
 
-        state_var_definitions.insert(
+        (
             "message",
             StateVarVariant::String(StateVarDefinition {
-                return_dependency_instructions: |_| {
-                    let instruction = DependencyInstruction::Child {
+                dependency_instructions: vec![
+                    DependencyInstruction::Child {
                         desired_profiles: vec![ComponentProfile::Text],
                         parse_into_expression: false,
-                    };
+                    }
+                ],
 
-                    HashMap::from([("children_value_svs", instruction)])
-                },
 
                 determine_state_var_from_dependencies: |dependency_values| {
-                    let error_message = dependency_values.dep_value("children_value_svs")?
-                        .has_exactly_one_element()?
-                        .into_string()?;
+                    let error_message = dependency_values[0][0].into_string()?;
                     Ok(SetValue(error_message))
                 },
 
@@ -39,9 +36,9 @@ lazy_static! {
 
                 ..Default::default()
             }),
-        );
+        )
+        ]
 
-        return state_var_definitions;
     };
 }
 
@@ -50,6 +47,8 @@ lazy_static! {
         component_type: "_error",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![
             "start_index",

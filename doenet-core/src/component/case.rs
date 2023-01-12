@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 
 
 lazy_static! {
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
         let mut state_var_definitions = HashMap::new();
         state_var_definitions.insert("condition", boolean_definition_from_attribute!("condition", true));
 

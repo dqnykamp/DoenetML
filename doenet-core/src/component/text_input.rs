@@ -9,35 +9,28 @@ use crate::base_definitions::*;
 
 lazy_static! {
 
-    pub static ref MY_STATE_VAR_DEFINITIONS: HashMap<StateVarName, StateVarVariant> = {
+    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
 
         use StateVarUpdateInstruction::*;
 
-        let mut state_var_definitions = HashMap::new();
+        vec![
 
-        state_var_definitions.insert("value", StateVarVariant::String(StateVarDefinition {
-            return_dependency_instructions: |_|
-                HashMap::from([
-                    ("essential", DependencyInstruction::Essential { prefill: Some("prefill") }),
-                    ("immediate", DependencyInstruction::StateVar {
-                        component_name: None,
-                        state_var_name: "immediateValue",
-                    }),
-                    ("sync", DependencyInstruction::StateVar {
-                        component_name: None,
-                        state_var_name: "syncImmediateValue",
-                    }),
-                ]),
+        ("value", StateVarVariant::String(StateVarDefinition {
+            dependency_instructions: vec![
+                DependencyInstruction::Essential { prefill: Some("prefill") },
+                DependencyInstruction::StateVar {
+                    component_name: None,
+                    state_var_name: "immediateValue",
+                },
+                DependencyInstruction::StateVar {
+                    component_name: None,
+                    state_var_name: "syncImmediateValue",
+                },
+            ],
             determine_state_var_from_dependencies: |dependency_values| {
-                let essential_value = dependency_values.dep_value("essential")?
-                    .has_exactly_one_element()?
-                    .into_string()?;
-                let immediate_value = dependency_values.dep_value("immediate")?
-                    .has_exactly_one_element()?
-                    .into_string()?;
-                let sync_values = dependency_values.dep_value("sync")?
-                    .has_exactly_one_element()?
-                    .into_bool()?;
+                let essential_value = dependency_values[0][0].into_string()?;
+                let immediate_value = dependency_values[1][0].into_string()?;
+                let sync_values = dependency_values[2][0].into_bool()?;
 
                 let value =
                     if sync_values {
@@ -48,58 +41,57 @@ lazy_static! {
                 Ok(SetValue(value))
             } ,
             request_dependencies_to_update_value: |desired_value, sources| {
-                HashMap::from([
-                    ("essential", Ok(vec![
+                vec![
+                    (0, Ok(vec![
                         DependencyValue {
-                            source: sources.get("essential").unwrap().first().unwrap().0.clone(),
+                            source: sources[0][0].0.clone(),
                             value: desired_value.clone().into(),
                         }
                     ])),
-                    ("sync", Ok(vec![
+                    (1, Ok(vec![
                         DependencyValue {
-                            source: sources.get("sync").unwrap().first().unwrap().0.clone(),
-                            value: StateVarValue::Boolean(true),
-                        }
-                    ])),
-                    ("immediate", Ok(vec![
-                        DependencyValue {
-                            source: sources.get("immediate").unwrap().first().unwrap().0.clone(),
+                            source: sources[1][0].0.clone(),
                             value: desired_value.into(),
                         }
                     ])),
-                ])
+                    (2, Ok(vec![
+                        DependencyValue {
+                            source: sources[2][0].0.clone(),
+                            value: StateVarValue::Boolean(true),
+                        }
+                    ])),
+                ]
             },
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("immediateValue", StateVarVariant::String(StateVarDefinition {
+        ("immediateValue", StateVarVariant::String(StateVarDefinition {
             for_renderer: true,
-            return_dependency_instructions: |_|
-                HashMap::from([
-                    ("essential", DependencyInstruction::Essential { prefill: Some("prefill") }),
-                ]),
+            dependency_instructions: vec![
+                DependencyInstruction::Essential { prefill: Some("prefill") },
+            ],
             determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
             request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("syncImmediateValue", StateVarVariant::Boolean(StateVarDefinition {
-            return_dependency_instructions: USE_ESSENTIAL_DEPENDENCY_INSTRUCTION,
+        ("syncImmediateValue", StateVarVariant::Boolean(StateVarDefinition {
+            dependency_instructions: USE_ESSENTIAL_DEPENDENCY_INSTRUCTION(),
             determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
             request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
             initial_essential_value: true,
             ..Default::default()
-        }));
+        })),
 
 
 
-        state_var_definitions.insert("expanded", StateVarVariant::Boolean(StateVarDefinition {
+        ("expanded", StateVarVariant::Boolean(StateVarDefinition {
             for_renderer: true,
             determine_state_var_from_dependencies: |_| Ok(SetValue(false)),
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("size", StateVarVariant::Number(StateVarDefinition {
+        ("size", StateVarVariant::Number(StateVarDefinition {
 
 
             determine_state_var_from_dependencies: |_| {
@@ -107,18 +99,18 @@ lazy_static! {
             },
             for_renderer: true,
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("width", StateVarVariant::Number(StateVarDefinition {
+        ("width", StateVarVariant::Number(StateVarDefinition {
             for_renderer: true,
             determine_state_var_from_dependencies: |_| Ok(SetValue(600.0)),
             ..Default::default()
-        }));
+        })),
 
-        state_var_definitions.insert("hidden", HIDDEN_DEFAULT_DEFINITION());
-        state_var_definitions.insert("disabled", DISABLED_DEFAULT_DEFINITION());
+        ("hidden", HIDDEN_DEFAULT_DEFINITION()),
+        ("disabled", DISABLED_DEFAULT_DEFINITION()),
 
-        return state_var_definitions
+        ]
     };
 
 
@@ -131,6 +123,8 @@ lazy_static! {
         component_type: "textInput",
 
         state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
+        
+        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
 
         attribute_names: vec![
             "hide",
@@ -147,20 +141,20 @@ lazy_static! {
                     let new_val = args.get("text").expect("No text argument").first().unwrap();
 
                     vec![
-                        ("immediateValue", new_val.clone()),
-                        ("syncImmediateValue", StateVarValue::Boolean(false)),
+                        (1, new_val.clone()),
+                        (2, StateVarValue::Boolean(false)),
                     ]
                 },
 
                 "updateValue" => {
 
-                    let new_val = resolve_and_retrieve_state_var(&"immediateValue")
+                    let new_val = resolve_and_retrieve_state_var(1)
                         .unwrap().try_into().unwrap();
                     let new_val = StateVarValue::String(new_val);
 
                     vec![
-                        ("value", new_val),
-                        ("syncImmediateValue", StateVarValue::Boolean(true)),
+                        (0, new_val),
+                        (2, StateVarValue::Boolean(true)),
                     ]
 
                 }

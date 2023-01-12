@@ -26,15 +26,12 @@ pub struct StateVarDefinition<T> {
     /// Some state variable's dependencies change based on other variables.
     // pub state_vars_to_determine_dependencies: fn() -> Vec<StateVarName>,
 
-    /// Return the instructions that core can use to make Dependency structs.
-    /// Note: arg currently unused
-    pub return_dependency_instructions: fn(
-        HashMap<StateVarName, StateVarValue>
-    ) -> HashMap<InstructionName, DependencyInstruction>,
-    
+    /// The instructions that core can use to make Dependency structs.
+    pub dependency_instructions: Vec<DependencyInstruction>,
+
     /// Determine the value and return that to core as an update instruction.
     pub determine_state_var_from_dependencies: fn(
-        HashMap<InstructionName, Vec<DependencyValue>>
+        Vec<Vec<DependencyValue>>
     ) -> Result<StateVarUpdateInstruction<T>, String>,
 
     pub for_renderer: bool,
@@ -46,8 +43,8 @@ pub struct StateVarDefinition<T> {
     /// values for the dependencies that would make this state variable return that value.
     pub request_dependencies_to_update_value: fn(
         T,
-        HashMap<InstructionName, Vec<(DependencySource, Option<StateVarValue>)>>
-    ) -> HashMap<InstructionName, Result<Vec<DependencyValue>, String>>,
+        Vec<Vec<(DependencySource, Option<StateVarValue>)>>
+    ) -> Vec<(usize, Result<Vec<DependencyValue>, String>)>,
 }
 
 
@@ -57,7 +54,7 @@ impl<T> Default for StateVarDefinition<T>
 {
     fn default() -> Self {
         StateVarDefinition {
-            return_dependency_instructions: |_| HashMap::new(),
+            dependency_instructions: Vec::new(),
             determine_state_var_from_dependencies:
                 |_| Ok(StateVarUpdateInstruction::SetValue(T::default())),
             for_renderer: false,
@@ -65,7 +62,7 @@ impl<T> Default for StateVarDefinition<T>
 
             request_dependencies_to_update_value: |_, _| {
                 log!("DEFAULT REQUEST_DEPENDENCIES_TO_UPDATE_VALUE DOES NOTHING");
-                HashMap::new()
+                Vec::new()
             },
         }
     }
@@ -74,7 +71,7 @@ impl<T> Default for StateVarDefinition<T>
 
 
 
-/// Since `StateVarDefinition` is generic, this enum is needed to store one in a HashMap.
+/// Since `StateVarDefinition` is generic, this enum is needed to store one in a HashMap or Vec.
 #[derive(Debug)]
 pub enum StateVarVariant {
     String(StateVarDefinition<String>),
@@ -142,7 +139,7 @@ pub enum StateVarUpdateInstruction<T> {
 pub enum DependencySource {
     StateVar {
         component_type: ComponentType,
-        state_var_name: StateVarName,
+        state_var_ind: usize,
     },
     Essential {
         value_type: &'static str,
@@ -264,34 +261,34 @@ pub trait DepValueSingle {
     fn value(&self) -> StateVarValue;
 }
 
-impl DepValueSingle for (&DependencyValue, InstructionName) {
+impl DepValueSingle for DependencyValue {
     fn into_bool(&self) -> Result<bool, String> {
-        self.0.value.clone().try_into().map_err(|_|
-            format!("Instruction [{}] is a {}, expected a bool", self.1, self.0.value.type_as_str()))
+        self.value.clone().try_into().map_err(|_|
+            format!("Instruction is a {}, expected a bool", self.value.type_as_str()))
     }
 
     fn into_string(&self) -> Result<String, String> {
-        self.0.value.clone().try_into().map_err(|_|
-            format!("Instruction [{}] is a {}, expected a string", self.1, self.0.value.type_as_str()))
+        self.value.clone().try_into().map_err(|_|
+            format!("Instruction is a {}, expected a string", self.value.type_as_str()))
     }
 
     fn into_number(&self) -> Result<f64, String> {
-        self.0.value.clone().try_into().map_err(|_|
-            format!("Instruction [{}] is a {}, expected a number", self.1, self.0.value.type_as_str()))
+        self.value.clone().try_into().map_err(|_|
+            format!("Instruction is a {}, expected a number", self.value.type_as_str()))
     }
 
     fn into_integer(&self) -> Result<i64, String> {
-        self.0.value.clone().try_into().map_err(|_|
-            format!("Instruction [{}] is a {}, expected an integer", self.1, self.0.value.type_as_str()))
+        self.value.clone().try_into().map_err(|_|
+            format!("Instruction is a {}, expected an integer", self.value.type_as_str()))
     }
 
     fn into_math_expression(&self) -> Result<MathExpression, String> {
-        self.0.value.clone().try_into().map_err(|_|
-            format!("Instruction [{}] is a {}, expected a math expression", self.1, self.0.value.type_as_str()))
+        self.value.clone().try_into().map_err(|_|
+            format!("Instruction is a {}, expected a math expression", self.value.type_as_str()))
     }
 
     fn value(&self) -> StateVarValue {
-        self.0.value.clone()
+        self.value.clone()
     }
 }
 
@@ -303,24 +300,24 @@ pub trait DepValueOption {
     fn value(&self) -> Option<StateVarValue>;
 }
 
-impl DepValueOption for (Option<&DependencyValue>, InstructionName) {
+impl DepValueOption for Option<&DependencyValue> {
 
     fn is_bool_if_exists(&self) -> Result<Option<bool>, String> {
         self.into_if_exists().map_err(|e| e + ", expected a bool")
     }
 
     fn into_if_exists<T: TryFrom<StateVarValue>>(&self) -> Result<Option<T>, String> {
-        let (dep_value_opt, name) = self;
+        let dep_value_opt = self;
 
         dep_value_opt.and_then(|dep_value| Some(dep_value.value.clone().try_into().map_err(|_|
-                format!("could not convert value {} from instruction [{}]",
-                    dep_value.value.type_as_str(), name)
+                format!("could not convert value {} from instruction",
+                    dep_value.value.type_as_str())
             )))
             .map_or(Ok(None), |v| v.map(Some)) // flip nested Option<Result<T>>
     }
 
     fn value(&self) -> Option<StateVarValue> {
-        match self.0 {
+        match self {
             Some(dep_value) => Some(dep_value.value.clone()),
             None => None,
         }
@@ -482,41 +479,20 @@ impl std::fmt::Display for StateVarValue {
 
 impl StateVarVariant {
 
-    // pub fn state_vars_to_determine_dependencies(&self) -> Vec<StateVarName> {
-
-    //     match self {
-    //         StateVarVariant::String(def) => (def.state_vars_to_determine_dependencies)(),
-    //         StateVarVariant::Boolean(def) => (def.state_vars_to_determine_dependencies)(),
-    //         StateVarVariant::Number(def) => (def.state_vars_to_determine_dependencies)(),
-    //         StateVarVariant::Integer(def) => (def.state_vars_to_determine_dependencies)(),
-    //     }
-    // }
-
-
-    // Non-array specific functions
-
-
-    pub fn return_dependency_instructions(&self,
-        prerequisite_state_values: HashMap<StateVarName, StateVarValue>)
-         -> HashMap<InstructionName, DependencyInstruction> {
+    pub fn return_dependency_instructions(&self)
+         -> &Vec<DependencyInstruction> {
 
         match self {
-            Self::String(def) =>
-                (def.return_dependency_instructions)(prerequisite_state_values),
-            Self::Boolean(def) =>
-                (def.return_dependency_instructions)(prerequisite_state_values),
-            Self::Number(def) =>
-                (def.return_dependency_instructions)(prerequisite_state_values),
-            Self::Integer(def) =>
-                (def.return_dependency_instructions)(prerequisite_state_values),
+            Self::String(def) => &def.dependency_instructions,
+            Self::Boolean(def) => &def.dependency_instructions,
+            Self::Number(def) => &def.dependency_instructions,
+            Self::Integer(def) => &def.dependency_instructions,
         }
     }
 
-
-    
     
     pub fn determine_state_var_from_dependencies(&self,
-        dependency_values: HashMap<InstructionName, Vec<DependencyValue>>
+        dependency_values: Vec<Vec<DependencyValue>>
     ) -> Result<StateVarUpdateInstruction<StateVarValue>, String> {
 
         use StateVarUpdateInstruction::*;
@@ -556,8 +532,8 @@ impl StateVarVariant {
     pub fn request_dependencies_to_update_value(
         &self,
         desired_value: StateVarValue,
-        dependency_sources: HashMap<InstructionName, Vec<(DependencySource, Option<StateVarValue>)>>
-    ) -> Result<HashMap<InstructionName, Result<Vec<DependencyValue>, String>>, String> {
+        dependency_sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>>
+    ) -> Result<Vec<(usize, Result<Vec<DependencyValue>, String>)>, String> {
 
         match self {
             Self::String(def) =>  {

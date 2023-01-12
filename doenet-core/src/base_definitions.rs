@@ -59,15 +59,14 @@ macro_rules! integer_definition_from_attribute {
 
                 initial_essential_value:$default,
 
-                return_dependency_instructions: |_| {
-                    let attribute = DependencyInstruction::Attribute{
+                dependency_instructions: vec![
+                    DependencyInstruction::Attribute{
                         attribute_name: $attribute,
-                    };
-                    HashMap::from([("attribute", attribute)])
-                },
+                    }
+                ],
 
                 determine_state_var_from_dependencies: |dependency_values| {
-                    let (attribute, _) = dependency_values.dep_value("attribute")?;
+                    let attribute = &dependency_values[0];
                     if attribute.len() > 0 {
 
                         // let (expression, numerical_values) = split_dependency_values_into_math_expression_and_values(attribute)?;
@@ -82,10 +81,10 @@ macro_rules! integer_definition_from_attribute {
                 },
 
                 request_dependencies_to_update_value: |desired_value, sources| {
-                    let attribute_sources = sources.get("attribute").unwrap().clone();
-                    HashMap::from([
-                        ("attribute", DETERMINE_INTEGER_DEPENDENCIES(desired_value, attribute_sources))
-                    ])
+                    let attribute_sources = &sources[0];
+                    vec![
+                        (0, DETERMINE_INTEGER_DEPENDENCIES(desired_value, attribute_sources))
+                    ]
                 },
 
                 ..Default::default()
@@ -104,15 +103,14 @@ macro_rules! boolean_definition_from_attribute {
 
                 initial_essential_value: $default,
 
-                return_dependency_instructions: |_| {
-                    let attribute = DependencyInstruction::Attribute{
+                dependency_instructions: vec![
+                    DependencyInstruction::Attribute{
                         attribute_name: $attribute,
-                    };
-                    HashMap::from([("attribute", attribute)])
-                },
+                    }
+                ],
 
                 determine_state_var_from_dependencies: |dependency_values| {
-                    let (attribute, _) = dependency_values.dep_value("attribute")?;
+                    let attribute = &dependency_values[0];
                     if attribute.len() > 0 {
 
                         match DETERMINE_BOOLEAN(attribute) {
@@ -140,17 +138,16 @@ macro_rules! string_definition_from_attribute {
 
                 initial_essential_value: $default.to_string(),
 
-                return_dependency_instructions: |_| {
-                    let attribute = DependencyInstruction::Attribute{
+                dependency_instructions: vec![
+                    DependencyInstruction::Attribute{
                         attribute_name: $attribute,
-                    };
-                    HashMap::from([("attribute", attribute)])
-                },
+                    }
+                ],
 
                 determine_state_var_from_dependencies: |dependency_values| {
-                    let attribute = dependency_values.get("attribute").unwrap();
+                    let attribute = &dependency_values[0];
                     if attribute.len() > 0 {
-                        DETERMINE_STRING(attribute.clone())
+                        DETERMINE_STRING(attribute)
                             .map(|x| crate::state_variables::StateVarUpdateInstruction::SetValue(x))
                     } else {
                         Ok ( crate::state_variables::StateVarUpdateInstruction::SetValue($default.to_string()) )
@@ -214,7 +211,7 @@ pub(crate) use string_definition_from_attribute;
 // pub(crate) use map_array;
 
 pub fn split_dependency_values_into_math_expression_and_values(
-    dependency_values: Vec<&DependencyValue>
+    dependency_values: &Vec<DependencyValue>
 ) -> Result<(MathExpression, Vec<StateVarValue>), String> {
 
     let expression = dependency_values.iter().find_map(|elem| {
@@ -281,25 +278,22 @@ pub fn split_dependency_sources_into_expression_and_variables(
 // Default functions for an essential depenency
 
 #[allow(non_snake_case)]
-pub fn USE_ESSENTIAL_DEPENDENCY_INSTRUCTION(
-    _: HashMap<StateVarName, StateVarValue>
-) -> HashMap<InstructionName, DependencyInstruction> {
-    HashMap::from([
-        ("essential", DependencyInstruction::Essential { prefill: None })
-    ])
+pub fn USE_ESSENTIAL_DEPENDENCY_INSTRUCTION() -> Vec<DependencyInstruction> {
+   vec![DependencyInstruction::Essential { prefill: None }]
 }
+
 
 #[allow(non_snake_case)]
 pub fn DETERMINE_FROM_ESSENTIAL<T>(
-    dependency_values: HashMap<InstructionName, Vec<DependencyValue>>
+    dependency_values: Vec<Vec<DependencyValue>>
 ) -> Result<StateVarUpdateInstruction<T>, String>
 where
     T: TryFrom<StateVarValue> + Default,
     <T as TryFrom<StateVarValue>>::Error: std::fmt::Debug
 {
-    let essential = dependency_values.dep_value("essential")?;
-    let essential = essential.has_zero_or_one_elements()?;
-    let set_value = match essential.0 {
+    let essential = &dependency_values[0];
+    let essential = essential.get(0);
+    let set_value = match essential {
         Some(dep_value) => {
             T::try_from(dep_value.value.clone()).map_err(|e| format!("{:#?}", e))?
         },
@@ -308,17 +302,19 @@ where
     Ok( StateVarUpdateInstruction::SetValue( set_value ) )
 }
 
+
+
 #[allow(non_snake_case)]
-pub fn REQUEST_ESSENTIAL_TO_UPDATE<T: Into<StateVarValue>>(desired_value: T, sources: HashMap<InstructionName, Vec<(DependencySource, Option<StateVarValue>)>>)
-    -> HashMap<InstructionName, Result<Vec<DependencyValue>, String>> {
-    HashMap::from([
-        ("essential", Ok(vec![
+pub fn REQUEST_ESSENTIAL_TO_UPDATE<T: Into<StateVarValue>>(desired_value: T, sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>>)
+    -> Vec<(usize, Result<Vec<DependencyValue>, String>)> {
+    vec![
+        (0, Ok(vec![
             DependencyValue {
-                source: sources.get("essential").unwrap().first().unwrap().0.clone(),
+                source: sources[0][0].0.clone(),
                 value: desired_value.into(),
             }
         ]))
-    ])
+    ]
 }
 
 /// Requires that the component has a parent with 'hidden' and a bool 'hide' attribute
@@ -329,25 +325,21 @@ pub fn HIDDEN_DEFAULT_DEFINITION() -> StateVarVariant {
 
     StateVarVariant::Boolean(StateVarDefinition {
         
-        return_dependency_instructions: |_| {
-            HashMap::from([
-                ("parent_hidden", DependencyInstruction::Parent {
-                    state_var_name: "hidden",
-                }),
-                ("my_hide", DependencyInstruction::Attribute {
-                    attribute_name: "hide",
-                }),
-            ])
-        },
+        dependency_instructions: vec![
+           DependencyInstruction::Parent {
+                state_var_name: "hidden",
+            },
+            DependencyInstruction::Attribute {
+                attribute_name: "hide",
+            },
+        ],
 
 
         determine_state_var_from_dependencies: |dependency_values| {
 
-            let parent_hidden = dependency_values.dep_value("parent_hidden")?
-                .has_exactly_one_element()?
-                .into_bool();
+            let parent_hidden = dependency_values[0][0].into_bool();
 
-            let (attribute, _) = dependency_values.dep_value("my_hide")?;
+            let attribute = &dependency_values[1];
 
             let my_hide =
                 (attribute.len() > 0)
@@ -372,18 +364,14 @@ pub fn TEXT_DEFAULT_DEFINITION() -> StateVarVariant {
     StateVarVariant::String(StateVarDefinition {
         for_renderer: true,
 
-        return_dependency_instructions: |_| {        
-            HashMap::from([("value_of_value", DependencyInstruction::StateVar {
-                component_name: None,
-                state_var_name: "value"
-            })])
-        },
+        dependency_instructions: vec![DependencyInstruction::StateVar {
+            component_name: None,
+            state_var_name: "value"
+        }],
 
         determine_state_var_from_dependencies: |dependency_values| {
 
-            let value = dependency_values.dep_value("value_of_value")?
-                .has_exactly_one_element()?
-                .value();
+            let value = &dependency_values[0][0].value;
 
             match &value {
                 StateVarValue::String(v) => Ok(SetValue(v.to_string())),
@@ -416,7 +404,7 @@ pub fn FIXED_DEFAULT_DEFINITION() -> StateVarVariant {
 
 
 #[allow(non_snake_case)]
-pub fn DETERMINE_BOOLEAN(dependency_values: Vec<&DependencyValue>)
+pub fn DETERMINE_BOOLEAN(dependency_values: &Vec<DependencyValue>)
     -> Result<bool, String> {
 
     if dependency_values.len() == 1
@@ -471,7 +459,7 @@ pub fn DETERMINE_BOOLEAN(dependency_values: Vec<&DependencyValue>)
 }
 
 #[allow(non_snake_case)]
-pub fn DETERMINE_NUMBER(dependency_values: Vec<&DependencyValue>)
+pub fn DETERMINE_NUMBER(dependency_values: &Vec<DependencyValue>)
     -> Result<f64, String> {
 
     if dependency_values.len() == 1
@@ -626,7 +614,7 @@ pub fn DETERMINE_INTEGER(dependency_values: Vec<&DependencyValue>)
 }
 
 #[allow(non_snake_case)]
-pub fn DETERMINE_INTEGER_DEPENDENCIES(desired_value: i64, sources: Vec<(DependencySource, Option<StateVarValue>)>)
+pub fn DETERMINE_INTEGER_DEPENDENCIES(desired_value: i64, sources: &Vec<(DependencySource, Option<StateVarValue>)>)
     -> Result<Vec<DependencyValue>, String> {
     if sources.len() == 1 {
         let (source, _) = sources.first().unwrap().clone();
@@ -648,7 +636,7 @@ pub fn DETERMINE_INTEGER_DEPENDENCIES(desired_value: i64, sources: Vec<(Dependen
 
 
 #[allow(non_snake_case)]
-pub fn DETERMINE_STRING(dependency_values: Vec<DependencyValue>)
+pub fn DETERMINE_STRING(dependency_values: &Vec<DependencyValue>)
     -> Result<String, String> {
 
     let mut val = String::new();
@@ -687,40 +675,3 @@ pub fn get_children_of_type<'a>(
     )
 }
 
-// ========== Prop Index ============
-
-pub const PROP_INDEX_SV: StateVarName = "propIndex";
-// pub const PROP_INDEX_PREFIX_SV: StateVarName = "propIndexExpressionPrefix";
-pub const PROP_INDEX_EXPR_INSTRUCTION: InstructionName = "expression";
-pub const PROP_INDEX_VARS_INSTRUCTION: InstructionName = "expression_variables";
-// pub const PROP_INDEX_VAR_PREFIX_INSTRUCTION: InstructionName = "expression_prefix";
-
-pub fn prop_index_determine_value(dependency_values: HashMap<InstructionName, Vec<DependencyValue>>
-) -> Result<StateVarUpdateInstruction<f64>, String> {
-    
-    use StateVarUpdateInstruction::SetValue;
-
-    let expression = dependency_values.dep_value(PROP_INDEX_EXPR_INSTRUCTION)?
-        .has_exactly_one_element()?
-        .into_math_expression()?;
-    // let expression_prefix = dependency_values.dep_value(PROP_INDEX_VAR_PREFIX_INSTRUCTION)?
-    //     .has_exactly_one_element()?
-    //     .into_string()?;
-    let expression_var_values = dependency_values.dep_value(PROP_INDEX_VARS_INSTRUCTION)?
-        .into_number_list()?;
-
-    let mut expr_context = HashMapContext::new();
-
-    // Setup expression context
-    for (id, var_value) in expression_var_values.into_iter().enumerate() {
-        let var_name = format!("{}{}", expression.variable_prefix, id);
-        expr_context.set_value(var_name.to_string(), var_value.into())
-            .map_err(|err| err.to_string())?;
-    }
-
-    let value = expression.tree.eval_float_with_context(&expr_context)
-        .map_err(|err| err.to_string())?;
-
-    Ok(SetValue(value))
-
-}
