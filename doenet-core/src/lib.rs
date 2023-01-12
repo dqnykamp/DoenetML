@@ -48,6 +48,10 @@ pub struct DoenetCore {
     /// - tracking when a change affects other state variables
     pub dependencies: HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
 
+    pub dependent_on_state_var: HashMap<(ComponentName, StateVarName), Vec<(ComponentName, StateVarName)>>,
+
+    pub dependent_on_essential: HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, StateVarName)>>,
+
     /// Endpoints of the dependency graph.
     /// Every update instruction will lead to these.
     pub essential_data: HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
@@ -160,7 +164,8 @@ pub fn create_doenet_core(
     log!("create component nodes: {:?}", start.elapsed());
     let start = Instant::now();
 
-    let (dependencies, essential_data) = create_dependencies_and_essential_data(
+    let (dependencies, dependent_on_state_var, dependent_on_essential, essential_data) = 
+    create_dependencies_and_essential_data(
         &component_nodes,
         &component_attributes,
         existing_essential_data
@@ -168,6 +173,8 @@ pub fn create_doenet_core(
 
 
     // log!("dependencies: {:#?}", dependencies);
+    // log!("dependent_on_state_var: {:#?}", dependent_on_state_var);
+    // log!("dependent_on_essential: {:#?}", dependent_on_essential);
     // log!("essential_data: {:#?}", essential_data);
   
     log!("create dependencies: {:?}", start.elapsed());
@@ -198,6 +205,8 @@ pub fn create_doenet_core(
         component_states,
         root_component_name,
         dependencies,
+        dependent_on_state_var,
+        dependent_on_essential,
         essential_data,
     }, doenet_ml_warnings, doenet_ml_errors))
 }
@@ -305,7 +314,9 @@ fn create_dependencies_and_essential_data(
     component_attributes: &HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
     existing_essential_data: Option<HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>>,
 ) -> (HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
-     HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>) {
+    HashMap<(ComponentName, StateVarName), Vec<(ComponentName, StateVarName)>>,
+    HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, StateVarName)>>,
+    HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>) {
 
 
     // Fill in component_states and dependencies HashMaps for every component
@@ -314,10 +325,13 @@ fn create_dependencies_and_essential_data(
     let mut essential_data = existing_essential_data.unwrap_or(HashMap::new());
 
     let mut dependencies = HashMap::new();
+    let mut dependent_on_state_var = HashMap::new();
+    let mut dependent_on_essential = HashMap::new();
 
     for component in component_nodes.values() {
 
-        let dependencies_for_this_component = create_all_dependencies_for_component(
+        let (dependencies_for_this_component, new_on_state_var, new_on_essential) = 
+        create_all_dependencies_for_component(
             &component_nodes,
             component,
             component_attributes.get(&component.name).unwrap_or(&HashMap::new()),
@@ -326,11 +340,12 @@ fn create_dependencies_and_essential_data(
             should_initialize_essential_data,
         );
         dependencies.insert(component.name.to_string(), dependencies_for_this_component);
-
+        dependent_on_state_var.extend(new_on_state_var);
+        dependent_on_essential.extend(new_on_essential);
 
 
     }
-    (dependencies, essential_data)
+    (dependencies, dependent_on_state_var, dependent_on_essential, essential_data)
 }
 
 fn create_all_dependencies_for_component<'a>(
@@ -340,10 +355,17 @@ fn create_all_dependencies_for_component<'a>(
     // copy_index_flag: Option<&(ComponentName, StateVarName, Vec<ObjectName>)>,
     essential_data: &'a mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     should_initialize_essential_data: bool,
-) -> HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>> {
+) -> (HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>,
+    HashMap<(ComponentName, StateVarName), Vec<(ComponentName, StateVarName)>>,
+    HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, StateVarName)>>)
+    {
 
     // log_debug!("Creating dependencies for {}", component.name);
     let mut dependencies_for_component = HashMap::new();
+    let mut dependent_on_state_var = HashMap::new();
+    let mut dependent_on_essential = HashMap::new();
+
+
     let my_definitions = component.definition.state_var_definitions;
 
 
@@ -368,17 +390,33 @@ fn create_all_dependencies_for_component<'a>(
                 should_initialize_essential_data
             );
 
+            for dep in instruct_dependencies.iter() {
+                match dep {
+                    Dependency::StateVar { component_name, state_var_name: inner_sv } => {
+                        let vec_dep = dependent_on_state_var.entry((component_name.clone(), inner_sv.clone()))
+                            .or_insert(Vec::new());
+                        vec_dep.push((component.name.clone(), state_var_name.clone()));
+                    }
+                    Dependency::Essential { component_name, origin } => {
+                        let vec_dep = dependent_on_essential.entry((component_name.clone(), origin.clone()))
+                            .or_insert(Vec::new());
+                        vec_dep.push((component.name.clone(), state_var_name.clone()));
+                    }
+                }
+
+            }
+
             dependencies_for_state_variable.insert(
                 instruct_name,
                 instruct_dependencies   
             );
+
         }
 
         dependencies_for_component.insert(component_state.1, dependencies_for_state_variable);
 
-
     }
-    dependencies_for_component
+    (dependencies_for_component, dependent_on_state_var, dependent_on_essential)
 
 }
 
@@ -1104,35 +1142,37 @@ fn get_dependency_sources_for_state_var<'a>(
 }
 
 
-fn mark_stale_state_var_and_dependencies<'a>(
-    dependencies: &'a HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
-    component_nodes: &'a HashMap<ComponentName, ComponentNode>,
-    component_states: &'a mut HashMap<ComponentName, HashMap<StateVarName, StateVar>>,
-    component_state: &ComponentState,
+fn mark_stale_state_var_and_dependencies(
+    dependent_on_state_var: &HashMap<(ComponentName, StateVarName), Vec<(ComponentName, StateVarName)>>,
+    component_nodes: &HashMap<ComponentName, ComponentNode>,
+    component_states: &mut HashMap<ComponentName, HashMap<StateVarName, StateVar>>,
+    component_name: &String,
+    state_var_name: &str,
 ) {
     // log_debug!("Check stale {:?}", state);
 
     let state = component_states
-        .get(&component_state.0.name.clone())
-        .expect(&format!("Error accessing state of {:?}", component_state.0))
-        .get(component_state.1)
-        .expect(&format!("Error accessing state variable {} of {:?}", component_state.1, component_state.0));
+        .get(&component_name.clone())
+        .expect(&format!("Error accessing state of {:?}", component_name))
+        .get(state_var_name)
+        .expect(&format!("Error accessing state variable {} of {:?}", state_var_name, state_var_name));
         
 
 
     state.mark_stale();
 
-    let depending_on_me = get_state_variables_depending_on_me(dependencies, component_nodes, &component_state);
-
-    for new_component_state in depending_on_me {
-        mark_stale_state_var_and_dependencies(dependencies, component_nodes, component_states, &new_component_state);
+    if let Some(depending_on_me) = dependent_on_state_var.get(&(component_name.clone(), state_var_name)) {
+        for (new_comp_name, new_sv_name) in depending_on_me {
+            mark_stale_state_var_and_dependencies(dependent_on_state_var, component_nodes, component_states, new_comp_name, &new_sv_name);
+        }
     }
 }
 
-fn mark_stale_essential_datum_dependencies<'a>(
-    component_nodes: &'a HashMap<ComponentName, ComponentNode>,
-    dependencies: &'a HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
-    component_states: &'a mut HashMap<ComponentName, HashMap<StateVarName, StateVar>>,
+fn mark_stale_essential_datum_dependencies(
+    component_nodes: &HashMap<ComponentName, ComponentNode>,
+    dependent_on_state_var: &HashMap<(ComponentName, StateVarName), Vec<(ComponentName, StateVarName)>>,
+    dependent_on_essential: &HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, StateVarName)>>,
+    component_states: &mut HashMap<ComponentName, HashMap<StateVarName, StateVar>>,
     essential_state: &EssentialState,
 ) {
     let component_name = essential_state.0.clone();
@@ -1140,71 +1180,11 @@ fn mark_stale_essential_datum_dependencies<'a>(
 
     // log_debug!("Marking stale essential {}:{}", component_name, state_var);
 
-    let search_dep = Dependency::Essential {
-        component_name,
-        origin,
-    };
-
-    // let my_dependencies = dependencies.iter().filter_map( |(key, deps) | {
-    //     if deps.contains(&search_dep) {
-    //         Some(ComponentState(component_nodes.get(&key.0).unwrap(), key.1))
-    //     } else {
-    //         None
-    //     }
-    // });
-
-    for (comp_name, dependencies2) in dependencies.iter() {
-        for (sv_name, dependencies2) in dependencies2.iter() {
-            for (_, dependencies2) in dependencies2.iter() {
-                if dependencies2.contains(&search_dep) {
-                    let component_state = ComponentState(component_nodes.get(&comp_name.clone()).unwrap(), sv_name);
-                    mark_stale_state_var_and_dependencies(dependencies, component_nodes, component_states, &component_state);
-                }
-
-            }
+    if let Some(vec_deps) = dependent_on_essential.get(&(component_name, origin)) {
+        for (comp_name, sv_name) in vec_deps.iter() {
+            mark_stale_state_var_and_dependencies(dependent_on_state_var, component_nodes, component_states, comp_name, sv_name);
         }
     }
-}
-//     for component_state in my_dependencies {
-//         mark_stale_state_var_and_dependencies(dependencies, component_nodes, component_states, &component_state);
-//     }
-// }
-
-/// Calculate all the state vars that depend on the given state var
-fn get_state_variables_depending_on_me<'a>(
-    dependencies: &'a HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
-    component_nodes: &'a HashMap<ComponentName, ComponentNode>,
-    component_state: &'a ComponentState,
-) -> Vec<ComponentState<'a>> {
-
-    let sv_component = &component_state.0;
-    let sv_name = &component_state.1;
-
-    let mut depending_on_me = vec![];
-
-    for (_, dependencies) in dependencies.iter() {
-        for (_, dependencies) in dependencies.iter() {
-            for (_, dependencies) in dependencies.iter() {
-                for dependency in dependencies {
-
-                    match dependency {
-                        Dependency::StateVar { component_name, state_var_name } => {
-                            if sv_component.name == *component_name && sv_name == state_var_name {
-                                let node = component_nodes.get(&component_name.clone()).unwrap();
-                                depending_on_me.push(ComponentState(node, state_var_name));
-                            }
-                        },
-
-                        // Essential dependencies are endpoints
-                        Dependency::Essential { .. } => {},
-
-                    }
-                }
-            }
-        }
-    }
-
-    depending_on_me
 }
 
 
@@ -1407,7 +1387,9 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
 
         let component_state = ComponentState(&component, state_var_name);
         let request = UpdateRequest::SetStateVar(component_state, requested_value);
-        process_update_request(&core.component_nodes, &core.dependencies, &mut core.component_states, &mut core.essential_data, &request);
+        process_update_request(&core.component_nodes, &core.dependencies,
+            &mut core.dependent_on_state_var, &mut core.dependent_on_essential,
+            &mut core.component_states, &mut core.essential_data, &request);
     }
 
     // log_json!("Component tree after action", utils::json_components(&core.component_nodes, &core.component_states));
@@ -1423,6 +1405,7 @@ fn convert_dependency_values_to_update_request<'a>(
     component_state: &'a ComponentState,
     requests: HashMap<InstructionName, Result<Vec<DependencyValue>, String>>,
 ) -> Vec<UpdateRequest<'a>> {
+
 
     let component = component_state.0;
     let state_var = &component_state.1;
@@ -1480,6 +1463,8 @@ fn convert_dependency_values_to_update_request<'a>(
 fn process_update_request(
     component_nodes: &HashMap<ComponentName, ComponentNode>,
     dependencies: &HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
+    dependent_on_state_var: &HashMap<(ComponentName, StateVarName), Vec<(ComponentName, StateVarName)>>,
+    dependent_on_essential: &HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, StateVarName)>>,
     component_states: &mut HashMap<ComponentName, HashMap<StateVarName, StateVar>>,
     essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     update_request: &UpdateRequest
@@ -1502,7 +1487,7 @@ fn process_update_request(
 
             // log_debug!("Updated essential data {:?}", core.essential_data);
 
-            mark_stale_essential_datum_dependencies(component_nodes, dependencies, component_states, essential_state);
+            mark_stale_essential_datum_dependencies(component_nodes, dependent_on_state_var, dependent_on_essential, component_states, essential_state);
         },
 
         UpdateRequest::SetStateVar(component_state, requested_value) => {
@@ -1516,7 +1501,7 @@ fn process_update_request(
             );
 
             for dep_update_request in dep_update_requests {
-                process_update_request(component_nodes, dependencies, component_states, essential_data, &dep_update_request);
+                process_update_request(component_nodes, dependencies, dependent_on_state_var, dependent_on_essential, component_states, essential_data, &dep_update_request);
             }
 
             // needed?
