@@ -285,13 +285,13 @@ pub fn USE_ESSENTIAL_DEPENDENCY_INSTRUCTION() -> Vec<DependencyInstruction> {
 
 #[allow(non_snake_case)]
 pub fn DETERMINE_FROM_ESSENTIAL<T>(
-    dependency_values: Vec<Vec<DependencyValue>>
+    dependency_values: &Vec<Vec<DependencyValue>>
 ) -> Result<StateVarUpdateInstruction<T>, String>
 where
     T: TryFrom<StateVarValue> + Default,
     <T as TryFrom<StateVarValue>>::Error: std::fmt::Debug
 {
-    let essential = &dependency_values[0];
+    let essential = dependency_values[0];
     let essential = essential.get(0);
     let set_value = match essential {
         Some(dep_value) => {

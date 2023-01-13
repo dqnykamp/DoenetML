@@ -31,7 +31,7 @@ pub struct StateVarDefinition<T> {
 
     /// Determine the value and return that to core as an update instruction.
     pub determine_state_var_from_dependencies: fn(
-        Vec<Vec<DependencyValue>>
+        &Vec<Vec<DependencyValue>>
     ) -> Result<StateVarUpdateInstruction<T>, String>,
 
     pub for_renderer: bool,
@@ -492,7 +492,7 @@ impl StateVarVariant {
 
     
     pub fn determine_state_var_from_dependencies(&self,
-        dependency_values: Vec<Vec<DependencyValue>>
+        dependency_values: &Vec<Vec<DependencyValue>>
     ) -> Result<StateVarUpdateInstruction<StateVarValue>, String> {
 
         use StateVarUpdateInstruction::*;
