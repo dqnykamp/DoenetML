@@ -325,82 +325,6 @@ fn copy_source_for_ml_component(
 }
 
 
-fn create_dependencies_and_essential_data(
-    component_nodes: &HashMap<ComponentName, ComponentNode>,
-    component_attributes: &HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
-    existing_essential_data: Option<HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>>,
-) -> (
-    HashMap<ComponentName, Vec<DependenciesForStateVar>>,
-    HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
-    HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
-    HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>
-) {
-
-
-    // Fill in component_states and dependencies HashMaps for every component
-    // and supply any essential_data required by dependencies.
-    let should_initialize_essential_data = existing_essential_data.is_none();
-    let mut essential_data = existing_essential_data.unwrap_or(HashMap::new());
-
-    let mut dependencies = HashMap::new();
-    let mut dependent_on_state_var = HashMap::new();
-    let mut dependent_on_essential = HashMap::new();
-
-    for component in component_nodes.values() {
-
-        let dependencies_for_this_component = 
-        create_all_dependencies_for_component(
-            &component_nodes,
-            component,
-            component_attributes.get(&component.name).unwrap_or(&HashMap::new()),
-            // copy_index_flags.get(component_name).as_deref(),
-            &mut essential_data,
-            &mut dependent_on_state_var,
-            &mut dependent_on_essential,
-            should_initialize_essential_data,
-        );
-        dependencies.insert(component.name.to_string(), dependencies_for_this_component);
-
-
-    }
-    (dependencies, dependent_on_state_var, dependent_on_essential, essential_data)
-}
-
-fn create_all_dependencies_for_component<'a>(
-    component_nodes: &'a HashMap<ComponentName, ComponentNode>,
-    component: &'a ComponentNode,
-    component_attributes: &'a HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>,
-    // copy_index_flag: Option<&(ComponentName, StateVarName, Vec<ObjectName>)>,
-    essential_data: &'a mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
-    dependent_on_state_var: &'a mut HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
-    dependent_on_essential: &'a mut HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
-    should_initialize_essential_data: bool,
-) ->Vec<DependenciesForStateVar>
-    {
-
-    let my_definitions = component.definition.state_var_definitions;
-    let component_name = component.name.clone();
-
-    // log_debug!("Creating dependencies for {}", component.name);
-    let mut dependencies_for_component = Vec::with_capacity(my_definitions.len());
-
-
-    for (state_var_ind, (_, state_var_variant)) in my_definitions.iter().enumerate() {
-
-
-        let (dependencies_for_state_var, dependency_values_for_state_var) = create_dependencies_get_values_for_state_var(state_var_variant, component_nodes, &component_name, state_var_ind, component_attributes, essential_data, should_initialize_essential_data, dependent_on_state_var, dependent_on_essential, component);
-
-        dependencies_for_component.push(DependenciesForStateVar { 
-            dependencies: dependencies_for_state_var,
-            dependency_values: dependency_values_for_state_var
-        });
-
-    }
-    dependencies_for_component
-
-}
-
-
 /// This function also creates essential data when a DependencyInstruction asks for it.
 /// The second return is element specific dependencies.
 fn create_dependencies_from_instruction_initialize_essential(
@@ -944,7 +868,7 @@ fn get_state_var_value(
     essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     component_state: &ComponentState,
     should_initialize_essential_data: bool
-) -> Option<StateVarValue> {
+) -> StateVarValue {
 
     let dependency_values;
 
@@ -952,24 +876,18 @@ fn get_state_var_value(
     let current_state = component_state.get_value(component_states);
 
     match current_state {
-        Some(State::Fresh(current_value)) => return Some(current_value),
-        None => return None,
-        Some(State::Unresolved) => {
+        State::Fresh(current_value) => return current_value,
+        State::Unresolved => {
 
             // if state variable is unresolved, we calculate the dependencies first and then resulting value 
 
-            let component_name = component_state.0.name;
+            let component_name = &component_state.0.name;
             let state_var_ind = component_state.1;
 
             let state_var_definitions = component_state.0.definition.state_var_definitions;
         
             // log_debug!("Creating dependencies for {}", component.name);
-            let mut dependencies_for_component = dependencies.entry(component_name)
-                .or_insert_with(|| 
-                    // create vector of length num of state var defs,
-                    // where each entry is an DependencyForStateVars containg zero length vectors
-                    vec![DependenciesForStateVar { dependencies: vec![], dependency_values: vec![] }; state_var_definitions.len()]
-            );
+
         
 
             let state_var_def = &state_var_definitions[state_var_ind].1;
@@ -984,7 +902,7 @@ fn get_state_var_value(
                     &component_nodes,
                     &component_name,
                     state_var_ind,
-                    component_attributes.get(&component_name).unwrap_or(&HashMap::new()),
+                    component_attributes.get(&component_name.clone()).unwrap_or(&HashMap::new()),
                     dep_instruction,
                     essential_data,
                     should_initialize_essential_data
@@ -1012,20 +930,19 @@ fn get_state_var_value(
         
                 }
         
-                dependencies_for_state_var.push(instruct_dependencies);
 
 
                 let mut values_for_this_dep: Vec<DependencyValue> = Vec::with_capacity(instruct_dependencies.len());
 
-                for dep in instruct_dependencies {
+                for dep in instruct_dependencies.iter() {
                     let dependency_source = get_source_for_dependency(component_nodes, essential_data, &dep);
 
                     match dep {
                         Dependency::StateVar { component_name, state_var_ind } => {
-                            let new_node = component_nodes.get(&component_name).unwrap();
-                            let new_component_state = ComponentState(new_node, state_var_ind);
+                            let new_node = component_nodes.get(&component_name.clone()).unwrap();
+                            let new_component_state = ComponentState(new_node, *state_var_ind);
 
-                            let state_var_value_option = get_state_var_value(
+                            let state_var_value = get_state_var_value(
                                 component_nodes,
                                 component_attributes,
                                 dependencies,
@@ -1038,12 +955,9 @@ fn get_state_var_value(
                             );
 
 
-                            // TODO: if state_var_value_option in None, should we warn author or developers?
-                            if let Some(state_var_value) = state_var_value_option {
-                                values_for_this_dep.push(
-                                    DependencyValue { source: dependency_source, value: state_var_value }
-                                );
-                            }
+                            values_for_this_dep.push(
+                                DependencyValue { source: dependency_source, value: state_var_value }
+                            );
                         },
 
                         Dependency::Essential { component_name, origin } => {
@@ -1061,17 +975,27 @@ fn get_state_var_value(
                     }
                 }
 
+                dependencies_for_state_var.push(instruct_dependencies);
+
                 dependency_values_for_state_var.push(values_for_this_dep);
         
             }
 
-            dependency_values = &dependency_values_for_state_var;
         
+            let dependencies_for_component = dependencies.entry(component_name.clone())
+            .or_insert_with(|| 
+                    // create vector of length num of state var defs,
+                    // where each entry is an DependencyForStateVars containg zero length vectors
+                    vec![DependenciesForStateVar { dependencies: vec![], dependency_values: vec![] }; state_var_definitions.len()]
+            );
             dependencies_for_component[state_var_ind].dependencies = dependencies_for_state_var;
             dependencies_for_component[state_var_ind].dependency_values = dependency_values_for_state_var;
 
+            dependency_values = &dependencies_for_component[state_var_ind].dependency_values;
+
+
         }
-        Some(State::Stale) => {
+        State::Stale => {
 
 
 
@@ -1085,17 +1009,15 @@ fn get_state_var_value(
             for (instruction_ind, deps) in dependencies_for_state_var.iter().enumerate() {
                 let dep_vals = &dependency_values[instruction_ind];
                 
-                let mut ind_for_dep_vals = 0;
-
-                for dep in deps.iter() {
-                    let mut dep_val = &dep_vals[ind_for_dep_vals];
+                for (val_ind, dep) in deps.iter().enumerate() {
+                    let mut dep_val = &dep_vals[val_ind];
 
                     match dep {
                         Dependency::StateVar { component_name, state_var_ind } => {
                             let new_node = component_nodes.get(component_name).unwrap();
                             let new_component_state = ComponentState(new_node, *state_var_ind);
 
-                            let state_var_value_option = get_state_var_value(
+                            let state_var_value = get_state_var_value(
                                 component_nodes,
                                 component_attributes,
                                 dependencies,
@@ -1108,13 +1030,8 @@ fn get_state_var_value(
                             );
 
 
-                            // TODO: if state_var_value_option in None, should we warn author or developers?
-                            if let Some(state_var_value) = state_var_value_option {
-                                dep_val.value = state_var_value;
+                            dep_val.value = state_var_value;
 
-                                // TODO: better solution here!
-                                ind_for_dep_vals += 1;
-                            }
                         },
 
                         Dependency::Essential { component_name, origin } => {
@@ -1126,9 +1043,6 @@ fn get_state_var_value(
                                 .clone();
             
                             dep_val.value = value.0;
-
-                            // TODO: better solution here!
-                            ind_for_dep_vals += 1;
 
                         },
                     }
@@ -1148,25 +1062,22 @@ fn get_state_var_value(
         component_state, component_state.0.definition.component_type)
     );
 
-    let updated_value: Option<StateVarValue>;
+    let updated_value: StateVarValue;
 
     match update_instruction {
         StateVarUpdateInstruction::NoChange => {
             match current_state {
-                Some(State::Fresh(current_value)) => {
+                State::Fresh(current_value) => {
                     // Do nothing. It's fresh, so we can use it as is
-                    updated_value = Some(current_value);
+                    updated_value = current_value;
                 },
-                Some(State::Stale) | Some(State::Unresolved) => 
+                State::Stale | State::Unresolved => 
                     panic!("Cannot use NoChange update instruction on a stale or unresolved value"),
-                None => {
-                    updated_value = None;
-                },
             }
         },
         StateVarUpdateInstruction::SetValue(new_value) => {
 
-            updated_value = Some(component_state.set_value(component_states, new_value));
+            updated_value = component_state.set_value(component_states, new_value);
         }
 
     };
@@ -1200,7 +1111,7 @@ fn dependencies_of_state_var<'a>(
     component_state: &ComponentState,
 ) -> &'a Vec<Vec<Dependency>> {
 
-    let my_deps = dependencies.get(&component_state.0.name).unwrap().get(component_state.1).unwrap();
+    let my_deps = &dependencies.get(&component_state.0.name).unwrap().get(component_state.1).unwrap().dependencies;
     
     my_deps
 }
@@ -1253,18 +1164,18 @@ fn get_dependency_sources_for_state_var<'a>(
     let my_dependencies = &my_dependencies_struct.dependencies;
     let my_dependency_values = &my_dependencies_struct.dependency_values;
 
-    // let my_dependencies = dependencies_of_state_var(dependencies, component_state);
+    // TODO: can we avoid allocating here as this function is called for every update
     
-    // let mut dependency_sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>> = Vec::with_capacity(my_dependencies.len());
+    let mut dependency_sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>> = Vec::with_capacity(my_dependencies.len());
 
-    let mut ind_for_dep_vals = 0;
-
-                            // // TODO: better solution here!
-                            // ind_for_dep_vals += 1;
     
-    for new_dependencies in my_dependencies {
-        let instruction_sources: Vec<(DependencySource, Option<StateVarValue>)> = new_dependencies.iter().map(|dependency| {
-            let source = get_source_for_dependency(component_nodes, essential_data, &dependency);
+    for (instruct_ind, new_dependencies) in my_dependencies.iter().enumerate() {
+        let new_dependency_values = &my_dependency_values[instruct_ind];
+
+        let instruction_sources: Vec<(DependencySource, Option<StateVarValue>)> = new_dependencies.iter().enumerate()
+            .map(|(val_ind, dependency)| {
+            
+            let source = new_dependency_values[val_ind].source;
 
             let essential_value = if let Dependency::Essential { origin, .. } = dependency {
                 let data = essential_data
@@ -1404,7 +1315,7 @@ fn generate_render_tree_internal(
             &mut core.essential_data,
             &ComponentState(component.component_node, state_var_ind),
             core.should_initialize_essential_data
-        ).unwrap();
+        );
 
         let sv_renderer_name = state_var_aliases
             .get(state_var_name)
@@ -1812,12 +1723,11 @@ fn get_child_nodes_including_copy<'a>(
 impl<'a> ComponentState<'a> {
 
     fn get_value(&self, component_states: &HashMap<ComponentName, Vec<StateVar>>)
-        -> Option<State<StateVarValue>> {
-        Some(component_states.get(&self.0.name).unwrap()
+        -> State<StateVarValue> {
+        component_states.get(&self.0.name).unwrap()
             .get(self.1)
             .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
             .get_state()
-        )
     }
 
     fn set_value(&self, component_states: &HashMap<ComponentName, Vec<StateVar>>, new_value: StateVarValue)

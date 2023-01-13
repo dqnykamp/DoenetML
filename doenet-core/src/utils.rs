@@ -155,16 +155,16 @@ pub fn json_dependencies<'a>(
     let mut display_deps = HashMap::new();
 
 
-    for (component_name, dependencies) in dependencies.iter() {
-        for (state_var_name, dependencies) in dependencies.iter() {
-            for (instruction_name, dependencies) in dependencies.iter() {
-                let display_key = format!("{}:{} \"{}\"", component_name, state_var_name, instruction_name);
+    // for (component_name, dependencies) in dependencies.iter() {
+    //     for (state_var_name, dependencies) in dependencies.iter() {
+    //         for (instruction_name, dependencies) in dependencies.iter() {
+    //             let display_key = format!("{}:{} \"{}\"", component_name, state_var_name, instruction_name);
 
-                display_deps.entry(component_name.clone()).or_insert(HashMap::new())
-                    .entry(display_key).or_insert(dependencies.clone());
-            }
-        }
-    }
+    //             display_deps.entry(component_name.clone()).or_insert(HashMap::new())
+    //                 .entry(display_key).or_insert(dependencies.clone());
+    //         }
+    //     }
+    // }
 
     display_deps
 }

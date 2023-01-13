@@ -149,7 +149,7 @@ lazy_static! {
                 "updateValue" => {
 
                     let new_val = resolve_and_retrieve_state_var(1)
-                        .unwrap().try_into().unwrap();
+                        .try_into().unwrap();
                     let new_val = StateVarValue::String(new_val);
 
                     vec![

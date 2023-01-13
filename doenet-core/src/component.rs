@@ -128,7 +128,7 @@ pub struct ComponentDefinition {
     pub on_action: for<'a> fn(
         action_name: &str,
         args: HashMap<String, Vec<StateVarValue>>,
-        resolve_and_retrieve_state_var: &'a dyn FnMut(usize) -> Option<StateVarValue>
+        resolve_and_retrieve_state_var: &'a dyn FnMut(usize) -> StateVarValue
     ) -> Vec<(usize, StateVarValue)>,
 
     pub should_render_children: bool,
