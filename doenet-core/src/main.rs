@@ -8,11 +8,11 @@ fn main() {
 "#;
 
 for x in 1..100 {
-  let result = doenet_core::create_doenet_core(&program, None);
+  let mut result = doenet_core::create_doenet_core(&program, None);
 
-  if let Ok((core, _, _)) = result {
+  if let Ok((mut core, _, _)) = result {
     println!("nodes: {:?}", core.component_nodes.len());
-    let render_tree_string = doenet_core::update_renderers(&core);
+    let render_tree_string = doenet_core::update_renderers(&mut core);
 
   }
 }

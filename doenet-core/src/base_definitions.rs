@@ -291,7 +291,7 @@ where
     T: TryFrom<StateVarValue> + Default,
     <T as TryFrom<StateVarValue>>::Error: std::fmt::Debug
 {
-    let essential = dependency_values[0];
+    let essential = &dependency_values[0];
     let essential = essential.get(0);
     let set_value = match essential {
         Some(dep_value) => {

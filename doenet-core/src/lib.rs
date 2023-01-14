@@ -203,8 +203,8 @@ pub fn create_doenet_core(
     let should_initialize_essential_data = existing_essential_data.is_none();
     let essential_data = existing_essential_data.unwrap_or(HashMap::new());
 
-    log_json!("Component tree upon core creation",
-        utils::json_components(&component_nodes, &component_states));
+    // log_json!("Component tree upon core creation",
+    //     utils::json_components(&component_nodes, &component_states));
     // log_json!("Dependencies",
     //     utils::json_dependencies(&dependencies));
     // log_json!("Essential data upon core creation",
@@ -431,8 +431,6 @@ fn create_dependencies_from_instruction_initialize_essential(
                 // so we depend on it directly
 
                 let comp_name = component_state.0.clone();
-                let comp = component_nodes.get(&comp_name).unwrap();
-                let c_def = comp.definition;
                 let sv_ind = component_state.1.clone();
     
                 relevant_children.push(
@@ -1003,14 +1001,19 @@ fn get_state_var_value(
 
             // TODO: put this back into dependencies_of_state_var
             let my_dependencies = &dependencies.get(&component_state.0.name).unwrap()[component_state.1];
-            let dependencies_for_state_var = &my_dependencies.dependencies;
-            dependency_values = &my_dependencies.dependency_values;
+            let dependencies_for_state_var = my_dependencies.dependencies.clone();
+            // dependency_values = &my_dependencies.dependency_values;
 
+            // let n_instructions = dependencies.get(&component_state.0.name).unwrap()[component_state.1].dependencies.len();
+
+            // for instruction_ind in 0..n_instructions {
+            //     let 
+            // }
             for (instruction_ind, deps) in dependencies_for_state_var.iter().enumerate() {
-                let dep_vals = &dependency_values[instruction_ind];
+                // let dep_vals = &dependency_values[instruction_ind];
                 
                 for (val_ind, dep) in deps.iter().enumerate() {
-                    let mut dep_val = &dep_vals[val_ind];
+                    // let mut dep_val = &dep_vals[val_ind];
 
                     match dep {
                         Dependency::StateVar { component_name, state_var_ind } => {
@@ -1029,8 +1032,13 @@ fn get_state_var_value(
                                 should_initialize_essential_data
                             );
 
-
-                            dep_val.value = state_var_value;
+                            // let my_dependencies = &mut dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1];
+                            // let dependency_values = &mut my_dependencies.dependency_values;
+                            // let dep_vals = &mut dependency_values[instruction_ind];
+                            // let mut dep_val = &mut dep_vals[val_ind];
+                            // let mut dep_val = &dependencies.get(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind];
+                            dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = state_var_value;
+                            // dep_val.value = state_var_value;
 
                         },
 
@@ -1042,13 +1050,17 @@ fn get_state_var_value(
                                 .get(&origin).unwrap()
                                 .clone();
             
-                            dep_val.value = value.0;
+                            dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = value.0;
+                            // dep_val.value = value.0;
 
                         },
                     }
                 }
 
             }
+
+            dependency_values = &dependencies.get(&component_state.0.name).unwrap()[component_state.1].dependency_values;
+
         }
     }
 
@@ -1116,10 +1128,6 @@ fn dependencies_of_state_var<'a>(
     my_deps
 }
 
-fn contains_ptr<T>(v: &Vec<&T>, e: &T) -> bool {
-    v.iter().any(|&x| std::ptr::eq(x, e))
-}
-
 fn get_source_for_dependency(
     component_nodes: &HashMap<ComponentName, ComponentNode>,
     essential_data: &HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
@@ -1152,7 +1160,6 @@ fn get_source_for_dependency(
 
 /// Also includes the values of essential data
 fn get_dependency_sources_for_state_var<'a>(
-    component_nodes: &'a HashMap<ComponentName, ComponentNode>,
     dependencies: &'a HashMap<ComponentName, Vec<DependenciesForStateVar>>,
     essential_data: &'a mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     component_state: &ComponentState,
@@ -1175,7 +1182,7 @@ fn get_dependency_sources_for_state_var<'a>(
         let instruction_sources: Vec<(DependencySource, Option<StateVarValue>)> = new_dependencies.iter().enumerate()
             .map(|(val_ind, dependency)| {
             
-            let source = new_dependency_values[val_ind].source;
+            let source = new_dependency_values[val_ind].source.clone();
 
             let essential_value = if let Dependency::Essential { origin, .. } = dependency {
                 let data = essential_data
@@ -1247,10 +1254,10 @@ fn mark_stale_essential_datum_dependencies(
 
 
 
-pub fn update_renderers(core: &DoenetCore) -> String {
+pub fn update_renderers(core: &mut DoenetCore) -> String {
     let json_obj = generate_render_tree(core);
 
-    log_json!("Component tree after renderer update", utils::json_components(&core.component_nodes, &core.component_states));
+    // log_json!("Component tree after renderer update", utils::json_components(&core.component_nodes, &core.component_states));
 
     // log_json!("Essential data after renderer update",
     // utils::json_essential_data(&core.essential_data));
@@ -1258,7 +1265,7 @@ pub fn update_renderers(core: &DoenetCore) -> String {
     serde_json::to_string(&json_obj).unwrap()
 }
 
-fn generate_render_tree(core: &DoenetCore) -> serde_json::Value {
+fn generate_render_tree(core: &mut DoenetCore) -> serde_json::Value {
     let start = Instant::now();
 
     let root_node = core.component_nodes.get(&core.root_component_name).unwrap();
@@ -1270,7 +1277,18 @@ fn generate_render_tree(core: &DoenetCore) -> serde_json::Value {
     let mut json_obj: Vec<serde_json::Value> = vec![];
 
     log!("===== Render tree ======");
-    generate_render_tree_internal(core, root_comp_rendered, &mut json_obj);
+    generate_render_tree_internal(
+        &core.component_nodes,
+        &core.component_attributes,
+        &mut core.dependencies,
+        &mut core.dependent_on_state_var,
+        &mut core.dependent_on_essential,
+        &mut core.component_states,
+        &mut core.essential_data,
+        core.should_initialize_essential_data,
+        root_comp_rendered, 
+        &mut json_obj
+    );
 
 
     log!("generated renderer tree: {:?}", start.elapsed());
@@ -1279,7 +1297,14 @@ fn generate_render_tree(core: &DoenetCore) -> serde_json::Value {
 }
 
 fn generate_render_tree_internal(
-    core: &DoenetCore,
+    component_nodes: &HashMap<ComponentName, ComponentNode>,
+    component_attributes: &HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
+    dependencies: &mut HashMap<ComponentName, Vec<DependenciesForStateVar>>,
+    dependent_on_state_var: &mut HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
+    dependent_on_essential: &mut HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
+    component_states: &mut HashMap<ComponentName, Vec<StateVar>>,
+    essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
+    should_initialize_essential_data: bool,
     component: RenderedComponent,
     json_obj: &mut Vec<serde_json::Value>,
 ) {
@@ -1306,15 +1331,15 @@ fn generate_render_tree_internal(
     for (state_var_ind, state_var_name) in renderered_state_vars {
 
         let value = get_state_var_value(
-            &core.component_nodes,
-            &core.component_attributes,
-            &mut core.dependencies,
-            &mut core.dependent_on_state_var,
-            &mut core.dependent_on_essential,
-            &mut core.component_states,
-            &mut core.essential_data,
+            component_nodes,
+            component_attributes,
+            dependencies,
+            dependent_on_state_var,
+            dependent_on_essential,
+            component_states,
+            essential_data,
             &ComponentState(component.component_node, state_var_ind),
-            core.should_initialize_essential_data
+            should_initialize_essential_data
         );
 
         let sv_renderer_name = state_var_aliases
@@ -1334,7 +1359,7 @@ fn generate_render_tree_internal(
 
     let mut children_instructions = Vec::new();
     if component_definition.should_render_children {
-        for (child, actual_parent) in get_child_refs_including_copy_and_members(core, component.component_node) {
+        for (child, actual_parent) in get_child_refs_including_copy_and_members(component_nodes, component.component_node) {
             match child {
                 ObjectRef::String(string) => {
                     children_instructions.push(json!(string));
@@ -1374,7 +1399,18 @@ fn generate_render_tree_internal(
                         "rendererType": renderer_type,
                     }));
 
-                    generate_render_tree_internal(core, child_component, json_obj); 
+                    generate_render_tree_internal(
+                        component_nodes,
+                        component_attributes,
+                        dependencies,
+                        dependent_on_state_var,
+                        dependent_on_essential,
+                        component_states,
+                        essential_data,
+                        should_initialize_essential_data,
+                        child_component,
+                        json_obj
+                    ); 
                 },
             }
         }
@@ -1441,7 +1477,7 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
 
     let component = core.component_nodes.get(&action.component_name).unwrap();
 
-    let state_var_resolver = | state_var_ind: usize | {
+    let mut state_var_resolver = | state_var_ind: usize | {
         let component_state = ComponentState(&component, state_var_ind);
 
         get_state_var_value(
@@ -1460,7 +1496,7 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
     let state_vars_to_update = (component.definition.on_action)(
         &action.action_name,
         action.args,
-        &state_var_resolver,
+        &mut state_var_resolver,
     );
 
     for (state_var_ind, requested_value) in state_vars_to_update {
@@ -1611,7 +1647,7 @@ fn request_dependencies_to_update_value_including_shadow<'a, 'b>(
 
     } else {
 
-        let dependency_sources = get_dependency_sources_for_state_var(component_nodes, dependencies, essential_data, component_state);
+        let dependency_sources = get_dependency_sources_for_state_var(dependencies, essential_data, component_state);
 
         // log_debug!("Dependency sources for {}, {:?}", component_state, dependency_sources);
 
@@ -1664,7 +1700,7 @@ enum ObjectRef<'a> {
 }
 
 fn get_child_refs_including_copy_and_members<'a>(
-    core: &'a DoenetCore,
+    component_nodes: &'a HashMap<ComponentName, ComponentNode>,
     component_node: &'a ComponentNode,
 ) -> Vec<(ObjectRef<'a>, &'a ComponentNode)> {
 
@@ -1672,8 +1708,8 @@ fn get_child_refs_including_copy_and_members<'a>(
 
     match &component_node.copy_source {
         Some(CopySource::Component(source_name)) => {
-            let source_component = core.component_nodes.get(source_name).unwrap();
-            children_vec = get_child_refs_including_copy_and_members(core, source_component);
+            let source_component = component_nodes.get(source_name).unwrap();
+            children_vec = get_child_refs_including_copy_and_members(component_nodes, source_component);
         },
         _ => {},
     }
@@ -1684,7 +1720,7 @@ fn get_child_refs_including_copy_and_members<'a>(
         .flat_map(|c| match c {
             ComponentChild::String(s) => vec![(ObjectRef::String(s.clone()), component_node)],
             ComponentChild::Component(c) => {
-                let node = core.component_nodes.get(c).unwrap();
+                let node = component_nodes.get(c).unwrap();
                 vec![(ObjectRef::Component(node), component_node)]
             }
         })

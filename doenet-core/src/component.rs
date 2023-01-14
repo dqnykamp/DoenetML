@@ -128,7 +128,7 @@ pub struct ComponentDefinition {
     pub on_action: for<'a> fn(
         action_name: &str,
         args: HashMap<String, Vec<StateVarValue>>,
-        resolve_and_retrieve_state_var: &'a dyn FnMut(usize) -> StateVarValue
+        resolve_and_retrieve_state_var: &'a mut dyn FnMut(usize) -> StateVarValue
     ) -> Vec<(usize, StateVarValue)>,
 
     pub should_render_children: bool,
@@ -226,7 +226,7 @@ impl Default for ComponentDefinition {
 impl Debug for ComponentDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ComponentDefinition")
-            .field("state_var_definitions", &self.state_var_definitions)
+            // .field("state_var_definitions", &self.state_var_definitions)
             .field("should_render_children", &self.should_render_children)
             .field("renderer_type", &self.renderer_type)
             .field("primary_input_state_var_ind", &self.primary_input_state_var_ind)

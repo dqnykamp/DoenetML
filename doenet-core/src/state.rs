@@ -54,16 +54,16 @@ impl StateVar {
 
         match value_type {
             StateVarVariant::Boolean(_) => StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::Boolean(Stale))
+                value_type_protector: RefCell::new(ValueTypeProtector::Boolean(Unresolved))
             },
             StateVarVariant::Integer(_) => StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::Integer(Stale))
+                value_type_protector: RefCell::new(ValueTypeProtector::Integer(Unresolved))
             },
             StateVarVariant::Number(_) =>  StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::Number(Stale))
+                value_type_protector: RefCell::new(ValueTypeProtector::Number(Unresolved))
             },
             StateVarVariant::String(_) => StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::String(Stale))
+                value_type_protector: RefCell::new(ValueTypeProtector::String(Unresolved))
             }
         }
     }

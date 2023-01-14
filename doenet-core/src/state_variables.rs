@@ -20,7 +20,7 @@ pub type InstructionName = &'static str;
 
 /// State variable functions core uses.
 /// The generics force component code to be consistent with the type of a state variable.
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct StateVarDefinition<T> {
 
     /// Some state variable's dependencies change based on other variables.
@@ -72,7 +72,7 @@ impl<T> Default for StateVarDefinition<T>
 
 
 /// Since `StateVarDefinition` is generic, this enum is needed to store one in a HashMap or Vec.
-#[derive(Debug)]
+// #[derive(Debug)]
 pub enum StateVarVariant {
     String(StateVarDefinition<String>),
     Boolean(StateVarDefinition<bool>),
