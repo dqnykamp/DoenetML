@@ -136,9 +136,9 @@ lazy_static! {
              dependency_instructions: vec![
                 DependencyInstruction::Essential { prefill: Some("prefill") }
             ],
-             determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
-             request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
-             ..Default::default()
+            determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
+            request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
+            ..Default::default()
          })),
 
 
