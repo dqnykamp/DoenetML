@@ -2,7 +2,7 @@ use enum_as_inner::EnumAsInner;
 use serde::Serialize;
 
 use crate::state_variables::*;
-use std::{cell::RefCell, fmt};
+use std::{cell::RefCell, fmt, rc::Rc, ops::Deref};
 use self::State::*;
 
 #[derive(Clone)]
@@ -12,7 +12,7 @@ pub struct StateVar {
     // If it any point we might want to mutate a field, its value should be wrapped in a RefCell.
 
     // This field should remain private
-    value_type_protector: RefCell<ValueTypeProtector>,
+    value_type_protector: ValueTypeProtector,
 }
 
 
@@ -22,24 +22,63 @@ pub struct StateVar {
 /// so that the type is retained even when the content is Stale.
 #[derive(Clone, Debug)]
 enum ValueTypeProtector {
-    String(State<String>),
-    Boolean(State<bool>),
-    Integer(State<i64>),
-    Number(State<f64>),
+    String(StateVarInner<String>),
+    Boolean(StateVarInner<bool>),
+    Integer(StateVarInner<i64>),
+    Number(StateVarInner<f64>),
+}
+
+
+pub struct StateVarInner<T> {
+    val: Rc<RefCell<T>>,
+    state: State
+}
+
+impl <T> StateVarInner<T> {
+    // use get_read_only_view to main a reference to the value
+    // that you can repeatedly access its value
+    // but allow the value to be modified when not accessing the value
+    fn get_read_only_view(&self) -> TypedReadOnlyView<T> {
+        TypedReadOnlyView { val: self.val.clone() }
+    }
+
+    // use get_value to get a single reference to the value
+    fn get_value<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        self.val.borrow()
+    }
+}
+
+pub struct TypedReadOnlyView<T> {
+    // this must remain private to ensure read only
+    val: Rc<RefCell<T>>,
+}
+
+impl <T> TypedReadOnlyView<T> {
+    fn borrow<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        self.val.borrow()
+    }
 }
 
 
 #[derive(Debug, Clone, PartialEq, EnumAsInner)]
-pub enum State<T> {
-    Fresh(T),
+pub enum State {
+    Fresh,
     Stale,
     Unresolved,
 }
 
 impl From<&StateVar> for serde_json::Value {
-    fn from(state: &StateVar) -> serde_json::Value {
-        match state.get_state() {
-            State::Fresh(value) => value.into(),
+    fn from(state_var: &StateVar) -> serde_json::Value {
+        match state_var.get_state() {
+            State::Fresh => {
+                let inner = state_var.get_inner();
+                match inner {
+                    ValueTypeProtector::Number(inner_sv) => serde_json::json!(inner_sv.get_value()),
+                    ValueTypeProtector::Integer(inner_sv) => serde_json::json!(inner_sv.get_value()),
+                    ValueTypeProtector::String(inner_sv) => serde_json::json!(inner_sv.get_value()),
+                    ValueTypeProtector::Boolean(inner_sv) => serde_json::json!(inner_sv.get_value()),
+                }
+            },
             State::Stale => serde_json::Value::Null,
             State::Unresolved => serde_json::Value::Null,
         }
@@ -49,23 +88,27 @@ impl From<&StateVar> for serde_json::Value {
 
 impl StateVar {
 
-    /// Stale StateVar of the given type
+    /// Create Unresolved StateVar of the given type
     pub fn new(value_type: &StateVarVariant) -> Self {
 
         match value_type {
             StateVarVariant::Boolean(_) => StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::Boolean(Unresolved))
+                value_type_protector: ValueTypeProtector::Boolean(StateVarInner { val: Rc::new(RefCell::new(false)), state: Unresolved })
             },
             StateVarVariant::Integer(_) => StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::Integer(Unresolved))
+                value_type_protector: ValueTypeProtector::Integer(StateVarInner { val: Rc::new(RefCell::new(0)), state: Unresolved })
             },
             StateVarVariant::Number(_) =>  StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::Number(Unresolved))
+                value_type_protector: ValueTypeProtector::Number(StateVarInner { val: Rc::new(RefCell::new(f64::NAN)), state: Unresolved })
             },
             StateVarVariant::String(_) => StateVar {
-                value_type_protector: RefCell::new(ValueTypeProtector::String(Unresolved))
+                value_type_protector: ValueTypeProtector::String(StateVarInner { val: Rc::new(RefCell::new(String::from(""))), state: Unresolved })
             }
         }
+    }
+
+    pub fn get_inner(&self) -> &ValueTypeProtector {
+        &self.value_type_protector
     }
 
     pub fn set_value(&self, new_value: StateVarValue) -> Result<StateVarValue, String> {
@@ -87,37 +130,48 @@ impl StateVar {
     }
 
 
-    pub fn get_state(&self) -> State<StateVarValue> {
+    pub fn get_state(&self) -> State {
 
         let type_protector = &*self.value_type_protector.borrow();
 
         match type_protector {
-            ValueTypeProtector::String(value_option) => match value_option {
-                Fresh(val) => Fresh(StateVarValue::String(val.clone())),
-                Stale => Stale,
-                Unresolved => Unresolved
-            },
-            ValueTypeProtector::Number(value_option) => match value_option {
-                Fresh(val) => Fresh(StateVarValue::Number(val.clone())),
-                Stale => Stale,
-                Unresolved => Unresolved
-            },
-            ValueTypeProtector::Boolean(value_option) => match value_option {
-                Fresh(val) => Fresh(StateVarValue::Boolean(val.clone())),
-                Stale => Stale,
-                Unresolved => Unresolved
-            },
-            ValueTypeProtector::Integer(value_option) => match value_option {
-                Fresh(val) => Fresh(StateVarValue::Integer(val.clone())),
-                Stale => Stale,
-                Unresolved => Unresolved
-            }
+            ValueTypeProtector::String(sv_inner) => sv_inner.state,
+            ValueTypeProtector::Number(sv_inner) => sv_inner.state,
+            ValueTypeProtector::Integer(sv_inner) => sv_inner.state,
+            ValueTypeProtector::Boolean(sv_inner) => sv_inner.state,
         }
     }
 
 
+}
+
+
+impl ValueTypeProtector {
+
+    fn set_value(&mut self, new_value: StateVarValue) -> Result<StateVarValue, String> {
+
+        match self {
+            ValueTypeProtector::String(state) => {                
+                *state = Fresh(new_value.clone().try_into()?);
+            },
+            ValueTypeProtector::Integer(state) => {
+                *state = Fresh(new_value.clone().try_into()?);
+            },
+            ValueTypeProtector::Number(state) => {
+                *state = Fresh(new_value.clone().try_into()?);
+            },
+            ValueTypeProtector::Boolean(state) => {
+                *state = Fresh(new_value.clone().try_into()?);
+            }
+        }
+
+        Ok(new_value)
+    }
 
 }
+
+
+
 
 
 
@@ -166,27 +220,4 @@ impl StateVarValue {
     }
 }
 
-impl ValueTypeProtector {
-
-    fn set_value(&mut self, new_value: StateVarValue) -> Result<StateVarValue, String> {
-
-        match self {
-            ValueTypeProtector::String(state) => {                
-                *state = Fresh(new_value.clone().try_into()?);
-            },
-            ValueTypeProtector::Integer(state) => {
-                *state = Fresh(new_value.clone().try_into()?);
-            },
-            ValueTypeProtector::Number(state) => {
-                *state = Fresh(new_value.clone().try_into()?);
-            },
-            ValueTypeProtector::Boolean(state) => {
-                *state = Fresh(new_value.clone().try_into()?);
-            }
-        }
-
-        Ok(new_value)
-    }
-
-}
 
