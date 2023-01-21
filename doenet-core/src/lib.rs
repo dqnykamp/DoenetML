@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
-use state::{State, EssentialStateVar};
+use state::{Freshness, EssentialStateVar};
 use component::*;
 use state_variables::*;
 
@@ -891,12 +891,12 @@ fn get_state_var_value(
     // Is there a better way to make sure it is initialized?
     let mut updated_value = StateVarValue::Boolean(false);
 
-    let current_state = original_component_state.get_value(component_states);
+    let current_freshness = original_component_state.get_freshness(component_states);
     
-    let initial_calculation_state = match current_state {
+    let initial_calculation_state = match current_freshness {
         // No need to continue if the state var is already fresh
-        State::Fresh(current_value) => return current_value,
-        State::Unresolved => StateVarCalculationState::Unresolved(UnresolvedCalculationState{
+        Freshness::Fresh => return original_component_state.get_value_assuming_fresh(component_states),
+        Freshness::Unresolved => StateVarCalculationState::Unresolved(UnresolvedCalculationState{
             component_state: original_component_state.clone(),
             instruction_ind: 0,
             val_ind: 0,
@@ -906,7 +906,7 @@ fn get_state_var_value(
             dependency_values_for_state_var: None,
             values_for_this_dep: None
         }),
-        State::Stale => StateVarCalculationState::Stale(StaleCalculationState {
+        Freshness::Stale => StateVarCalculationState::Stale(StaleCalculationState {
             component_state: original_component_state.clone(),
             instruction_ind: 0,
             val_ind: 0,
@@ -1007,12 +1007,12 @@ fn get_state_var_value(
                                 let new_node = component_nodes.get(&comp_name_inner.clone()).unwrap();
                                 let new_component_state = ComponentState(new_node, *sv_ind_inner);
 
-                                let new_current_state = new_component_state.get_value(component_states);
+                                let new_current_freshness = new_component_state.get_freshness(component_states);
     
-                                let state_var_value = match new_current_state {
+                                let state_var_value = match new_current_freshness {
                                     // No need to continue if the state var is already fresh
-                                    State::Fresh(new_current_value) => new_current_value,
-                                    State::Unresolved => {
+                                    Freshness::Fresh => new_component_state.get_value_assuming_fresh(component_states),
+                                    Freshness::Unresolved => {
                                         stack.push(
                                             StateVarCalculationState::Unresolved(UnresolvedCalculationState {
                                                 component_state,
@@ -1040,7 +1040,7 @@ fn get_state_var_value(
 
                                         continue 'stack_loop;
                                     }
-                                    State::Stale => {
+                                    Freshness::Stale => {
                                         stack.push(
                                             StateVarCalculationState::Unresolved(UnresolvedCalculationState {
                                                 component_state,
@@ -1134,12 +1134,12 @@ fn get_state_var_value(
                                 let new_node = component_nodes.get(component_name).unwrap();
                                 let new_component_state = ComponentState(new_node, *state_var_ind);
 
-                                let new_current_state = new_component_state.get_value(component_states);
+                                let new_current_freshness = new_component_state.get_freshness(component_states);
     
-                                let state_var_value = match new_current_state {
+                                let state_var_value = match new_current_freshness {
                                     // No need to continue if the state var is already fresh
-                                    State::Fresh(new_current_value) => new_current_value,
-                                    State::Unresolved => {
+                                    Freshness::Fresh => new_component_state.get_value_assuming_fresh(component_states),
+                                    Freshness::Unresolved => {
                                         stack.push(
                                             StateVarCalculationState::Stale(StaleCalculationState {
                                                 component_state,
@@ -1163,7 +1163,7 @@ fn get_state_var_value(
 
                                         continue 'stack_loop;
                                     }
-                                    State::Stale => {
+                                    Freshness::Stale => {
                                         stack.push(
                                             StateVarCalculationState::Stale(StaleCalculationState {
                                                 component_state,
@@ -1227,11 +1227,11 @@ fn get_state_var_value(
         match update_instruction {
             StateVarUpdateInstruction::NoChange => {
                 // match current_state {
-                //     State::Fresh(current_value) => {
+                //     Freshness::Fresh(current_value) => {
                 //         // Do nothing. It's fresh, so we can use it as is
                 //         updated_value = current_value;
                 //     },
-                //     State::Stale | State::Unresolved => 
+                //     Freshness::Stale | Freshness::Unresolved => 
                         panic!("Cannot use NoChange update instruction on a stale or unresolved value");
                 // }
             },
@@ -1377,9 +1377,9 @@ fn mark_stale_state_var_and_dependencies(
     while let Some((component_name, state_var_ind)) = stack.pop() {
 
         let state = component_states
-            .get(&component_name.clone())
+            .get_mut(&component_name.clone())
             .expect(&format!("Error accessing state of {:?}", component_name))
-            .get(state_var_ind)
+            .get_mut(state_var_ind)
             .expect(&format!("Error accessing state variable {} of {:?}", state_var_ind, component_name));
             
 
@@ -1664,7 +1664,7 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
 
         // if component state is unresolved, then calculate its value to resolve it
         let component_state = ComponentState(&component, state_var_ind);
-        if component_state.get_value(&core.component_states) == State::Unresolved {
+        if component_state.get_freshness(&core.component_states) == Freshness::Unresolved {
             get_state_var_value(
                 &core.component_nodes, 
                 &core.component_attributes,
@@ -1935,18 +1935,26 @@ fn get_child_nodes_including_copy<'a>(
 
 impl<'a> ComponentState<'a> {
 
-    fn get_value(&self, component_states: &HashMap<ComponentName, Vec<StateVar>>)
-        -> State<StateVarValue> {
+    fn get_freshness(&self, component_states: &HashMap<ComponentName, Vec<StateVar>>)
+        -> Freshness {
         component_states.get(&self.0.name).unwrap()
             .get(self.1)
             .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
-            .get_state()
+            .get_freshness()
     }
 
-    fn set_value(&self, component_states: &HashMap<ComponentName, Vec<StateVar>>, new_value: StateVarValue)
+    fn get_value_assuming_fresh(&self, component_states: &HashMap<ComponentName, Vec<StateVar>>)
+    -> StateVarValue {
+    component_states.get(&self.0.name).unwrap()
+        .get(self.1)
+        .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
+        .get_value_assuming_fresh()
+}
+
+    fn set_value(&self, component_states: &mut HashMap<ComponentName, Vec<StateVar>>, new_value: StateVarValue)
         -> StateVarValue {
-            component_states.get(&self.0.name).unwrap()
-                .get(self.1)
+            component_states.get_mut(&self.0.name).unwrap()
+                .get_mut(self.1)
                 .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
                 .set_value(new_value)
                 .unwrap()

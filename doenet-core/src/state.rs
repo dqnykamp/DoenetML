@@ -3,17 +3,7 @@ use serde::Serialize;
 
 use crate::state_variables::*;
 use std::{cell::RefCell, fmt, rc::Rc, ops::Deref};
-use self::State::*;
-
-#[derive(Clone)]
-pub struct StateVar {
-
-    // Why we need RefCells: the Box does not allow mutability in the thing it wraps.
-    // If it any point we might want to mutate a field, its value should be wrapped in a RefCell.
-
-    // This field should remain private
-    value_type_protector: ValueTypeProtector,
-}
+// use self::Freshness::*;
 
 
 /// This private enum does not change its variant once initialized,
@@ -21,7 +11,7 @@ pub struct StateVar {
 /// We have to store the State enum *inside* each variant
 /// so that the type is retained even when the content is Stale.
 #[derive(Clone, Debug)]
-enum ValueTypeProtector {
+pub enum StateVar {
     String(StateVarInner<String>),
     Boolean(StateVarInner<bool>),
     Integer(StateVarInner<i64>),
@@ -29,9 +19,11 @@ enum ValueTypeProtector {
 }
 
 
+
+#[derive(Clone, Debug)]
 pub struct StateVarInner<T> {
-    val: Rc<RefCell<T>>,
-    state: State
+    value: Rc<RefCell<T>>,
+    freshness: Freshness
 }
 
 impl <T> StateVarInner<T> {
@@ -39,12 +31,15 @@ impl <T> StateVarInner<T> {
     // that you can repeatedly access its value
     // but allow the value to be modified when not accessing the value
     fn get_read_only_view(&self) -> TypedReadOnlyView<T> {
-        TypedReadOnlyView { val: self.val.clone() }
+        TypedReadOnlyView { val: self.value.clone() }
     }
 
     // use get_value to get a single reference to the value
-    fn get_value<'a>(&'a self) -> impl Deref<Target = T> + 'a {
-        self.val.borrow()
+    fn get_value_assuming_fresh<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        if self.freshness != Freshness::Fresh {
+            panic!("State variable is not fressh, cannot get its fresh value");
+        }
+        self.value.borrow()
     }
 }
 
@@ -55,13 +50,14 @@ pub struct TypedReadOnlyView<T> {
 
 impl <T> TypedReadOnlyView<T> {
     fn borrow<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        // Note: this does not check to make sure that the value is fresh
         self.val.borrow()
     }
 }
 
 
-#[derive(Debug, Clone, PartialEq, EnumAsInner)]
-pub enum State {
+#[derive(Debug, Clone, Copy, PartialEq, EnumAsInner)]
+pub enum Freshness {
     Fresh,
     Stale,
     Unresolved,
@@ -69,18 +65,17 @@ pub enum State {
 
 impl From<&StateVar> for serde_json::Value {
     fn from(state_var: &StateVar) -> serde_json::Value {
-        match state_var.get_state() {
-            State::Fresh => {
-                let inner = state_var.get_inner();
-                match inner {
-                    ValueTypeProtector::Number(inner_sv) => serde_json::json!(inner_sv.get_value()),
-                    ValueTypeProtector::Integer(inner_sv) => serde_json::json!(inner_sv.get_value()),
-                    ValueTypeProtector::String(inner_sv) => serde_json::json!(inner_sv.get_value()),
-                    ValueTypeProtector::Boolean(inner_sv) => serde_json::json!(inner_sv.get_value()),
+        match state_var.get_freshness() {
+            Freshness::Fresh => {
+                match state_var {
+                    StateVar::Number(inner_sv) => serde_json::json!(*inner_sv.get_value_assuming_fresh()),
+                    StateVar::Integer(inner_sv) => serde_json::json!(*inner_sv.get_value_assuming_fresh()),
+                    StateVar::String(inner_sv) => serde_json::json!(inner_sv.get_value_assuming_fresh().clone()),
+                    StateVar::Boolean(inner_sv) => serde_json::json!(*inner_sv.get_value_assuming_fresh()),
                 }
             },
-            State::Stale => serde_json::Value::Null,
-            State::Unresolved => serde_json::Value::Null,
+            Freshness::Stale => serde_json::Value::Null,
+            Freshness::Unresolved => serde_json::Value::Null,
         }
     }
 }
@@ -92,83 +87,81 @@ impl StateVar {
     pub fn new(value_type: &StateVarVariant) -> Self {
 
         match value_type {
-            StateVarVariant::Boolean(_) => StateVar {
-                value_type_protector: ValueTypeProtector::Boolean(StateVarInner { val: Rc::new(RefCell::new(false)), state: Unresolved })
-            },
-            StateVarVariant::Integer(_) => StateVar {
-                value_type_protector: ValueTypeProtector::Integer(StateVarInner { val: Rc::new(RefCell::new(0)), state: Unresolved })
-            },
-            StateVarVariant::Number(_) =>  StateVar {
-                value_type_protector: ValueTypeProtector::Number(StateVarInner { val: Rc::new(RefCell::new(f64::NAN)), state: Unresolved })
-            },
-            StateVarVariant::String(_) => StateVar {
-                value_type_protector: ValueTypeProtector::String(StateVarInner { val: Rc::new(RefCell::new(String::from(""))), state: Unresolved })
-            }
+            StateVarVariant::Number(_) => StateVar::Number(
+                StateVarInner { value: Rc::new(RefCell::new(f64::NAN)), freshness: Freshness::Unresolved }
+            ),
+            StateVarVariant::Integer(_) => StateVar::Integer(
+                StateVarInner { value: Rc::new(RefCell::new(0)), freshness: Freshness::Unresolved }
+            ),
+            StateVarVariant::Boolean(_) => StateVar::Boolean(
+                StateVarInner { value: Rc::new(RefCell::new(false)), freshness: Freshness::Unresolved }
+            ),
+            StateVarVariant::String(_) => StateVar::String(
+                StateVarInner { value: Rc::new(RefCell::new(String::from(""))), freshness: Freshness::Unresolved }
+            ),
         }
     }
 
-    pub fn get_inner(&self) -> &ValueTypeProtector {
-        &self.value_type_protector
-    }
-
-    pub fn set_value(&self, new_value: StateVarValue) -> Result<StateVarValue, String> {
-
-        self.value_type_protector.borrow_mut().set_value(new_value)
-    }
-
-
-    pub fn mark_stale(&self) {
-
-        let type_protector = &mut *self.value_type_protector.borrow_mut();
-
-        *type_protector = match type_protector {
-            ValueTypeProtector::String(_)  => ValueTypeProtector::String(Stale),
-            ValueTypeProtector::Boolean(_) => ValueTypeProtector::Boolean(Stale),
-            ValueTypeProtector::Number(_)  => ValueTypeProtector::Number(Stale),
-            ValueTypeProtector::Integer(_) => ValueTypeProtector::Integer(Stale),
-        }
-    }
-
-
-    pub fn get_state(&self) -> State {
-
-        let type_protector = &*self.value_type_protector.borrow();
-
-        match type_protector {
-            ValueTypeProtector::String(sv_inner) => sv_inner.state,
-            ValueTypeProtector::Number(sv_inner) => sv_inner.state,
-            ValueTypeProtector::Integer(sv_inner) => sv_inner.state,
-            ValueTypeProtector::Boolean(sv_inner) => sv_inner.state,
-        }
-    }
-
-
-}
-
-
-impl ValueTypeProtector {
-
-    fn set_value(&mut self, new_value: StateVarValue) -> Result<StateVarValue, String> {
+    pub fn set_value(&mut self, new_value: StateVarValue) -> Result<StateVarValue, String> {
 
         match self {
-            ValueTypeProtector::String(state) => {                
-                *state = Fresh(new_value.clone().try_into()?);
+            StateVar::String(sv_inner) => {    
+                *sv_inner.value.borrow_mut() = new_value.clone().try_into()?;
+                sv_inner.freshness = Freshness::Fresh;            
             },
-            ValueTypeProtector::Integer(state) => {
-                *state = Fresh(new_value.clone().try_into()?);
+            StateVar::Integer(sv_inner) => {
+                *sv_inner.value.borrow_mut() = new_value.clone().try_into()?;
+                sv_inner.freshness = Freshness::Fresh;            
             },
-            ValueTypeProtector::Number(state) => {
-                *state = Fresh(new_value.clone().try_into()?);
+            StateVar::Number(sv_inner) => {
+                *sv_inner.value.borrow_mut() = new_value.clone().try_into()?;
+                sv_inner.freshness = Freshness::Fresh;            
             },
-            ValueTypeProtector::Boolean(state) => {
-                *state = Fresh(new_value.clone().try_into()?);
+            StateVar::Boolean(sv_inner) => {
+                *sv_inner.value.borrow_mut() = new_value.clone().try_into()?;
+                sv_inner.freshness = Freshness::Fresh;            
             }
         }
 
         Ok(new_value)
     }
 
+    pub fn mark_stale(&mut self) {
+
+        match self {
+            StateVar::String(sv_inner)  => sv_inner.freshness = Freshness::Stale,
+            StateVar::Boolean(sv_inner) => sv_inner.freshness = Freshness::Stale,
+            StateVar::Number(sv_inner)  => sv_inner.freshness = Freshness::Stale,
+            StateVar::Integer(sv_inner) => sv_inner.freshness = Freshness::Stale,
+        };
+    }
+
+
+    pub fn get_freshness(&self) -> Freshness {
+
+        match self {
+            StateVar::String(sv_inner) => sv_inner.freshness,
+            StateVar::Number(sv_inner) => sv_inner.freshness,
+            StateVar::Integer(sv_inner) => sv_inner.freshness,
+            StateVar::Boolean(sv_inner) => sv_inner.freshness,
+        }
+    }
+
+    pub fn get_value_assuming_fresh(&self) -> StateVarValue {
+        match self {
+            StateVar::Boolean(sv_bool) => StateVarValue::Boolean(*sv_bool.get_value_assuming_fresh()),
+            StateVar::Number(sv_number) => StateVarValue::Number(*sv_number.get_value_assuming_fresh()),
+            StateVar::Integer(sv_int) => StateVarValue::Integer(*sv_int.get_value_assuming_fresh()),
+            StateVar::String(sv_string) => StateVarValue::String(sv_string.get_value_assuming_fresh().clone()),
+        }
+
+    }
+
+    
+
 }
+
+
 
 
 
@@ -190,11 +183,11 @@ impl EssentialStateVar {
 
 // Boilerplate to display EssentialStateVar and StateVar better
 
-impl fmt::Debug for StateVar {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("{:?}", &self.get_state()))
-    }
-}
+// impl fmt::Debug for StateVar {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         f.write_str(&format!("{:?}", &self.get_state()))
+//     }
+// }
 
 impl StateVarValue {
     fn set_protect_type(&mut self,  new_value: StateVarValue) -> Result<(), String> {
