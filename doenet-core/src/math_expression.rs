@@ -84,7 +84,15 @@ impl From<f64> for MathExpression {
 }
 
 
-
+impl Default for MathExpression {
+    fn default() -> Self {
+        MathExpression {
+            tree: build_operator_tree("NaN").unwrap(),
+            variable_prefix: String::new(),
+            external_variables_count: 0,
+        }
+    }
+}
 
 
 

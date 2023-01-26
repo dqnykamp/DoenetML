@@ -4,17 +4,16 @@ pub mod component;
 pub mod state;
 pub mod parse_json;
 pub mod utils;
-pub mod base_definitions;
+// pub mod base_definitions;
 pub mod math_expression;
 
 use lazy_static::lazy_static;
 use parse_json::{DoenetMLError, DoenetMLWarning, MLComponent, RangeInDoenetML};
-use state::StateVar;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
-use state::{Freshness, EssentialStateVar};
+use state::{Freshness, StateVar, EssentialStateVar, StateVarReadOnly};
 use component::*;
 use state_variables::*;
 
@@ -35,6 +34,8 @@ pub struct DoenetCore {
 
     /// State variables
     pub component_states: HashMap<ComponentName, Vec<StateVar>>,
+
+    pub component_state_variables: HashMap<ComponentName, Vec<StateVarVariant>>,
 
     // attributes (needed to construct dependencies)
     component_attributes: HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
@@ -57,7 +58,7 @@ pub struct DoenetCore {
 
     /// Endpoints of the dependency graph.
     /// Every update instruction will lead to these.
-    pub essential_data: HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
+    pub essential_data: HashMap<ComponentName, HashMap<EssentialDataOrigin, StateVar>>,
 
     /// if true, then we didn't read in initial essential_data
     /// so must initialize essential data when creating dependencies
@@ -133,7 +134,7 @@ pub enum Dependency {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DependenciesForStateVar {
     dependencies: Vec<Vec<Dependency>>,
     dependency_values: Vec<Vec<DependencyValue>>
@@ -141,7 +142,7 @@ pub struct DependenciesForStateVar {
 
 pub fn create_doenet_core(
     program: &str,
-    existing_essential_data: Option<HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>>,
+    existing_essential_data: Option<HashMap<ComponentName, HashMap<EssentialDataOrigin, StateVar>>>,
 ) -> Result<(DoenetCore, Vec<DoenetMLWarning>, Vec<DoenetMLError>), DoenetMLError> {
 
     log!("===== DoenetCore creation =====");
@@ -193,7 +194,7 @@ pub fn create_doenet_core(
 
     // check_for_cyclical_dependencies(&dependencies)?;
 
-    let component_states = create_unresolved_component_states(&component_nodes);
+    let (component_state_variables, component_states) = create_unresolved_component_states(&component_nodes);
 
     // log!("component_states: {:#?}", component_states);
 
@@ -215,6 +216,7 @@ pub fn create_doenet_core(
 
     Ok((DoenetCore {
         component_nodes,
+        component_state_variables,
         component_states,
         component_attributes,
         root_component_name,
@@ -333,7 +335,8 @@ fn create_dependencies_from_instruction_initialize_essential(
     state_var_ind: usize,
     the_component_attributes: &HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>,
     instruction: &DependencyInstruction,
-    essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
+    component_state_variables: &HashMap<ComponentName, Vec<StateVarVariant>>,
+    essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, StateVar>>,
     should_initialize_essential_data: bool,
 ) -> Vec<Dependency> {
 
@@ -351,7 +354,7 @@ fn create_dependencies_from_instruction_initialize_essential(
             if should_initialize_essential_data && source_name == *component_name {
                 // Components only create their own essential data
 
-                let (_, sv_def) = &component.definition.state_var_definitions[state_var_ind];
+                let sv_def = &component_state_variables.get(component_name).unwrap()[state_var_ind];
 
                 let initial_data: StateVarValue = prefill
                     .and_then(|prefill_attr_name| the_component_attributes
@@ -364,7 +367,7 @@ fn create_dependencies_from_instruction_initialize_essential(
                                 )
                             })
                         )
-                    .unwrap_or(sv_def.initial_essential_value());
+                    .unwrap_or(sv_def.return_initial_essential_value());
 
                 let initial_data = InitialEssentialData::Single(initial_data);
     
@@ -558,154 +561,156 @@ fn create_dependencies_from_instruction_initialize_essential(
 
         DependencyInstruction::Attribute { attribute_name } => {
 
-            // log_debug!("Getting attribute {} for {}", attribute_name, component_slice);
-            let (_, sv_def) = &component.definition.state_var_definitions[state_var_ind];
-            let essential_origin = EssentialDataOrigin::StateVar(state_var_ind);
+            unimplemented!("Have not implemented attribute dependency instruction")
+
+            // // log_debug!("Getting attribute {} for {}", attribute_name, component_slice);
+            // let (_, sv_def) = &component.definition.state_var_definitions[state_var_ind];
+            // let essential_origin = EssentialDataOrigin::StateVar(state_var_ind);
 
 
-            let default_value = match sv_def {
+            // let default_value = match sv_def {
 
-                StateVarVariant::Number(_) | 
-                StateVarVariant::Integer(_) => {
-                    StateVarValue::MathExpr(MathExpression::new(
-                        &vec![ObjectName::String(match sv_def.initial_essential_value() {
-                            StateVarValue::Number(v) => v.to_string(),
-                            StateVarValue::Integer(v) => v.to_string(),
-                            _ => unreachable!(),
-                        })]
-                    ))
-                },
-                _ => sv_def.initial_essential_value(),
-            };
+            //     StateVarVariant::Number(_) | 
+            //     StateVarVariant::Integer(_) => {
+            //         StateVarValue::MathExpr(MathExpression::new(
+            //             &vec![ObjectName::String(match sv_def.initial_essential_value() {
+            //                 StateVarValue::Number(v) => v.to_string(),
+            //                 StateVarValue::Integer(v) => v.to_string(),
+            //                 _ => unreachable!(),
+            //             })]
+            //         ))
+            //     },
+            //     _ => sv_def.initial_essential_value(),
+            // };
 
-            let attribute = the_component_attributes.get(*attribute_name);
-            if attribute.is_none() {
-                if let Some(CopySource::Component(component_name)) = &component.copy_source {
+            // let attribute = the_component_attributes.get(*attribute_name);
+            // if attribute.is_none() {
+            //     if let Some(CopySource::Component(component_name)) = &component.copy_source {
 
-                    // inherit attribute from copy source
+            //         // inherit attribute from copy source
 
-                    return vec![Dependency::StateVar {
-                        component_name: component_name.clone(),
-                        state_var_ind
-                     }]
-                }
+            //         return vec![Dependency::StateVar {
+            //             component_name: component_name.clone(),
+            //             state_var_ind
+            //          }]
+            //     }
 
-                if should_initialize_essential_data {
-                    create_essential_data_for(
-                        &component.name,
-                        EssentialDataOrigin::StateVar(state_var_ind),
-                        InitialEssentialData::Single(default_value),
-                        essential_data
-                    );    
-                }
+            //     if should_initialize_essential_data {
+            //         create_essential_data_for(
+            //             &component.name,
+            //             EssentialDataOrigin::StateVar(state_var_ind),
+            //             InitialEssentialData::Single(default_value),
+            //             essential_data
+            //         );    
+            //     }
 
-                return vec![Dependency::Essential {
-                    component_name: component.name.clone(),
-                    origin: essential_origin,
-                }]
-            }
+            //     return vec![Dependency::Essential {
+            //         component_name: component.name.clone(),
+            //         origin: essential_origin,
+            //     }]
+            // }
 
-            // attribute specified
-            let attribute = attribute.unwrap();
+            // // attribute specified
+            // let attribute = attribute.unwrap();
 
-            // log_debug!("attribute {:?}", attribute);
+            // // log_debug!("attribute {:?}", attribute);
 
-            // Create the essential data if it does not exist yet
-            if should_initialize_essential_data && !essential_data_exists_for(&component.name, &essential_origin, essential_data) {
+            // // Create the essential data if it does not exist yet
+            // if should_initialize_essential_data && !essential_data_exists_for(&component.name, &essential_origin, essential_data) {
 
-                let get_value_from_object_list = |obj_list: &Vec<ObjectName>| -> StateVarValue {
+            //     let get_value_from_object_list = |obj_list: &Vec<ObjectName>| -> StateVarValue {
 
-                    if matches!(sv_def, StateVarVariant::Number(_)
-                        | StateVarVariant::Integer(_)
-                        | StateVarVariant::Boolean(_)
-                    ) {
-                        StateVarValue::MathExpr(
-                            MathExpression::new(obj_list)
-                        )
-                    } else if obj_list.len() > 0 {
+            //         if matches!(sv_def, StateVarVariant::Number(_)
+            //             | StateVarVariant::Integer(_)
+            //             | StateVarVariant::Boolean(_)
+            //         ) {
+            //             StateVarValue::MathExpr(
+            //                 MathExpression::new(obj_list)
+            //             )
+            //         } else if obj_list.len() > 0 {
 
-                        let first_obj = obj_list.get(0).unwrap();
-                        if obj_list.len() > 1 {
-                            unimplemented!("Multiple objects for non mathexpression state var");
-                        }
-                        match first_obj {
-                            ObjectName::String(str_val) => {
-                                package_string_as_state_var_value(str_val.to_string(), &sv_def).unwrap()
-                            }
-                            _ => default_value.clone()
-                        }
-                    } else {
-                        default_value.clone()
-                    }
-                };
+            //             let first_obj = obj_list.get(0).unwrap();
+            //             if obj_list.len() > 1 {
+            //                 unimplemented!("Multiple objects for non mathexpression state var");
+            //             }
+            //             match first_obj {
+            //                 ObjectName::String(str_val) => {
+            //                     package_string_as_state_var_value(str_val.to_string(), &sv_def).unwrap()
+            //                 }
+            //                 _ => default_value.clone()
+            //             }
+            //         } else {
+            //             default_value.clone()
+            //         }
+            //     };
 
-                let initial_essential_data;
-
-
-                assert_eq!(attribute.keys().len(), 1);
-                let obj_list = attribute.get(&1).unwrap();
-
-                // log_debug!("Initializing non-array essential data for {} from attribute data {:?}", component_slice, obj_list);
-
-                let value = get_value_from_object_list(obj_list);
-                initial_essential_data = InitialEssentialData::Single(value);                    
-
-                create_essential_data_for(
-                    &component.name,
-                    essential_origin.clone(),
-                    initial_essential_data,
-                    essential_data,
-                );
-            }
+            //     let initial_essential_data;
 
 
-            let attribute_index = 1;
-            let attr_objects = attribute.get(&attribute_index)
-                .expect(&format!("attribute {} does not have index {}. Attribute: {:?}",
-                    component.name, &attribute_index, attribute));
+            //     assert_eq!(attribute.keys().len(), 1);
+            //     let obj_list = attribute.get(&1).unwrap();
 
-            let mut dependencies = Vec::new();
+            //     // log_debug!("Initializing non-array essential data for {} from attribute data {:?}", component_slice, obj_list);
 
-            let relevant_attr_objects = match sv_def {
-                StateVarVariant::Number(_) |
-                StateVarVariant::Integer(_) => {
-                    // First add an essential dependency to the expression
-                    dependencies.push(Dependency::Essential {
-                        component_name: component.name.clone(),
-                        origin: essential_origin.clone(),
-                    });
+            //     let value = get_value_from_object_list(obj_list);
+            //     initial_essential_data = InitialEssentialData::Single(value);                    
 
-                    attr_objects.into_iter().filter_map(|obj|
-                        matches!(obj, ObjectName::Component(_)).then(|| obj.clone())
-                    ).collect()
-                },
-                _ => attr_objects.clone(),
-            };
+            //     create_essential_data_for(
+            //         &component.name,
+            //         essential_origin.clone(),
+            //         initial_essential_data,
+            //         essential_data,
+            //     );
+            // }
 
-            for attr_object in relevant_attr_objects {
 
-                let dependency = match attr_object {
-                    ObjectName::String(_) => Dependency::Essential {
-                        component_name: component.name.clone(),
-                        origin: essential_origin.clone(),
-                    },
-                    ObjectName::Component(comp_name) => {
-                        let comp = component_nodes.get(&comp_name).unwrap();
-                        let primary_input_sv_ind = comp.definition.primary_input_state_var_ind.expect(
-                            &format!("An attribute cannot depend on a non-primitive component. Try adding '.value' to the macro.")
-                        );
+            // let attribute_index = 1;
+            // let attr_objects = attribute.get(&attribute_index)
+            //     .expect(&format!("attribute {} does not have index {}. Attribute: {:?}",
+            //         component.name, &attribute_index, attribute));
 
-                        Dependency::StateVar { 
-                            component_name: comp_name,
-                            state_var_ind: primary_input_sv_ind
-                         }
-                    },
-                };
+            // let mut dependencies = Vec::new();
 
-                dependencies.push(dependency);
-            }
+            // let relevant_attr_objects = match sv_def {
+            //     StateVarVariant::Number(_) |
+            //     StateVarVariant::Integer(_) => {
+            //         // First add an essential dependency to the expression
+            //         dependencies.push(Dependency::Essential {
+            //             component_name: component.name.clone(),
+            //             origin: essential_origin.clone(),
+            //         });
 
-            dependencies
+            //         attr_objects.into_iter().filter_map(|obj|
+            //             matches!(obj, ObjectName::Component(_)).then(|| obj.clone())
+            //         ).collect()
+            //     },
+            //     _ => attr_objects.clone(),
+            // };
+
+            // for attr_object in relevant_attr_objects {
+
+            //     let dependency = match attr_object {
+            //         ObjectName::String(_) => Dependency::Essential {
+            //             component_name: component.name.clone(),
+            //             origin: essential_origin.clone(),
+            //         },
+            //         ObjectName::Component(comp_name) => {
+            //             let comp = component_nodes.get(&comp_name).unwrap();
+            //             let primary_input_sv_ind = comp.definition.primary_input_state_var_ind.expect(
+            //                 &format!("An attribute cannot depend on a non-primitive component. Try adding '.value' to the macro.")
+            //             );
+
+            //             Dependency::StateVar { 
+            //                 component_name: comp_name,
+            //                 state_var_ind: primary_input_sv_ind
+            //              }
+            //         },
+            //     };
+
+            //     dependencies.push(dependency);
+            // }
+
+            // dependencies
         },
     }
 }
@@ -792,7 +797,7 @@ fn create_essential_data_for(
     component_name: &ComponentName,
     origin: EssentialDataOrigin,
     initial_values: InitialEssentialData,
-    essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
+    essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, StateVar>>,
 ) {
 
     if let Some(comp_essential_data) = essential_data.get(component_name) {
@@ -800,7 +805,7 @@ fn create_essential_data_for(
     }
 
     let essential_state = match initial_values {
-        InitialEssentialData::Single(value) => EssentialStateVar(value)
+        InitialEssentialData::Single(value) => StateVar::new_with_value(value)
     };
 
     // log_debug!("New essential data for {} {:?} {:?}", component_name, origin, essential_state);
@@ -828,22 +833,26 @@ fn essential_data_exists_for(
 
 
 fn create_unresolved_component_states(component_nodes: &HashMap<ComponentName, ComponentNode>)
-    -> HashMap<ComponentName, Vec<StateVar>> {
+    -> (HashMap<ComponentName, Vec<StateVarVariant>>,
+        HashMap<ComponentName, Vec<StateVar>>
+     ) {
 
+    let mut component_state_variables = HashMap::new();
     let mut component_states = HashMap::new();
     for  component in component_nodes.values() {
+        let state_variables = (component.definition.generate_state_vars)();
+        let states = state_variables.iter().map(|sv| sv.create_new_mutable_view()).collect();
 
-        let state_for_this_component: Vec<StateVar> =
-            component.definition.state_var_definitions.iter()
-                .map(|(_, sv_variant)| StateVar::new(&sv_variant))
-                .collect();
-            
+        component_state_variables.insert(
+            component.name.clone(),
+            state_variables
+        );        
         component_states.insert(
             component.name.clone(),
-            state_for_this_component,
+            states
         );
     }
-    component_states
+    (component_state_variables, component_states)
 }
 
 
@@ -857,7 +866,7 @@ struct UnresolvedCalculationState<'a> {
     component_state: ComponentState<'a>,
     instruction_ind: usize,
     val_ind: usize,
-    dependency_instructions: Option<&'a Vec<DependencyInstruction>>,
+    dependency_instructions: Option<Vec<DependencyInstruction>>,
     instruct_dependencies: Option<Vec<Dependency>>,
     dependencies_for_state_var: Option<Vec<Vec<Dependency>>>,
     dependency_values_for_state_var: Option<Vec<Vec<DependencyValue>>>,
@@ -867,7 +876,6 @@ struct StaleCalculationState<'a> {
     component_state: ComponentState<'a>,
     instruction_ind: usize,
     val_ind: usize,
-    dependencies_for_state_var: Option<Vec<Vec<Dependency>>>
 }
 
 enum StateVarCalculationState<'a> {
@@ -881,21 +889,38 @@ fn get_state_var_value(
     dependencies: &mut HashMap<ComponentName, Vec<DependenciesForStateVar>>,
     dependent_on_state_var: &mut HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
     dependent_on_essential: &mut HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
+    component_state_variables: &mut HashMap<ComponentName, Vec<StateVarVariant>>,
     component_states: &mut HashMap<ComponentName, Vec<StateVar>>,
     essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     original_component_state: ComponentState,
     should_initialize_essential_data: bool
 ) -> StateVarValue {
 
-    // TODO: initialize updated_value as false as otherwise compiler thinks it may uninitialized in some conditions
-    // Is there a better way to make sure it is initialized?
-    let mut updated_value = StateVarValue::Boolean(false);
+    freshen_state_var(component_nodes, component_attributes, dependencies, dependent_on_state_var, dependent_on_essential, component_state_variables, component_states, essential_data, &original_component_state, should_initialize_essential_data);
+
+    original_component_state.get_value_assuming_fresh(component_states)
+
+}
+
+fn freshen_state_var(
+    component_nodes: &HashMap<ComponentName, ComponentNode>,
+    component_attributes: &HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
+    dependencies: &mut HashMap<ComponentName, Vec<DependenciesForStateVar>>,
+    dependent_on_state_var: &mut HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
+    dependent_on_essential: &mut HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
+    component_state_variables: &mut HashMap<ComponentName, Vec<StateVarVariant>>,
+    component_states: &mut HashMap<ComponentName, Vec<StateVar>>,
+    essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
+    original_component_state: &ComponentState,
+    should_initialize_essential_data: bool
+) -> () {
 
     let current_freshness = original_component_state.get_freshness(component_states);
     
     let initial_calculation_state = match current_freshness {
         // No need to continue if the state var is already fresh
-        Freshness::Fresh => return original_component_state.get_value_assuming_fresh(component_states),
+        Freshness::Fresh => return (),
+        // Freshness::Fresh => return original_component_state.get_value_assuming_fresh(component_states),
         Freshness::Unresolved => StateVarCalculationState::Unresolved(UnresolvedCalculationState{
             component_state: original_component_state.clone(),
             instruction_ind: 0,
@@ -910,7 +935,6 @@ fn get_state_var_value(
             component_state: original_component_state.clone(),
             instruction_ind: 0,
             val_ind: 0,
-            dependencies_for_state_var: None,
         })
     };
 
@@ -921,8 +945,8 @@ fn get_state_var_value(
 
     'stack_loop: while let Some(calculation_state) = stack.pop() {
 
-        let dependency_values;
-        let component_state_to_update;
+        // let dependency_values;
+        // let component_state_to_update;
 
         match calculation_state {
             StateVarCalculationState::Unresolved(unresolved_state) => {
@@ -932,11 +956,13 @@ fn get_state_var_value(
                 let component_name = &component_state.0.name;
                 let state_var_ind = component_state.1;
 
+                // let state_variables = component_state_variables.get_mut(component_name).unwrap();
                 
-                let state_var_definitions = component_state.0.definition.state_var_definitions;
+                // let state_var_definitions = component_state.0.definition.state_var_definitions;
 
                 let dependency_instructions = unresolved_state.dependency_instructions.unwrap_or_else(|| {
-                    state_var_definitions[state_var_ind].1.return_dependency_instructions()
+                    let state_variables = component_state_variables.get_mut(component_name).unwrap();
+                    state_variables[state_var_ind].return_dependency_instructions()
                 });
             
                 let mut dependencies_for_state_var = unresolved_state.dependencies_for_state_var.unwrap_or_else(|| {
@@ -963,6 +989,7 @@ fn get_state_var_value(
                             state_var_ind,
                             component_attributes.get(&component_name.clone()).unwrap_or(&HashMap::new()),
                             dep_instruction,
+                            component_state_variables,
                             essential_data,
                             should_initialize_essential_data
                         )
@@ -977,8 +1004,8 @@ fn get_state_var_value(
                                         dependent_on_state_var.entry(inner_comp_name.clone())
                                             .or_insert_with( || {
                                                 // create vector of length num of state var defs, where each entry is zero-length vector
-                                                let num_inner_state_var_defs = component_nodes.get(&inner_comp_name.clone()).unwrap()
-                                                    .definition.state_var_definitions.len();
+                                                let num_inner_state_var_defs = component_state_variables.get(&inner_comp_name.clone()).unwrap()
+                                                    .len();
                                                 vec![Vec::new(); num_inner_state_var_defs]
                                             });
                                     vec_dep[*inner_sv_ind].push((component_name.clone(), state_var_ind));
@@ -1009,9 +1036,9 @@ fn get_state_var_value(
 
                                 let new_current_freshness = new_component_state.get_freshness(component_states);
     
-                                let state_var_value = match new_current_freshness {
+                                let state_var_read_only_view = match new_current_freshness {
                                     // No need to continue if the state var is already fresh
-                                    Freshness::Fresh => new_component_state.get_value_assuming_fresh(component_states),
+                                    Freshness::Fresh => new_component_state.get_read_only_view(component_states),
                                     Freshness::Unresolved => {
                                         stack.push(
                                             StateVarCalculationState::Unresolved(UnresolvedCalculationState {
@@ -1058,7 +1085,6 @@ fn get_state_var_value(
                                                 component_state: new_component_state,
                                                 instruction_ind: 0,
                                                 val_ind: 0,
-                                                dependencies_for_state_var: None
                                             })
                                         );
 
@@ -1069,21 +1095,21 @@ fn get_state_var_value(
     
                                 let dependency_source = get_source_for_dependency(component_nodes, essential_data, &dep);
                                 values_for_this_dep.push(
-                                    DependencyValue { source: dependency_source, value: state_var_value }
+                                    DependencyValue { source: dependency_source, value: state_var_read_only_view }
                                 );
                             },
     
                             Dependency::Essential { component_name: comp_name_inner, origin } => {
-    
+
                                 let value = essential_data
                                     .get(&comp_name_inner.clone()).unwrap()
                                     .get(&origin).unwrap()
-                                    .clone();
+                                    .get_read_only_view();
             
                                 let dependency_source = get_source_for_dependency(component_nodes, essential_data, &dep);
                                 values_for_this_dep.push(DependencyValue {
                                     source: dependency_source,
-                                    value: value.0,
+                                    value: value,
                                 })
                             },
                         }
@@ -1098,19 +1124,33 @@ fn get_state_var_value(
 
                 }
 
+                let state_variables = component_state_variables.get_mut(component_name).unwrap();
 
                 let dependencies_for_component = dependencies.entry(component_name.clone())
                 .or_insert_with(|| 
                         // create vector of length num of state var defs,
                         // where each entry is an DependencyForStateVars containg zero length vectors
-                        vec![DependenciesForStateVar { dependencies: vec![], dependency_values: vec![] }; state_var_definitions.len()]
+                        // let deps = Vec::with_capacity(capacity)
+                        (0..state_variables.len()).map(|_| DependenciesForStateVar { dependencies: vec![], dependency_values: vec![]} ).collect()
+                        // vec![DependenciesForStateVar { dependencies: vec![], dependency_values: vec![] }; state_variables.len()]
                 );
+
+
+                
+                state_variables[state_var_ind].set_dependencies(&dependency_values_for_state_var);
+
+
                 dependencies_for_component[state_var_ind].dependencies = dependencies_for_state_var;
                 dependencies_for_component[state_var_ind].dependency_values = dependency_values_for_state_var;
 
-                dependency_values = &dependencies_for_component[state_var_ind].dependency_values;
 
-                component_state_to_update = component_state;
+                state_variables[state_var_ind].calculate_state_var_from_dependencies();
+
+                // dependency_values = &dependencies_for_component[state_var_ind].dependency_values;
+
+                // component_state_to_update = component_state;
+
+
 
             
             }
@@ -1118,12 +1158,14 @@ fn get_state_var_value(
 
                 let component_state  = stale_state.component_state;
 
-                let dependencies_for_state_var = stale_state.dependencies_for_state_var .unwrap_or_else(|| {
-                    let my_dependencies = &dependencies.get(&component_state.0.name).unwrap()[component_state.1];
-                    my_dependencies.dependencies.clone()
-                });
+                // let dependencies_for_state_var = stale_state.dependencies_for_state_var .unwrap_or_else(|| {
+                //     let my_dependencies = &dependencies.get(&component_state.0.name).unwrap()[component_state.1];
+                //     my_dependencies.dependencies.clone()
+                // });
 
                 let mut initial_val_ind = stale_state.val_ind;
+
+                let dependencies_for_state_var = &dependencies.get(&component_state.0.name).unwrap()[component_state.1].dependencies;
 
                 for (instruction_ind, deps) in dependencies_for_state_var.iter().enumerate().skip(stale_state.instruction_ind) {
 
@@ -1136,32 +1178,12 @@ fn get_state_var_value(
 
                                 let new_current_freshness = new_component_state.get_freshness(component_states);
     
-                                let state_var_value = match new_current_freshness {
+                                match new_current_freshness {
                                     // No need to continue if the state var is already fresh
-                                    Freshness::Fresh => new_component_state.get_value_assuming_fresh(component_states),
+                                    Freshness::Fresh => (),
+                                    // Freshness::Fresh => new_component_state.get_value_assuming_fresh(component_states),
                                     Freshness::Unresolved => {
-                                        stack.push(
-                                            StateVarCalculationState::Stale(StaleCalculationState {
-                                                component_state,
-                                                instruction_ind,
-                                                val_ind,
-                                                dependencies_for_state_var: Some(dependencies_for_state_var),
-                                            })
-                                        );
-                                        stack.push(
-                                            StateVarCalculationState::Unresolved(UnresolvedCalculationState {
-                                                component_state: new_component_state,
-                                                instruction_ind: 0,
-                                                val_ind: 0,
-                                                dependency_instructions: None,
-                                                instruct_dependencies: None,
-                                                dependencies_for_state_var: None,
-                                                dependency_values_for_state_var: None,
-                                                values_for_this_dep: None
-                                            })
-                                        );
-
-                                        continue 'stack_loop;
+                                        panic!("How did a stale state variable depend on an unresolved state variable?")
                                     }
                                     Freshness::Stale => {
                                         stack.push(
@@ -1169,7 +1191,6 @@ fn get_state_var_value(
                                                 component_state,
                                                 instruction_ind,
                                                 val_ind,
-                                                dependencies_for_state_var: Some(dependencies_for_state_var),
                                             })
                                         );
                                         stack.push(
@@ -1177,7 +1198,6 @@ fn get_state_var_value(
                                                 component_state: new_component_state,
                                                 instruction_ind: 0,
                                                 val_ind: 0,
-                                                dependencies_for_state_var: None
                                             })
                                         );
 
@@ -1186,19 +1206,20 @@ fn get_state_var_value(
                                 };
                   
 
-                                dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = state_var_value;
+                                // dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = state_var_value;
     
                             },
     
                             Dependency::Essential { component_name, origin } => {
+  
+                                unimplemented!("Have not implemented essential dependency");
     
-    
-                                let value = essential_data
-                                    .get(&component_name.clone()).unwrap()
-                                    .get(&origin).unwrap()
-                                    .clone();
+                                // let value = essential_data
+                                //     .get(&component_name.clone()).unwrap()
+                                //     .get(&origin).unwrap()
+                                //     .clone();
                 
-                                dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = value.0;
+                                // dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = value.0;
     
                             },
                         }
@@ -1208,39 +1229,46 @@ fn get_state_var_value(
     
                 }
     
-                dependency_values = &dependencies.get(&component_state.0.name).unwrap()[component_state.1].dependency_values;
+
+                let component_name = &component_state.0.name;
+                let state_var_ind = component_state.1;
+                let state_variables = component_state_variables.get(component_name).unwrap();
+                state_variables[state_var_ind].calculate_state_var_from_dependencies();
+               
+
+                // dependency_values = &dependencies.get(&component_state.0.name).unwrap()[component_state.1].dependency_values;
     
-                component_state_to_update = component_state;
+                // component_state_to_update = component_state;
 
             }
 
         }
 
-        let update_instruction = generate_update_instruction_for_state(
-            &component_state_to_update,
-            dependency_values,
-        ).expect(&format!("Can't resolve {} (a {} component type)",
-            &component_state_to_update, component_state_to_update.0.definition.component_type)
-        );
+        // let update_instruction = generate_update_instruction_for_state(
+        //     &component_state_to_update,
+        //     dependency_values,
+        // ).expect(&format!("Can't resolve {} (a {} component type)",
+        //     &component_state_to_update, component_state_to_update.0.definition.component_type)
+        // );
     
     
-        match update_instruction {
-            StateVarUpdateInstruction::NoChange => {
-                // match current_state {
-                //     Freshness::Fresh(current_value) => {
-                //         // Do nothing. It's fresh, so we can use it as is
-                //         updated_value = current_value;
-                //     },
-                //     Freshness::Stale | Freshness::Unresolved => 
-                        panic!("Cannot use NoChange update instruction on a stale or unresolved value");
-                // }
-            },
-            StateVarUpdateInstruction::SetValue(new_value) => {
+        // match update_instruction {
+        //     StateVarUpdateInstruction::NoChange => {
+        //         // match current_state {
+        //         //     Freshness::Fresh(current_value) => {
+        //         //         // Do nothing. It's fresh, so we can use it as is
+        //         //         updated_value = current_value;
+        //         //     },
+        //         //     Freshness::Stale | Freshness::Unresolved => 
+        //                 panic!("Cannot use NoChange update instruction on a stale or unresolved value");
+        //         // }
+        //     },
+        //     StateVarUpdateInstruction::SetValue(new_value) => {
     
-                updated_value = component_state_to_update.set_value(component_states, new_value);
-            }
+        //         updated_value = component_state_to_update.set_value(component_states, new_value);
+        //     }
     
-        };
+        // };
 
     }
 
@@ -1253,7 +1281,7 @@ fn get_state_var_value(
 
     // log_debug!("Updated {} to {:?}", component_state, updated_value);
 
-    return updated_value;
+    // return updated_value;
 }
 
 
@@ -1264,12 +1292,13 @@ fn generate_update_instruction_for_state(
 
 ) -> Result<StateVarUpdateInstruction<StateVarValue>, String> {
 
+    unimplemented!("Have not implemented generate_update_instruction_for_state")
 
-    let (_, state_var_def) = &component_state.0.definition
-        .state_var_definitions[component_state.1];
+    // let (_, state_var_def) = &component_state.0.definition
+    //     .state_var_definitions[component_state.1];
 
 
-    state_var_def.determine_state_var_from_dependencies(dependency_values)
+    // state_var_def.determine_state_var_from_dependencies(dependency_values)
 
 }
 
@@ -1297,7 +1326,7 @@ fn get_source_for_dependency(
             let data = essential_data.get(&component_name.clone()).unwrap().get(origin).unwrap();
 
             DependencySource::Essential {
-                value_type: data.0.type_as_str()
+                value_type: data.get_type_as_str()
             }
 
         },
@@ -1322,43 +1351,45 @@ fn get_dependency_sources_for_state_var<'a>(
     component_state: &ComponentState,
 ) -> Vec<Vec<(DependencySource, Option<StateVarValue>)>> {
 
+    unimplemented!("have not implemented get_dependency_sources_for_state_var")
+
     // TODO: put this back into dependencies_of_state_var
-    let my_dependencies_struct = dependencies.get(&component_state.0.name).unwrap().get(component_state.1).unwrap();
+    // let my_dependencies_struct = dependencies.get(&component_state.0.name).unwrap().get(component_state.1).unwrap();
 
-    let my_dependencies = &my_dependencies_struct.dependencies;
-    let my_dependency_values = &my_dependencies_struct.dependency_values;
+    // let my_dependencies = &my_dependencies_struct.dependencies;
+    // let my_dependency_values = &my_dependencies_struct.dependency_values;
 
-    // TODO: can we avoid allocating here as this function is called for every update
+    // // TODO: can we avoid allocating here as this function is called for every update
     
-    let mut dependency_sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>> = Vec::with_capacity(my_dependencies.len());
+    // let mut dependency_sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>> = Vec::with_capacity(my_dependencies.len());
 
     
-    for (instruction_ind, new_dependencies) in my_dependencies.iter().enumerate() {
-        let new_dependency_values = &my_dependency_values[instruction_ind];
+    // for (instruction_ind, new_dependencies) in my_dependencies.iter().enumerate() {
+    //     let new_dependency_values = &my_dependency_values[instruction_ind];
 
-        let instruction_sources: Vec<(DependencySource, Option<StateVarValue>)> = new_dependencies.iter().enumerate()
-            .map(|(val_ind, dependency)| {
+    //     let instruction_sources: Vec<(DependencySource, Option<StateVarValue>)> = new_dependencies.iter().enumerate()
+    //         .map(|(val_ind, dependency)| {
             
-            let source = new_dependency_values[val_ind].source.clone();
+    //         let source = new_dependency_values[val_ind].source.clone();
 
-            let essential_value = if let Dependency::Essential { origin, .. } = dependency {
-                let data = essential_data
-                    .get(&component_state.0.name).unwrap()
-                    .get(origin).unwrap();
-                let value = data.0.clone();
-                Some(value)
+    //         let essential_value = if let Dependency::Essential { origin, .. } = dependency {
+    //             let data = essential_data
+    //                 .get(&component_state.0.name).unwrap()
+    //                 .get(origin).unwrap();
+    //             let value = data.0.clone();
+    //             Some(value)
 
-            } else {
-                None
-            };
+    //         } else {
+    //             None
+    //         };
 
-            (source, essential_value)
-        }).collect();
+    //         (source, essential_value)
+    //     }).collect();
 
-        dependency_sources.push(instruction_sources);
-    }
+    //     dependency_sources.push(instruction_sources);
+    // }
 
-    dependency_sources
+    // dependency_sources
 }
 
 
@@ -1445,6 +1476,7 @@ fn generate_render_tree(core: &mut DoenetCore) -> serde_json::Value {
         &mut core.dependencies,
         &mut core.dependent_on_state_var,
         &mut core.dependent_on_essential,
+        &mut core.component_state_variables,
         &mut core.component_states,
         &mut core.essential_data,
         core.should_initialize_essential_data,
@@ -1464,6 +1496,7 @@ fn generate_render_tree_internal(
     dependencies: &mut HashMap<ComponentName, Vec<DependenciesForStateVar>>,
     dependent_on_state_var: &mut HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
     dependent_on_essential: &mut HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
+    component_state_variables: &mut HashMap<ComponentName, Vec<StateVarVariant>>,
     component_states: &mut HashMap<ComponentName, Vec<StateVar>>,
     essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     should_initialize_essential_data: bool,
@@ -1474,15 +1507,18 @@ fn generate_render_tree_internal(
 
     // log_debug!("generating render tree for {}", component);
 
+    let component_name = &component.component_node.name;
+
     let component_definition = component.component_node.definition;
 
-    let renderered_state_vars = component_definition
-        .state_var_definitions
+    let state_variables = component_state_variables.get(component_name).unwrap();
+
+    let renderered_state_vars: Vec<(usize, &str)> = state_variables
         .iter()
         .enumerate()
-        .filter_map(|(ind, (name, variant))| {
-            variant.for_renderer().then(|| (ind, name))
-        });
+        .filter_map(|(ind, sv_variant)| {
+            sv_variant.return_for_renderer().then(|| (ind, sv_variant.get_name()))
+        }).collect();
 
     let state_var_aliases = match &component_definition.renderer_type {
         RendererType::Special { state_var_aliases, .. } => state_var_aliases.clone(),
@@ -1498,6 +1534,7 @@ fn generate_render_tree_internal(
             dependencies,
             dependent_on_state_var,
             dependent_on_essential,
+            component_state_variables,
             component_states,
             essential_data,
             ComponentState(component.component_node, state_var_ind),
@@ -1567,6 +1604,7 @@ fn generate_render_tree_internal(
                         dependencies,
                         dependent_on_state_var,
                         dependent_on_essential,
+                        component_state_variables,
                         component_states,
                         essential_data,
                         should_initialize_essential_data,
@@ -1636,54 +1674,55 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
 
     // log_debug!("Handling action {:#?}", action);
 
+    unimplemented!("Have not implemented handle_action")
 
-    let component = core.component_nodes.get(&action.component_name).unwrap();
+    // let component = core.component_nodes.get(&action.component_name).unwrap();
 
-    let mut state_var_resolver = | state_var_ind: usize | {
+    // let mut state_var_resolver = | state_var_ind: usize | {
 
-        get_state_var_value(
-            &core.component_nodes,
-            &core.component_attributes,
-            &mut core.dependencies,
-            &mut core.dependent_on_state_var,
-            &mut core.dependent_on_essential,
-            &mut core.component_states,
-            &mut core.essential_data,
-            ComponentState(&component, state_var_ind),
-            core.should_initialize_essential_data
-        )
-    };
+    //     get_state_var_value(
+    //         &core.component_nodes,
+    //         &core.component_attributes,
+    //         &mut core.dependencies,
+    //         &mut core.dependent_on_state_var,
+    //         &mut core.dependent_on_essential,
+    //         &mut core.component_states,
+    //         &mut core.essential_data,
+    //         ComponentState(&component, state_var_ind),
+    //         core.should_initialize_essential_data
+    //     )
+    // };
 
-    let state_vars_to_update = (component.definition.on_action)(
-        &action.action_name,
-        action.args,
-        &mut state_var_resolver,
-    );
+    // let state_vars_to_update = (component.definition.on_action)(
+    //     &action.action_name,
+    //     action.args,
+    //     &mut state_var_resolver,
+    // );
 
-    for (state_var_ind, requested_value) in state_vars_to_update {
+    // for (state_var_ind, requested_value) in state_vars_to_update {
 
-        // if component state is unresolved, then calculate its value to resolve it
-        let component_state = ComponentState(&component, state_var_ind);
-        if component_state.get_freshness(&core.component_states) == Freshness::Unresolved {
-            get_state_var_value(
-                &core.component_nodes, 
-                &core.component_attributes,
-                &mut core.dependencies,
-                &mut core.dependent_on_state_var,
-                &mut core.dependent_on_essential, 
-                &mut core.component_states,
-                &mut core.essential_data,
-                component_state,
-                core.should_initialize_essential_data);
-        }
+    //     // if component state is unresolved, then calculate its value to resolve it
+    //     let component_state = ComponentState(&component, state_var_ind);
+    //     if component_state.get_freshness(&core.component_states) == Freshness::Unresolved {
+    //         get_state_var_value(
+    //             &core.component_nodes, 
+    //             &core.component_attributes,
+    //             &mut core.dependencies,
+    //             &mut core.dependent_on_state_var,
+    //             &mut core.dependent_on_essential, 
+    //             &mut core.component_states,
+    //             &mut core.essential_data,
+    //             component_state,
+    //             core.should_initialize_essential_data);
+    //     }
 
 
-        let component_state = ComponentState(&component, state_var_ind);
-        let request = UpdateRequest::SetStateVar(component_state, requested_value);
-        process_update_request(&core.component_nodes, &core.dependencies,
-            &mut core.dependent_on_state_var, &mut core.dependent_on_essential,
-            &mut core.component_states, &mut core.essential_data, &request);
-    }
+    //     let component_state = ComponentState(&component, state_var_ind);
+    //     let request = UpdateRequest::SetStateVar(component_state, requested_value);
+    //     process_update_request(&core.component_nodes, &core.dependencies,
+    //         &mut core.dependent_on_state_var, &mut core.dependent_on_essential,
+    //         &mut core.component_states, &mut core.essential_data, &request);
+    // }
 
     // log_json!("Component tree after action", utils::json_components(&core.component_nodes, &core.component_states));
 
@@ -1699,57 +1738,58 @@ fn convert_dependency_values_to_update_request<'a>(
     requests: Vec<(usize, Result<Vec<DependencyValue>, String>)>,
 ) -> Vec<UpdateRequest<'a>> {
 
+    unimplemented!("have not implemented convert_dependency_values_to_update_request")
 
-    let component = component_state.0;
-    let state_var = &component_state.1;
+    // let component = component_state.0;
+    // let state_var = &component_state.1;
 
-    let my_dependencies = dependencies_of_state_var(dependencies, &component_state);
+    // let my_dependencies = dependencies_of_state_var(dependencies, &component_state);
 
-    let mut update_requests = Vec::new();
+    // let mut update_requests = Vec::new();
 
-    for (instruction_ind, instruction_requests) in requests {
+    // for (instruction_ind, instruction_requests) in requests {
 
-        let valid_requests = match instruction_requests {
-            Err(_e) => {
-                // log_debug!("Inverse definition for {} failed with: {}", component_state, _e);
-                break;
-            },
-            Ok(result) => result,
-        };
+    //     let valid_requests = match instruction_requests {
+    //         Err(_e) => {
+    //             // log_debug!("Inverse definition for {} failed with: {}", component_state, _e);
+    //             break;
+    //         },
+    //         Ok(result) => result,
+    //     };
 
 
 
-        let instruct_dependencies = my_dependencies.get(instruction_ind).expect(
-            &format!("{}:{} has the wrong instruction name to determine dependencies",
-                component.definition.component_type, state_var)
-        );
+    //     let instruct_dependencies = my_dependencies.get(instruction_ind).expect(
+    //         &format!("{}:{} has the wrong instruction name to determine dependencies",
+    //             component.definition.component_type, state_var)
+    //     );
 
-        assert_eq!(valid_requests.len(), instruct_dependencies.len());
+    //     assert_eq!(valid_requests.len(), instruct_dependencies.len());
 
-        for (request, dependency) in valid_requests.into_iter().zip(instruct_dependencies.iter()) {
+    //     for (request, dependency) in valid_requests.into_iter().zip(instruct_dependencies.iter()) {
 
-            match dependency {
-                Dependency::Essential { component_name, origin } => {
-                    update_requests.push(UpdateRequest::SetEssentialValue(
-                        EssentialState(component_name.clone(), origin.clone()),
-                        request.value.clone(),
-                    ))
-                },
-                Dependency::StateVar { component_name, state_var_ind } => {
-                    // TODO: receiving multiple dependencies because of multiple instances
+    //         match dependency {
+    //             Dependency::Essential { component_name, origin } => {
+    //                 update_requests.push(UpdateRequest::SetEssentialValue(
+    //                     EssentialState(component_name.clone(), origin.clone()),
+    //                     request.value.clone(),
+    //                 ))
+    //             },
+    //             Dependency::StateVar { component_name, state_var_ind } => {
+    //                 // TODO: receiving multiple dependencies because of multiple instances
 
-                    let component_node = component_nodes.get(&component_name.clone()).unwrap();
+    //                 let component_node = component_nodes.get(&component_name.clone()).unwrap();
 
-                    let component_state = ComponentState(component_node, *state_var_ind);
-                    update_requests.push(UpdateRequest::SetStateVar(component_state, request.value.clone()));
+    //                 let component_state = ComponentState(component_node, *state_var_ind);
+    //                 update_requests.push(UpdateRequest::SetStateVar(component_state, request.value.clone()));
 
-                },
-            }
-        }
+    //             },
+    //         }
+    //     }
 
-    }
+    // }
 
-    update_requests
+    // update_requests
 
 }
 
@@ -1758,49 +1798,51 @@ fn process_update_request(
     dependencies: &HashMap<ComponentName, Vec<DependenciesForStateVar>>,
     dependent_on_state_var: &HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
     dependent_on_essential: &HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
-    component_states: &mut HashMap<ComponentName, Vec<StateVar>>,
+    component_states: &mut HashMap<ComponentName, Vec<StateVarVariant>>,
     essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     update_request: &UpdateRequest
 ) {
 
+    unimplemented!("have not implemented process_update_request")
+
     // log_debug!("Processing update request {:?}", update_request);
 
-    match update_request {
-        UpdateRequest::SetEssentialValue(essential_state, requested_value) => {
+    // match update_request {
+    //     UpdateRequest::SetEssentialValue(essential_state, requested_value) => {
 
-            let essential_var = essential_data
-                .get_mut(&essential_state.0).unwrap()
-                .get_mut(&essential_state.1).unwrap();
+    //         let essential_var = essential_data
+    //             .get_mut(&essential_state.0).unwrap()
+    //             .get_mut(&essential_state.1).unwrap();
 
-            essential_var.set_value(
-                requested_value.clone(),
-            ).expect(
-                &format!("Failed to set essential value for {:?}", essential_state)
-            );
+    //         essential_var.set_value(
+    //             requested_value.clone(),
+    //         ).expect(
+    //             &format!("Failed to set essential value for {:?}", essential_state)
+    //         );
 
-            // log_debug!("Updated essential data {:?}", core.essential_data);
+    //         // log_debug!("Updated essential data {:?}", core.essential_data);
 
-            mark_stale_essential_datum_dependencies(dependent_on_state_var, dependent_on_essential, component_states, essential_state);
-        },
+    //         mark_stale_essential_datum_dependencies(dependent_on_state_var, dependent_on_essential, component_states, essential_state);
+    //     },
 
-        UpdateRequest::SetStateVar(component_state, requested_value) => {
+    //     UpdateRequest::SetStateVar(component_state, requested_value) => {
 
-            let dep_update_requests = request_dependencies_to_update_value_including_shadow(
-                component_nodes,
-                dependencies,
-                essential_data,
-                component_state,
-                requested_value.clone(),
-            );
+    //         let dep_update_requests = request_dependencies_to_update_value_including_shadow(
+    //             component_nodes,
+    //             dependencies,
+    //             essential_data,
+    //             component_state,
+    //             requested_value.clone(),
+    //         );
 
-            for dep_update_request in dep_update_requests {
-                process_update_request(component_nodes, dependencies, dependent_on_state_var, dependent_on_essential, component_states, essential_data, &dep_update_request);
-            }
+    //         for dep_update_request in dep_update_requests {
+    //             process_update_request(component_nodes, dependencies, dependent_on_state_var, dependent_on_essential, component_states, essential_data, &dep_update_request);
+    //         }
 
-            // needed?
-            // mark_stale_state_var_and_dependencies(core, component_name, &map, &StateVarSlice::Single(state_var_ref.clone()));
-        }
-    }
+    //         // needed?
+    //         // mark_stale_state_var_and_dependencies(core, component_name, &map, &StateVarSlice::Single(state_var_ref.clone()));
+    //     }
+    // }
 
 }
 
@@ -1812,34 +1854,36 @@ fn request_dependencies_to_update_value_including_shadow<'a, 'b>(
     new_value: StateVarValue,
 ) -> Vec<UpdateRequest<'a>> {
 
-    let component = component_state.0;
-    let state_var_ind = component_state.1;
 
-    if let Some(component_ref_state) = state_var_is_shadowing(&component_state) {
+    unimplemented!("have not implemented request_dependencies_to_update_value_including_shadow")
+    // let component = component_state.0;
+    // let state_var_ind = component_state.1;
 
-        let source_component = component_nodes.get(&component_ref_state.0).unwrap();
-        let source_state_var_ind =component_ref_state.1;
-        let source_state = ComponentState(source_component, source_state_var_ind);
-        vec![UpdateRequest::SetStateVar(source_state, new_value)]
+    // if let Some(component_ref_state) = state_var_is_shadowing(&component_state) {
 
-    } else {
+    //     let source_component = component_nodes.get(&component_ref_state.0).unwrap();
+    //     let source_state_var_ind =component_ref_state.1;
+    //     let source_state = ComponentState(source_component, source_state_var_ind);
+    //     vec![UpdateRequest::SetStateVar(source_state, new_value)]
 
-        let dependency_sources = get_dependency_sources_for_state_var(dependencies, essential_data, component_state);
+    // } else {
 
-        // log!("Dependency sources for {}, {:?}", component_state, dependency_sources);
+    //     let dependency_sources = get_dependency_sources_for_state_var(dependencies, essential_data, component_state);
 
-        let requests = component.definition.state_var_definitions[state_var_ind].1
-            .request_dependencies_to_update_value(new_value, dependency_sources)
-            .expect(&format!("Failed requesting dependencies for {}", component_state));
+    //     // log!("Dependency sources for {}, {:?}", component_state, dependency_sources);
 
-        // log_debug!("{} wants its dependency to update to: {:?}", component_state, requests);
+    //     let requests = component.definition.state_var_definitions[state_var_ind].1
+    //         .request_dependencies_to_update_value(new_value, dependency_sources)
+    //         .expect(&format!("Failed requesting dependencies for {}", component_state));
 
-        let update_requests = convert_dependency_values_to_update_request(component_nodes, dependencies, component_state, requests);
+    //     // log_debug!("{} wants its dependency to update to: {:?}", component_state, requests);
 
-        // log_debug!("{} generated update requests: {:#?}", component_state, update_requests);
+    //     let update_requests = convert_dependency_values_to_update_request(component_nodes, dependencies, component_state, requests);
 
-        update_requests
-    }
+    //     // log_debug!("{} generated update requests: {:#?}", component_state, update_requests);
+
+    //     update_requests
+    // }
 }
 
 /// Detect if a state var is shadowing because of a CopySource
@@ -1949,16 +1993,26 @@ impl<'a> ComponentState<'a> {
         .get(self.1)
         .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
         .get_value_assuming_fresh()
-}
-
-    fn set_value(&self, component_states: &mut HashMap<ComponentName, Vec<StateVar>>, new_value: StateVarValue)
-        -> StateVarValue {
-            component_states.get_mut(&self.0.name).unwrap()
-                .get_mut(self.1)
-                .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
-                .set_value(new_value)
-                .unwrap()
     }
+
+    fn get_read_only_view(&self, component_states: &HashMap<ComponentName, Vec<StateVar>>)
+    -> StateVarReadOnly {
+    component_states.get(&self.0.name).unwrap()
+        .get(self.1)
+        .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
+        .get_read_only_view()
+    }
+
+    
+
+    // fn set_value(&self, component_states: &mut HashMap<ComponentName, Vec<StateVar>>, new_value: StateVarValue)
+    //     -> StateVarValue {
+    //         component_states.get_mut(&self.0.name).unwrap()
+    //             .get_mut(self.1)
+    //             .expect(&format!("Component {} has no state var '{}'", self.0.name, self.1))
+    //             .set_value(new_value)
+    //             .unwrap()
+    // }
 }
 
 

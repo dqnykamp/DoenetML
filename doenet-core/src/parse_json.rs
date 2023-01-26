@@ -1072,7 +1072,7 @@ fn macro_comp_ref(
 
         let variant_option = match source_def_option {
             Some(source_def) => match source_def.state_var_index_map.get(prop) {
-                Some(v) => Some(&source_def.state_var_definitions[*v].1),
+                Some(v) => unimplemented!("Have not implemented copy prop"),//Some(&source_def.state_var_definitions[*v].1),
                 None => {
                     if !found_error {
                         found_error = true;

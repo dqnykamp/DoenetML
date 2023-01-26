@@ -6,6 +6,7 @@ use crate::component::ComponentProfile;
 use crate::component::ComponentType;
 
 use crate::math_expression::MathExpression;
+use crate::state::{StateVarTyped, StateVarReadOnly, StateVar};
 use crate::utils::log;
 
 
@@ -18,66 +19,98 @@ pub type InstructionName = &'static str;
 
 
 
+pub trait StateVariable<T: Default>: std::fmt::Debug {
+
+    fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+        Vec::new()
+    }
+
+    fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {}
+    
+    fn calculate_state_var_from_dependencies(&self) -> ();
+
+    fn return_for_renderer(&self) -> bool {
+        false
+    }
+    
+    fn return_initial_essential_value(&self) -> T {
+        T::default()
+    }
+
+    fn request_dependencies_to_update_value(&self) -> Result<(),()> {
+        Err(())
+    }
+
+    fn get_value_assuming_fresh(&self) -> T;
+
+    fn create_new_mutable_view(&self) -> StateVarTyped<T>;
+
+    fn get_name(&self) -> &'static str;
+
+}
+
+
+
 /// State variable functions core uses.
 /// The generics force component code to be consistent with the type of a state variable.
 // #[derive(Debug)]
-pub struct StateVarDefinition<T> {
+// pub struct StateVarDefinition<T> {
 
-    /// Some state variable's dependencies change based on other variables.
-    // pub state_vars_to_determine_dependencies: fn() -> Vec<StateVarName>,
+//     /// Some state variable's dependencies change based on other variables.
+//     // pub state_vars_to_determine_dependencies: fn() -> Vec<StateVarName>,
 
-    /// The instructions that core can use to make Dependency structs.
-    pub dependency_instructions: Vec<DependencyInstruction>,
+//     /// The instructions that core can use to make Dependency structs.
+//     pub dependency_instructions: Vec<DependencyInstruction>,
 
-    /// Determine the value and return that to core as an update instruction.
-    pub determine_state_var_from_dependencies: fn(
-        &Vec<Vec<DependencyValue>>
-    ) -> Result<StateVarUpdateInstruction<T>, String>,
+//     /// Determine the value and return that to core as an update instruction.
+//     pub determine_state_var_from_dependencies: fn(
+//         &Vec<Vec<DependencyValue>>
+//     ) -> Result<StateVarUpdateInstruction<T>, String>,
 
-    pub for_renderer: bool,
+//     pub for_renderer: bool,
 
-    /// Determines whether to use essential data
-    pub initial_essential_value: T,
+//     /// Determines whether to use essential data
+//     pub initial_essential_value: T,
 
-    /// The inverse of `return_dependency_instructions`: For a desired value, return dependency
-    /// values for the dependencies that would make this state variable return that value.
-    pub request_dependencies_to_update_value: fn(
-        T,
-        Vec<Vec<(DependencySource, Option<StateVarValue>)>>
-    ) -> Vec<(usize, Result<Vec<DependencyValue>, String>)>,
-}
+//     /// The inverse of `return_dependency_instructions`: For a desired value, return dependency
+//     /// values for the dependencies that would make this state variable return that value.
+//     pub request_dependencies_to_update_value: fn(
+//         T,
+//         Vec<Vec<(DependencySource, Option<StateVarValue>)>>
+//     ) -> Vec<(usize, Result<Vec<DependencyValue>, String>)>,
+// }
 
 
 
-impl<T> Default for StateVarDefinition<T>
-    where T: Default
-{
-    fn default() -> Self {
-        StateVarDefinition {
-            dependency_instructions: Vec::new(),
-            determine_state_var_from_dependencies:
-                |_| Ok(StateVarUpdateInstruction::SetValue(T::default())),
-            for_renderer: false,
-            initial_essential_value: T::default(),
+// impl<T> Default for StateVarDefinition<T>
+//     where T: Default
+// {
+//     fn default() -> Self {
+//         StateVarDefinition {
+//             dependency_instructions: Vec::new(),
+//             determine_state_var_from_dependencies:
+//                 |_| Ok(StateVarUpdateInstruction::SetValue(T::default())),
+//             for_renderer: false,
+//             initial_essential_value: T::default(),
 
-            request_dependencies_to_update_value: |_, _| {
-                log!("DEFAULT REQUEST_DEPENDENCIES_TO_UPDATE_VALUE DOES NOTHING");
-                Vec::new()
-            },
-        }
-    }
-}
+//             request_dependencies_to_update_value: |_, _| {
+//                 log!("DEFAULT REQUEST_DEPENDENCIES_TO_UPDATE_VALUE DOES NOTHING");
+//                 Vec::new()
+//             },
+//         }
+//     }
+// }
 
 
 
 
 /// Since `StateVarDefinition` is generic, this enum is needed to store one in a HashMap or Vec.
-// #[derive(Debug)]
+#[derive(Debug)]
 pub enum StateVarVariant {
-    String(StateVarDefinition<String>),
-    Boolean(StateVarDefinition<bool>),
-    Number(StateVarDefinition<f64>),
-    Integer(StateVarDefinition<i64>),
+    String(Box<dyn StateVariable<String>>),
+    Boolean(Box<dyn StateVariable<bool>>),
+    Number(Box<dyn StateVariable<f64>>),
+    Integer(Box<dyn StateVariable<i64>>),
 }
 
 
@@ -148,10 +181,10 @@ pub enum DependencySource {
 
 /// Passed into determine_state_vars_from_dependencies
 /// TODO: This struct doesn't quite fit the result of an EssentialDependencyInstruction.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DependencyValue {
     pub source: DependencySource,
-    pub value: StateVarValue,
+    pub value: StateVarReadOnly,
 }
 
 
@@ -163,169 +196,169 @@ pub struct DependencyValue {
 // Note that these functions aren't cost free. They do allocate vectors, which you wouldn't have to do if 
 // you were unwrapping manually
 
-pub trait DepValueHashMap {
-    fn dep_value(&self, instruction_name: InstructionName) -> Result<(Vec<&DependencyValue>, InstructionName), String>;
-}
+// pub trait DepValueHashMap {
+//     fn dep_value(&self, instruction_name: InstructionName) -> Result<(Vec<&DependencyValue>, InstructionName), String>;
+// }
 
-impl DepValueHashMap for HashMap<InstructionName, Vec<DependencyValue>> {
+// impl DepValueHashMap for HashMap<InstructionName, Vec<DependencyValue>> {
 
-    fn dep_value(&self, instruction_name: InstructionName) -> Result<(Vec<&DependencyValue>, InstructionName), String> {
-        if let Some(values) = self.get(instruction_name) {
+//     fn dep_value(&self, instruction_name: InstructionName) -> Result<(Vec<&DependencyValue>, InstructionName), String> {
+//         if let Some(values) = self.get(instruction_name) {
 
-            let values_vec = values.iter().collect();
-            Ok((values_vec, instruction_name))
-        } else {
-            Err(format!("Instruction [{}] does not exist", instruction_name))
-        }
-    }
-}
-
-
-pub trait DepValueVec {
-    fn has_zero_or_one_elements(&self) -> Result<(Option<&DependencyValue>, InstructionName), String>;
-    fn has_exactly_one_element(&self) -> Result<(&DependencyValue, InstructionName), String>;
-
-    fn into_string_list(&self) -> Result<Vec<String>, String>;
-
-    fn into_number_list(&self) -> Result<Vec<f64>, String>;
-
-    fn filter_include_component_type(&self, component_type: &ComponentType) -> (Vec<&DependencyValue>, InstructionName);
-}
-
-impl DepValueVec for (Vec<&DependencyValue>, InstructionName) {
-
-   fn has_zero_or_one_elements(&self) -> Result<(Option<&DependencyValue>, InstructionName), String> {
-        let (dep_values, name) = self;
-        match dep_values.len() {
-            0 => Ok((None, name)),
-            1 => Ok((Some(&dep_values[0]), name)),
-            _ => Err(format!("Expected instruction [{}] to have zero or one elements", name))
-        }
-    }
-
-    fn has_exactly_one_element(&self) -> Result<(&DependencyValue, InstructionName), String> {
-        let (dep_values, name) = self;
-
-        if dep_values.len() == 1 {
-            Ok((&dep_values[0], name))
-        } else {
-            Err(format!("Expected instruction [{}] to have exactly one element", name))
-        }
-    }
-
-    fn into_string_list(&self) -> Result<Vec<String>, String> {
-        let (dep_values, name) = self;
-
-        dep_values.iter().map(|dep_value|
-            dep_value.value.clone().try_into().map_err(|_|
-                format!("Not all elements in instruction [{}] were strings", name)
-            )
-        ).collect()
-    }
+//             let values_vec = values.iter().collect();
+//             Ok((values_vec, instruction_name))
+//         } else {
+//             Err(format!("Instruction [{}] does not exist", instruction_name))
+//         }
+//     }
+// }
 
 
-    fn into_number_list(&self) -> Result<Vec<f64>, String> {
-        let (dep_values, name) = self;
+// pub trait DepValueVec {
+//     fn has_zero_or_one_elements(&self) -> Result<(Option<&DependencyValue>, InstructionName), String>;
+//     fn has_exactly_one_element(&self) -> Result<(&DependencyValue, InstructionName), String>;
 
-        dep_values.iter().map(|dep_value|
-            dep_value.value.clone().try_into().map_err(|_|
-                format!("Not all elements in instruction [{}] were strings", name)
-            )
-        ).collect()
-    }
+//     fn into_string_list(&self) -> Result<Vec<String>, String>;
+
+//     fn into_number_list(&self) -> Result<Vec<f64>, String>;
+
+//     fn filter_include_component_type(&self, component_type: &ComponentType) -> (Vec<&DependencyValue>, InstructionName);
+// }
+
+// impl DepValueVec for (Vec<&DependencyValue>, InstructionName) {
+
+//    fn has_zero_or_one_elements(&self) -> Result<(Option<&DependencyValue>, InstructionName), String> {
+//         let (dep_values, name) = self;
+//         match dep_values.len() {
+//             0 => Ok((None, name)),
+//             1 => Ok((Some(&dep_values[0]), name)),
+//             _ => Err(format!("Expected instruction [{}] to have zero or one elements", name))
+//         }
+//     }
+
+//     fn has_exactly_one_element(&self) -> Result<(&DependencyValue, InstructionName), String> {
+//         let (dep_values, name) = self;
+
+//         if dep_values.len() == 1 {
+//             Ok((&dep_values[0], name))
+//         } else {
+//             Err(format!("Expected instruction [{}] to have exactly one element", name))
+//         }
+//     }
+
+//     fn into_string_list(&self) -> Result<Vec<String>, String> {
+//         let (dep_values, name) = self;
+
+//         dep_values.iter().map(|dep_value|
+//             dep_value.value.clone().try_into().map_err(|_|
+//                 format!("Not all elements in instruction [{}] were strings", name)
+//             )
+//         ).collect()
+//     }
 
 
+//     fn into_number_list(&self) -> Result<Vec<f64>, String> {
+//         let (dep_values, name) = self;
 
-    fn filter_include_component_type(&self, component_type: &ComponentType) -> (Vec<&DependencyValue>, InstructionName) {
-        let (dep_values, name) = self;
-
-        let filtered_dep_values = dep_values.iter()
-            .filter(|dep_value| match &dep_value.source {
-                DependencySource::StateVar { component_type: comp, ..} => comp == component_type,
-                _ => false,
-            })
-            .map(|&dep_value| dep_value)
-            .collect();
-
-        (filtered_dep_values, name)
-    }
-}
-
-
-pub trait DepValueSingle {
-    fn into_bool(&self) -> Result<bool, String>;
-    fn into_string(&self) -> Result<String, String>;
-    fn into_number(&self) -> Result<f64, String>;
-    fn into_integer(&self) -> Result<i64, String>;
-    fn into_math_expression(&self) -> Result<MathExpression, String>;
-    fn value(&self) -> StateVarValue;
-}
-
-impl DepValueSingle for DependencyValue {
-    fn into_bool(&self) -> Result<bool, String> {
-        self.value.clone().try_into().map_err(|_|
-            format!("Instruction is a {}, expected a bool", self.value.type_as_str()))
-    }
-
-    fn into_string(&self) -> Result<String, String> {
-        self.value.clone().try_into().map_err(|_|
-            format!("Instruction is a {}, expected a string", self.value.type_as_str()))
-    }
-
-    fn into_number(&self) -> Result<f64, String> {
-        self.value.clone().try_into().map_err(|_|
-            format!("Instruction is a {}, expected a number", self.value.type_as_str()))
-    }
-
-    fn into_integer(&self) -> Result<i64, String> {
-        self.value.clone().try_into().map_err(|_|
-            format!("Instruction is a {}, expected an integer", self.value.type_as_str()))
-    }
-
-    fn into_math_expression(&self) -> Result<MathExpression, String> {
-        self.value.clone().try_into().map_err(|_|
-            format!("Instruction is a {}, expected a math expression", self.value.type_as_str()))
-    }
-
-    fn value(&self) -> StateVarValue {
-        self.value.clone()
-    }
-}
+//         dep_values.iter().map(|dep_value|
+//             dep_value.value.clone().try_into().map_err(|_|
+//                 format!("Not all elements in instruction [{}] were strings", name)
+//             )
+//         ).collect()
+//     }
 
 
 
-pub trait DepValueOption {
-    fn is_bool_if_exists(&self) -> Result<Option<bool>, String>;
-    fn into_if_exists<T: TryFrom<StateVarValue>>(&self) -> Result<Option<T>, String>;
-    fn value(&self) -> Option<StateVarValue>;
-}
+//     fn filter_include_component_type(&self, component_type: &ComponentType) -> (Vec<&DependencyValue>, InstructionName) {
+//         let (dep_values, name) = self;
 
-impl DepValueOption for Option<&DependencyValue> {
+//         let filtered_dep_values = dep_values.iter()
+//             .filter(|dep_value| match &dep_value.source {
+//                 DependencySource::StateVar { component_type: comp, ..} => comp == component_type,
+//                 _ => false,
+//             })
+//             .map(|&dep_value| dep_value)
+//             .collect();
 
-    fn is_bool_if_exists(&self) -> Result<Option<bool>, String> {
-        self.into_if_exists().map_err(|e| e + ", expected a bool")
-    }
-
-    fn into_if_exists<T: TryFrom<StateVarValue>>(&self) -> Result<Option<T>, String> {
-        let dep_value_opt = self;
-
-        dep_value_opt.and_then(|dep_value| Some(dep_value.value.clone().try_into().map_err(|_|
-                format!("could not convert value {} from instruction",
-                    dep_value.value.type_as_str())
-            )))
-            .map_or(Ok(None), |v| v.map(Some)) // flip nested Option<Result<T>>
-    }
-
-    fn value(&self) -> Option<StateVarValue> {
-        match self {
-            Some(dep_value) => Some(dep_value.value.clone()),
-            None => None,
-        }
-    }
-}
+//         (filtered_dep_values, name)
+//     }
+// }
 
 
-/////////// StateVarValue boilerplate ///////////
+// pub trait DepValueSingle {
+//     fn into_bool(&self) -> Result<bool, String>;
+//     fn into_string(&self) -> Result<String, String>;
+//     fn into_number(&self) -> Result<f64, String>;
+//     fn into_integer(&self) -> Result<i64, String>;
+//     fn into_math_expression(&self) -> Result<MathExpression, String>;
+//     fn value(&self) -> StateVarValue;
+// }
+
+// impl DepValueSingle for DependencyValue {
+//     fn into_bool(&self) -> Result<bool, String> {
+//         self.value.clone().try_into().map_err(|_|
+//             format!("Instruction is a {}, expected a bool", self.value.type_as_str()))
+//     }
+
+//     fn into_string(&self) -> Result<String, String> {
+//         self.value.clone().try_into().map_err(|_|
+//             format!("Instruction is a {}, expected a string", self.value.type_as_str()))
+//     }
+
+//     fn into_number(&self) -> Result<f64, String> {
+//         self.value.clone().try_into().map_err(|_|
+//             format!("Instruction is a {}, expected a number", self.value.type_as_str()))
+//     }
+
+//     fn into_integer(&self) -> Result<i64, String> {
+//         self.value.clone().try_into().map_err(|_|
+//             format!("Instruction is a {}, expected an integer", self.value.type_as_str()))
+//     }
+
+//     fn into_math_expression(&self) -> Result<MathExpression, String> {
+//         self.value.clone().try_into().map_err(|_|
+//             format!("Instruction is a {}, expected a math expression", self.value.type_as_str()))
+//     }
+
+//     fn value(&self) -> StateVarValue {
+//         self.value.clone()
+//     }
+// }
+
+
+
+// pub trait DepValueOption {
+//     fn is_bool_if_exists(&self) -> Result<Option<bool>, String>;
+//     fn into_if_exists<T: TryFrom<StateVarValue>>(&self) -> Result<Option<T>, String>;
+//     fn value(&self) -> Option<StateVarValue>;
+// }
+
+// impl DepValueOption for Option<&DependencyValue> {
+
+//     fn is_bool_if_exists(&self) -> Result<Option<bool>, String> {
+//         self.into_if_exists().map_err(|e| e + ", expected a bool")
+//     }
+
+//     fn into_if_exists<T: TryFrom<StateVarValue>>(&self) -> Result<Option<T>, String> {
+//         let dep_value_opt = self;
+
+//         dep_value_opt.and_then(|dep_value| Some(dep_value.value.clone().try_into().map_err(|_|
+//                 format!("could not convert value {} from instruction",
+//                     dep_value.value.type_as_str())
+//             )))
+//             .map_or(Ok(None), |v| v.map(Some)) // flip nested Option<Result<T>>
+//     }
+
+//     fn value(&self) -> Option<StateVarValue> {
+//         match self {
+//             Some(dep_value) => Some(dep_value.value.clone()),
+//             None => None,
+//         }
+//     }
+// }
+
+
+// /////////// StateVarValue boilerplate ///////////
 
 impl TryFrom<StateVarValue> for String {
     type Error = &'static str;
@@ -479,126 +512,84 @@ impl std::fmt::Display for StateVarValue {
 
 impl StateVarVariant {
 
-    pub fn return_dependency_instructions(&self)
-         -> &Vec<DependencyInstruction> {
 
+    pub fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
         match self {
-            Self::String(def) => &def.dependency_instructions,
-            Self::Boolean(def) => &def.dependency_instructions,
-            Self::Number(def) => &def.dependency_instructions,
-            Self::Integer(def) => &def.dependency_instructions,
+            Self::String(sv_typed) => sv_typed.return_dependency_instructions(),
+            Self::Boolean(sv_typed) => sv_typed.return_dependency_instructions(),
+            Self::Number(sv_typed) => sv_typed.return_dependency_instructions(),
+            Self::Integer(sv_typed) => sv_typed.return_dependency_instructions(),
         }
     }
 
+    pub fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+        match self {
+            Self::String(sv_typed) => sv_typed.set_dependencies(dependencies),
+            Self::Boolean(sv_typed) => sv_typed.set_dependencies(dependencies),
+            Self::Number(sv_typed) => sv_typed.set_dependencies(dependencies),
+            Self::Integer(sv_typed) => sv_typed.set_dependencies(dependencies),
+        }
+    }
     
-    pub fn determine_state_var_from_dependencies(&self,
-        dependency_values: &Vec<Vec<DependencyValue>>
-    ) -> Result<StateVarUpdateInstruction<StateVarValue>, String> {
-
-        use StateVarUpdateInstruction::*;
-
+    pub fn calculate_state_var_from_dependencies(&self) -> () {
         match self {
-            Self::String(def) => {
-                let instruction = (def.determine_state_var_from_dependencies)(dependency_values)?;
-                Ok(match instruction {                    
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::String(val)),
-                })
-            },
-            Self::Integer(def) => {
-                let instruction = (def.determine_state_var_from_dependencies)(dependency_values)?;
-                Ok(match instruction {
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::Integer(val)),
-                })
-            },
-            Self::Number(def) => {
-                let instruction = (def.determine_state_var_from_dependencies)(dependency_values)?;
-                Ok(match instruction {
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::Number(val)),
-                })
-            },
-            Self::Boolean(def) => {
-                let instruction = (def.determine_state_var_from_dependencies)(dependency_values)?;
-                Ok(match instruction {
-                    NoChange => NoChange,
-                    SetValue(val) => SetValue(StateVarValue::Boolean(val)),
-                })
-            },
+            Self::String(sv_typed) => sv_typed.calculate_state_var_from_dependencies(),
+            Self::Boolean(sv_typed) => sv_typed.calculate_state_var_from_dependencies(),
+            Self::Number(sv_typed) => sv_typed.calculate_state_var_from_dependencies(),
+            Self::Integer(sv_typed) => sv_typed.calculate_state_var_from_dependencies(),
         }
     }
 
-    pub fn request_dependencies_to_update_value(
-        &self,
-        desired_value: StateVarValue,
-        dependency_sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>>
-    ) -> Result<Vec<(usize, Result<Vec<DependencyValue>, String>)>, String> {
-
+    pub fn return_for_renderer(&self) -> bool {
         match self {
-            Self::String(def) =>  {
-                Ok((def.request_dependencies_to_update_value)(
-                    desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                        format!("Requested String be updated to {:#?}", desired_value)
-                    )?,
-                    dependency_sources,
-                ))
-            },
-            Self::Integer(def) => {
-                Ok((def.request_dependencies_to_update_value)(
-                    desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                        format!("Requested Integer be updated to {:#?}", desired_value)
-                    )?,
-                    dependency_sources,
-                ))
-            },
-            Self::Number(def) =>  {
-                Ok((def.request_dependencies_to_update_value)(
-                    desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                        format!("Requested Number be updated to {:#?}", desired_value)
-                    )?,
-                    dependency_sources,
-                ))
-            },
-            Self::Boolean(def) => {
-                Ok((def.request_dependencies_to_update_value)(
-                    desired_value.clone().try_into().map_err(|_| // only cloned for error msg
-                        format!("Requested Boolean be updated to {:#?}", desired_value)
-                    )?,
-                    dependency_sources,
-                ))
-            },
-
-
-        }       
+            Self::String(sv_typed) => sv_typed.return_for_renderer(),
+            Self::Boolean(sv_typed) => sv_typed.return_for_renderer(),
+            Self::Number(sv_typed) => sv_typed.return_for_renderer(),
+            Self::Integer(sv_typed) => sv_typed.return_for_renderer(),
+        }
+    }
+    
+    pub fn return_initial_essential_value(&self) -> StateVarValue {
+        match self {
+            Self::String(sv_typed) => StateVarValue::String(sv_typed.return_initial_essential_value()),
+            Self::Boolean(sv_typed) => StateVarValue::Boolean(sv_typed.return_initial_essential_value()),
+            Self::Number(sv_typed) => StateVarValue::Number(sv_typed.return_initial_essential_value()),
+            Self::Integer(sv_typed) => StateVarValue::Integer(sv_typed.return_initial_essential_value()),
+        }
     }
 
+    pub fn request_dependencies_to_update_value(&self) -> Result<(),()> {
+        Err(())
+    }
 
-
-    // Both array and non-array functions
-
-
-
-    pub fn initial_essential_value(&self) -> StateVarValue {
+    pub fn get_value_assuming_fresh(&self) -> StateVarValue {
         match self {
-            Self::String(def) =>  StateVarValue::String(def.initial_essential_value.clone()),
-            Self::Integer(def) => StateVarValue::Integer(def.initial_essential_value),
-            Self::Number(def) =>  StateVarValue::Number(def.initial_essential_value),
-            Self::Boolean(def) => StateVarValue::Boolean(def.initial_essential_value),
+            Self::String(sv_typed) => StateVarValue::String(sv_typed.get_value_assuming_fresh()),
+            Self::Boolean(sv_typed) => StateVarValue::Boolean(sv_typed.get_value_assuming_fresh()),
+            Self::Number(sv_typed) => StateVarValue::Number(sv_typed.get_value_assuming_fresh()),
+            Self::Integer(sv_typed) => StateVarValue::Integer(sv_typed.get_value_assuming_fresh()),
+        }
+    }
+
+    pub fn create_new_mutable_view(&self) -> StateVar {
+        match self {
+            Self::String(sv_typed) => StateVar::String(sv_typed.create_new_mutable_view()),
+            Self::Boolean(sv_typed) => StateVar::Boolean(sv_typed.create_new_mutable_view()),
+            Self::Number(sv_typed) => StateVar::Number(sv_typed.create_new_mutable_view()),
+            Self::Integer(sv_typed) => StateVar::Integer(sv_typed.create_new_mutable_view()),
         }
     }
 
 
-    pub fn for_renderer(&self) -> bool {
+    pub fn get_name(&self) -> &'static str {
         match self {
-            Self::String(def) =>  def.for_renderer,
-            Self::Integer(def) => def.for_renderer,
-            Self::Number(def) =>  def.for_renderer,
-            Self::Boolean(def) => def.for_renderer,
+            Self::String(sv_typed) => sv_typed.get_name(),
+            Self::Boolean(sv_typed) => sv_typed.get_name(),
+            Self::Number(sv_typed) => sv_typed.get_name(),
+            Self::Integer(sv_typed) => sv_typed.get_name(),
         }
     }
-
-
+    
 
 }
 

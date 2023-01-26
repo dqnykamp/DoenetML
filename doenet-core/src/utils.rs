@@ -6,8 +6,8 @@ use crate::StateVar;
 use crate::Dependency;
 use crate::component::*;
 use crate::state_variables::{StateVarName,InstructionName};
-use crate::state::EssentialStateVar;
-use crate::EssentialDataOrigin;
+// use crate::state::EssentialStateVar;
+// use crate::EssentialDataOrigin;
 
 use serde_json::{Value, Map, json};
 
@@ -169,15 +169,15 @@ pub fn json_dependencies<'a>(
     display_deps
 }
 
-pub fn json_essential_data(
-    essential_data: &HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
-) -> HashMap<String, HashMap<String, EssentialStateVar>> {
-    essential_data.iter().map(|(comp, h)|
-        (comp.clone(),
-             h.iter().map(|(origin, var)| {
-                let origin_name = format!("From {:?}", origin);
-                (origin_name, var.clone())
-             }).collect::<HashMap<String, EssentialStateVar>>()
-        )
-    ).collect()
-}
+// pub fn json_essential_data(
+//     essential_data: &HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
+// ) -> HashMap<String, HashMap<String, EssentialStateVar>> {
+//     essential_data.iter().map(|(comp, h)|
+//         (comp.clone(),
+//              h.iter().map(|(origin, var)| {
+//                 let origin_name = format!("From {:?}", origin);
+//                 (origin_name, var.clone())
+//              }).collect::<HashMap<String, EssentialStateVar>>()
+//         )
+//     ).collect()
+// }

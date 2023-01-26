@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 
+use crate::state::StateVarTyped;
 use crate::state_variables::*;
 use crate::base_definitions::*;
 
@@ -7,6 +8,27 @@ use super::*;
 
 use crate::ComponentProfile;
 
+
+struct Value {
+    val: StateVarTyped<f64>,
+}
+
+impl StateVariable<f64> for Value {
+    fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+        vec![
+            DependencyInstruction::Child {
+                desired_profiles: vec![ComponentProfile::Number],
+                parse_into_expression: true,
+            }
+        ]
+    }
+
+    fn set_dependencies(&mut self, dependencies: Vec<Vec<DependencyValue>>, value: StateVarTyped<f64>) -> () {
+        self.val = value;
+
+        let children = &dependencies[0];
+    }
+}
 
 
 lazy_static! {
@@ -52,6 +74,10 @@ lazy_static! {
         ("text", StateVarVariant::String(StateVarDefinition {
             for_renderer: true,
 
+            // my_value_setter: something,
+
+            // my_dependencies: something_else,
+
             dependency_instructions: vec![
                 DependencyInstruction::StateVar {
                     component_name: None,
@@ -63,6 +89,12 @@ lazy_static! {
 
                 let value: Option<f64> = dependency_values[0].get(0)
                     .into_if_exists()?;
+
+                // self.inner_val.set(value.map_or("".to_string(), |val| val.to_string()))
+
+                // ISetTheValue(val)
+
+                // Ididnotchange
 
                 Ok(SetValue(
                     value.map_or("".to_string(), |val| val.to_string())

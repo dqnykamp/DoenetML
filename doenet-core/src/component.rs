@@ -5,52 +5,53 @@ use crate::state_variables::*;
 use std::collections::HashMap;
 use std::fmt::{Debug, self};
 
+use crate::lazy_static;
 
 pub mod text;
-pub mod number;
-pub mod text_input;
+// pub mod number;
+// pub mod text_input;
 pub mod document;
-pub mod boolean;
-pub mod p;
-pub mod number_input;
+// pub mod boolean;
+// pub mod p;
+// pub mod number_input;
 // pub mod boolean_input;
 // pub mod sequence;
 // pub mod graph;
 // pub mod point;
 // pub mod collect;
-pub mod section;
+// pub mod section;
 // pub mod line;
 // pub mod map;
 // pub mod template;
 // pub mod sources;
 // pub mod conditional_content;
 // pub mod case;
-pub mod _error;
+// pub mod _error;
 
 lazy_static! {
     pub static ref COMPONENT_DEFINITIONS: HashMap<ComponentType, &'static ComponentDefinition> = {
 
         let defs: Vec<&'static ComponentDefinition> = vec![
             &crate::text               ::MY_COMPONENT_DEFINITION,
-            &crate::number             ::MY_COMPONENT_DEFINITION,
-            &crate::text_input         ::MY_COMPONENT_DEFINITION,
+            // &crate::number             ::MY_COMPONENT_DEFINITION,
+            // &crate::text_input         ::MY_COMPONENT_DEFINITION,
             &crate::document           ::MY_COMPONENT_DEFINITION,
-            &crate::boolean            ::MY_COMPONENT_DEFINITION,
-            &crate::p                  ::MY_COMPONENT_DEFINITION,
-            &crate::number_input       ::MY_COMPONENT_DEFINITION,
+            // &crate::boolean            ::MY_COMPONENT_DEFINITION,
+            // &crate::p                  ::MY_COMPONENT_DEFINITION,
+            // &crate::number_input       ::MY_COMPONENT_DEFINITION,
             // &crate::boolean_input      ::MY_COMPONENT_DEFINITION,
             // &crate::sequence           ::MY_COMPONENT_DEFINITION,
             // &crate::graph              ::MY_COMPONENT_DEFINITION,
             // &crate::point              ::MY_COMPONENT_DEFINITION,
             // &crate::collect            ::MY_COMPONENT_DEFINITION,
-            &crate::section            ::MY_COMPONENT_DEFINITION,
+            // &crate::section            ::MY_COMPONENT_DEFINITION,
             // &crate::line               ::MY_COMPONENT_DEFINITION,
             // &crate::map                ::MY_COMPONENT_DEFINITION,
             // &crate::template           ::MY_COMPONENT_DEFINITION,
             // &crate::sources            ::MY_COMPONENT_DEFINITION,
             // &crate::conditional_content::MY_COMPONENT_DEFINITION,
             // &crate::case               ::MY_COMPONENT_DEFINITION,
-            &crate::_error               ::MY_COMPONENT_DEFINITION,
+            // &crate::_error               ::MY_COMPONENT_DEFINITION,
         ];
 
         defs.into_iter().map(|def| (def.component_type, def)).collect()
@@ -106,9 +107,13 @@ pub enum ComponentProfile {
 
 /// The definition of a component type.
 pub struct ComponentDefinition {
-    pub state_var_definitions: &'static Vec<(StateVarName, StateVarVariant)>,
+    // pub state_var_definitions: &'static Vec<(StateVarName, StateVarVariant)>,
 
     pub state_var_index_map: HashMap<StateVarName, usize>,
+
+    pub state_var_names: Vec<&'static str>,
+
+    pub generate_state_vars: fn () -> Vec<StateVarVariant>,
 
     /// An ordered list of which profiles this component fulfills, along with the name of the
     /// state variable that fulfills it.
@@ -193,19 +198,24 @@ impl ComponentDefinition {
 
 }
 
-use crate::lazy_static;
-lazy_static! {
-    static ref EMPTY_STATE_VARS: Vec<(StateVarName, StateVarVariant)> = {
-        Vec::new()
-    };
-}
+// lazy_static! {
+//     static ref EMPTY_STATE_VARS: Vec<(StateVarName, StateVarVariant)> = {
+//         Vec::new()
+//     };
+// }
 
+
+fn empty_state_vars() -> Vec<StateVarVariant> {
+    Vec::new()
+}
 
 impl Default for ComponentDefinition {
     fn default() -> Self {
         ComponentDefinition {
-            state_var_definitions: &EMPTY_STATE_VARS,
+            // state_var_definitions: &EMPTY_STATE_VARS,
             state_var_index_map: HashMap::new(),
+            state_var_names: Vec::new(),
+            generate_state_vars: empty_state_vars,
             attribute_names: Vec::new(),
             static_attribute_names: Vec::new(),
             array_aliases: HashMap::new(),
