@@ -50,8 +50,14 @@ pub enum StateVarReadOnlyView {
 #[derive(Debug)]
 pub struct StateVarTyped<T: Default + Clone> {
     value: StateVarMutableViewTyped<T>,
+    immutable_view_of_value: StateVarReadOnlyViewTyped<T>,
     interface: Box<dyn StateVarInterface<T>>,
     parameters: StateVarParameters<T>,
+}
+
+pub struct UpdatesRequested {
+    pub instruction_ind: usize,
+    pub dependency_ind: usize
 }
 
 pub trait StateVarInterface<T: Default + Clone>: std::fmt::Debug {
@@ -64,7 +70,7 @@ pub trait StateVarInterface<T: Default + Clone>: std::fmt::Debug {
     
     fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<T>) -> ();
 
-    fn request_dependencies_to_update_value(&self) -> Result<(),()> {
+    fn request_dependencies_to_update_value(&self, state_var: &StateVarReadOnlyViewTyped<T>) -> Result<Vec<UpdatesRequested>,()> {
         Err(())
     }
 
@@ -108,6 +114,10 @@ impl<T: Default + Clone> StateVarInner<T> {
 
     pub fn request_value(&mut self, requested_val: T) {
         self.requested_value = requested_val;
+    }
+
+    pub fn get_requested_value<'a>(&'a self) -> &'a T {
+        &self.requested_value
     }
 }
 
@@ -167,6 +177,15 @@ impl<T: Default + Clone> StateVarMutableViewTyped<T> {
         self.inner.borrow_mut().request_value(requested_val);
     }
 
+    pub fn get_requested_value<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        Ref::map(self.inner.borrow(), |v| v.get_requested_value())
+    }
+
+    pub fn set_value_to_requested_value(&self) {
+        let mut inner = self.inner.borrow_mut();
+        inner.value = inner.requested_value.clone();
+    }
+
 }
 
 #[derive(Debug)]
@@ -195,6 +214,10 @@ impl<T: Default + Clone> StateVarReadOnlyViewTyped<T> {
 
     pub fn request_value(&self, requested_val: T) {
         self.inner.borrow_mut().request_value(requested_val);
+    }
+
+    pub fn get_requested_value<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        Ref::map(self.inner.borrow(), |v| v.get_requested_value())
     }
 }
 
@@ -300,6 +323,15 @@ impl StateVarMutableView {
         }
     }
 
+    pub fn set_value_to_requested_value(&self) {
+        match self {
+            StateVarMutableView::Number(sv_typed) => sv_typed.set_value_to_requested_value(),
+            StateVarMutableView::Integer(sv_typed) => sv_typed.set_value_to_requested_value(),
+            StateVarMutableView::String(sv_typed) => sv_typed.set_value_to_requested_value(),
+            StateVarMutableView::Boolean(sv_typed) => sv_typed.set_value_to_requested_value(),
+            StateVarMutableView::MathExpr(sv_typed) => sv_typed.set_value_to_requested_value(),
+        }
+    }
 
     pub fn get_type_as_str(&self) -> &'static str {
         match self {
@@ -314,8 +346,10 @@ impl StateVarMutableView {
 
 impl<T: Default + Clone> StateVarTyped<T> {
     pub fn new(interface: Box<dyn StateVarInterface<T>>, parameters: StateVarParameters<T>) -> Self {
+        let value = StateVarMutableViewTyped::new();
         StateVarTyped {
-            value: StateVarMutableViewTyped::new(),
+            immutable_view_of_value: value.create_new_read_only_view(),
+            value,
             interface,
             parameters
         }
@@ -369,8 +403,8 @@ impl<T: Default + Clone> StateVarTyped<T> {
         self.interface.calculate_state_var_from_dependencies(&self.value)
     }
 
-    fn request_dependencies_to_update_value(&self) -> Result<(),()> {
-        self.interface.request_dependencies_to_update_value()
+    fn request_dependencies_to_update_value(&self) -> Result<Vec<UpdatesRequested>,()> {
+        self.interface.request_dependencies_to_update_value(&self.immutable_view_of_value)
     }
 
     fn get_name(&self) -> &'static str {
@@ -455,6 +489,16 @@ impl StateVar {
     }
 
 
+    pub fn request_value(&self, requested_val: StateVarValue) {
+        match self {
+            StateVar::Number(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
+            StateVar::Integer(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
+            StateVar::String(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
+            StateVar::Boolean(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
+            StateVar::MathExpr(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
+        }
+    }
+
     pub fn get_type_as_str(&self) -> &'static str {
         match self {
             Self::String(_) => "string",
@@ -495,7 +539,7 @@ impl StateVar {
         }
     }
 
-    pub fn request_dependencies_to_update_value(&self) -> Result<(),()> {
+    pub fn request_dependencies_to_update_value(&self) -> Result<Vec<UpdatesRequested>,()> {
         match self {
             StateVar::Number(sv_typed) => sv_typed.request_dependencies_to_update_value(),
             StateVar::Integer(sv_typed) => sv_typed.request_dependencies_to_update_value(),

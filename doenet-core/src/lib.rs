@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
-use state::{Freshness, StateVarMutableView, StateVar, StateVarReadOnlyView, EssentialStateVar};
+use state::{Freshness, StateVarMutableView, StateVar, StateVarReadOnlyView, EssentialStateVar, UpdatesRequested};
 use component::*;
 use state_variables::*;
 
@@ -1202,14 +1202,12 @@ fn freshen_state_var(
     
                             Dependency::Essential { component_name, origin } => {
   
-                                unimplemented!("Have not implemented essential dependency");
-    
                                 // let value = essential_data
                                 //     .get(&component_name.clone()).unwrap()
                                 //     .get(&origin).unwrap()
                                 //     .clone();
                 
-                                // dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = value.0;
+                                // dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = value.get_read_only_view();
     
                             },
                         }
@@ -1385,7 +1383,7 @@ fn get_dependency_sources_for_state_var<'a>(
 
 fn mark_stale_state_var_and_dependencies(
     dependent_on_state_var: &HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
-    component_states: &mut HashMap<ComponentName, Vec<StateVarMutableView>>,
+    component_state_variables: &mut HashMap<ComponentName, Vec<StateVar>>,
     original_component_name: &String,
     original_state_var_ind: usize,
 ) {
@@ -1397,7 +1395,7 @@ fn mark_stale_state_var_and_dependencies(
 
     while let Some((component_name, state_var_ind)) = stack.pop() {
 
-        let state = component_states
+        let state = component_state_variables
             .get_mut(&component_name.clone())
             .expect(&format!("Error accessing state of {:?}", component_name))
             .get_mut(state_var_ind)
@@ -1420,7 +1418,7 @@ fn mark_stale_state_var_and_dependencies(
 fn mark_stale_essential_datum_dependencies(
     dependent_on_state_var: &HashMap<ComponentName, Vec<Vec<(ComponentName, usize)>>>,
     dependent_on_essential: &HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
-    component_states: &mut HashMap<ComponentName, Vec<StateVarMutableView>>,
+    component_state_variables: &mut HashMap<ComponentName, Vec<StateVar>>,
     essential_state: &EssentialState,
 ) {
     let component_name = essential_state.0.clone();
@@ -1430,7 +1428,7 @@ fn mark_stale_essential_datum_dependencies(
 
     if let Some(vec_deps) = dependent_on_essential.get(&(component_name, origin)) {
         for (comp_name, sv_ind) in vec_deps.iter() {
-            mark_stale_state_var_and_dependencies(dependent_on_state_var, component_states, comp_name, *sv_ind);
+            mark_stale_state_var_and_dependencies(dependent_on_state_var, component_state_variables, comp_name, *sv_ind);
         }
     }
 }
@@ -1637,8 +1635,8 @@ pub struct Action {
 /// Internal structure used to track changes
 #[derive(Debug, Clone)]
 enum UpdateRequest<'a> {
-    SetEssentialValue(EssentialState, StateVarValue),
-    SetStateVar(ComponentState<'a>, StateVarValue),
+    SetEssentialValue(EssentialState),
+    SetStateVar(ComponentState<'a>),
 }
 
 pub fn handle_action_from_json(core: &mut DoenetCore, action: &str) -> String {
@@ -1684,8 +1682,13 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
         &mut state_var_resolver,
     );
 
+
     for (state_var_ind, requested_value) in state_vars_to_update {
 
+        let state_variable = &core.component_state_variables.get(&component.name).unwrap()[state_var_ind];
+
+        state_variable.request_value(requested_value);
+        
         // if component state is unresolved, then calculate its value to resolve it
         let component_state = ComponentState(&component, state_var_ind);
         if component_state.get_freshness(&core.component_state_variables) == Freshness::Unresolved {
@@ -1702,10 +1705,10 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
         }
 
 
-        let request = UpdateRequest::SetStateVar(component_state, requested_value);
+        let request = UpdateRequest::SetStateVar(component_state);
         process_update_request(&core.component_nodes, &core.dependencies,
             &mut core.dependent_on_state_var, &mut core.dependent_on_essential,
-            &mut core.component_state_variables, &mut core.essential_data, &request);
+            &mut core.component_state_variables, &mut core.essential_data, request);
     }
 
     // log_json!("Component tree after action", utils::json_components(&core.component_nodes, &core.component_states));
@@ -1715,65 +1718,50 @@ pub fn handle_action(core: &mut DoenetCore, action: Action) {
 
 /// Convert the results of `request_dependencies_to_update_value`
 /// into UpdateRequest struct.
-fn convert_dependency_values_to_update_request<'a>(
+fn convert_dependency_values_to_update_request<'a, 'b>(
     component_nodes: &'a HashMap<ComponentName, ComponentNode>,
     dependencies: &'a HashMap<ComponentName, Vec<DependenciesForStateVar>>,
-    component_state: &'a ComponentState,
-    requests: Vec<(usize, Result<Vec<DependencyValue>, String>)>,
+    component_state: &'b ComponentState,
+    requests: Vec<UpdatesRequested>,
 ) -> Vec<UpdateRequest<'a>> {
 
-    unimplemented!("have not implemented convert_dependency_values_to_update_request")
 
-    // let component = component_state.0;
-    // let state_var = &component_state.1;
+    let component = component_state.0;
+    let state_var = &component_state.1;
 
-    // let my_dependencies = dependencies_of_state_var(dependencies, &component_state);
+    let my_dependencies = dependencies_of_state_var(dependencies, &component_state);
 
-    // let mut update_requests = Vec::new();
+    let mut update_requests = Vec::new();
 
-    // for (instruction_ind, instruction_requests) in requests {
+    for UpdatesRequested { instruction_ind, dependency_ind } in requests {
 
-    //     let valid_requests = match instruction_requests {
-    //         Err(_e) => {
-    //             // log_debug!("Inverse definition for {} failed with: {}", component_state, _e);
-    //             break;
-    //         },
-    //         Ok(result) => result,
-    //     };
+        let instruct_dependencies = my_dependencies.get(instruction_ind).expect(
+            &format!("{}:{} has too few instructions to determine dependencies",
+                component.definition.component_type, state_var)
+        );
 
+        let dependency = &instruct_dependencies[dependency_ind];
 
+        match dependency {
+            Dependency::Essential { component_name, origin } => {
+                update_requests.push(UpdateRequest::SetEssentialValue(
+                    EssentialState(component_name.clone(), origin.clone()),
+                ))
+            },
+            Dependency::StateVar { component_name, state_var_ind } => {
+                // TODO: receiving multiple dependencies because of multiple instances
 
-    //     let instruct_dependencies = my_dependencies.get(instruction_ind).expect(
-    //         &format!("{}:{} has the wrong instruction name to determine dependencies",
-    //             component.definition.component_type, state_var)
-    //     );
+                let component_node = component_nodes.get(&component_name.clone()).unwrap();
 
-    //     assert_eq!(valid_requests.len(), instruct_dependencies.len());
+                let component_state = ComponentState(component_node, *state_var_ind);
+                update_requests.push(UpdateRequest::SetStateVar(component_state));
 
-    //     for (request, dependency) in valid_requests.into_iter().zip(instruct_dependencies.iter()) {
+            },
+        }
 
-    //         match dependency {
-    //             Dependency::Essential { component_name, origin } => {
-    //                 update_requests.push(UpdateRequest::SetEssentialValue(
-    //                     EssentialState(component_name.clone(), origin.clone()),
-    //                     request.value.clone(),
-    //                 ))
-    //             },
-    //             Dependency::StateVar { component_name, state_var_ind } => {
-    //                 // TODO: receiving multiple dependencies because of multiple instances
+    }
 
-    //                 let component_node = component_nodes.get(&component_name.clone()).unwrap();
-
-    //                 let component_state = ComponentState(component_node, *state_var_ind);
-    //                 update_requests.push(UpdateRequest::SetStateVar(component_state, request.value.clone()));
-
-    //             },
-    //         }
-    //     }
-
-    // }
-
-    // update_requests
+    update_requests
 
 }
 
@@ -1784,99 +1772,97 @@ fn process_update_request(
     dependent_on_essential: &HashMap<(ComponentName, EssentialDataOrigin), Vec<(ComponentName, usize)>>,
     component_state_variables: &mut HashMap<ComponentName, Vec<StateVar>>,
     essential_data: &mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
-    initial_update_request: &UpdateRequest
+    initial_update_request: UpdateRequest
 ) {
-
-    unimplemented!("haven't implemented process update request")
 
     // log_debug!("Processing update request {:?}", update_request);
 
-    // let mut stack = Vec::new();
+    let mut stack = Vec::new();
 
-    // stack.push(initial_update_request);
-
-
-    // 'stack_loop: while let Some(update_request) = stack.pop() {
+    stack.push(initial_update_request);
 
 
-    //     match update_request {
-    //         UpdateRequest::SetEssentialValue(essential_state, requested_value) => {
+    while let Some(update_request) = stack.pop() {
 
-    //             let essential_var = essential_data
-    //                 .get_mut(&essential_state.0).unwrap()
-    //                 .get_mut(&essential_state.1).unwrap();
 
-    //             essential_var.set_value(
-    //                 requested_value.clone(),
-    //             ).expect(
-    //                 &format!("Failed to set essential value for {:?}", essential_state)
-    //             );
+        match update_request {
+            UpdateRequest::SetEssentialValue(essential_state) => {
 
-    //             // log_debug!("Updated essential data {:?}", core.essential_data);
+                let essential_var = essential_data
+                    .get_mut(&essential_state.0).unwrap()
+                    .get_mut(&essential_state.1).unwrap();
 
-    //             mark_stale_essential_datum_dependencies(dependent_on_state_var, dependent_on_essential, component_state_variables, essential_state);
-    //         },
+                essential_var.set_value_to_requested_value();
 
-    //         UpdateRequest::SetStateVar(component_state, requested_value) => {
+                // log_debug!("Updated essential data {:?}", core.essential_data);
 
-    //             let dep_update_requests = request_dependencies_to_update_value_including_shadow(
-    //                 component_nodes,
-    //                 dependencies,
-    //                 essential_data,
-    //                 component_state,
-    //                 requested_value.clone(),
-    //             );
+                mark_stale_essential_datum_dependencies(dependent_on_state_var, dependent_on_essential, component_state_variables, &essential_state);
+            },
 
-    //             for dep_update_request in dep_update_requests {
-    //                 process_update_request(component_nodes, dependencies, dependent_on_state_var, dependent_on_essential, component_state_variables, essential_data, &dep_update_request);
-    //             }
+            UpdateRequest::SetStateVar(component_state) => {
 
-    //             // needed?
-    //             // mark_stale_state_var_and_dependencies(core, component_name, &map, &StateVarSlice::Single(state_var_ref.clone()));
-    //         }
-    //     }
+                let mut dep_update_requests = request_dependencies_to_update_value_including_shadow(
+                    component_nodes,
+                    dependencies,
+                    component_state_variables,
+                    essential_data,
+                    &component_state
+                );
 
-    // }
+                // TODO: make sure that we do indeed want to reverse here to keep existing conventions
+                dep_update_requests.reverse();
+
+                stack.extend(dep_update_requests);
+
+                // needed?
+                // mark_stale_state_var_and_dependencies(core, component_name, &map, &StateVarSlice::Single(state_var_ref.clone()));
+            }
+        }
+
+    }
 }
+
 
 fn request_dependencies_to_update_value_including_shadow<'a, 'b>(
     component_nodes: &'a HashMap<ComponentName, ComponentNode>,
     dependencies: &'a HashMap<ComponentName, Vec<DependenciesForStateVar>>,
+    component_state_variables: &mut HashMap<ComponentName, Vec<StateVar>>,
     essential_data: &'b mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
-    component_state: &'a ComponentState,
-    new_value: StateVarValue,
+    component_state: &'b ComponentState,
 ) -> Vec<UpdateRequest<'a>> {
 
 
-    unimplemented!("have not implemented request_dependencies_to_update_value_including_shadow")
-    // let component = component_state.0;
-    // let state_var_ind = component_state.1;
 
-    // if let Some(component_ref_state) = state_var_is_shadowing(&component_state) {
+    let component = component_state.0;
+    let state_var_ind = component_state.1;
 
-    //     let source_component = component_nodes.get(&component_ref_state.0).unwrap();
-    //     let source_state_var_ind =component_ref_state.1;
-    //     let source_state = ComponentState(source_component, source_state_var_ind);
-    //     vec![UpdateRequest::SetStateVar(source_state, new_value)]
+    if let Some(component_ref_state) = state_var_is_shadowing(&component_state) {
 
-    // } else {
+        // TODO: state variable shadowing needs to be updated to state variable traits
 
-    //     let dependency_sources = get_dependency_sources_for_state_var(dependencies, essential_data, component_state);
+        let source_component = component_nodes.get(&component_ref_state.0).unwrap();
+        let source_state_var_ind =component_ref_state.1;
+        let source_state = ComponentState(source_component, source_state_var_ind);
+        vec![UpdateRequest::SetStateVar(source_state)]
 
-    //     // log!("Dependency sources for {}, {:?}", component_state, dependency_sources);
+    } else {
 
-    //     let requests = component.definition.state_var_definitions[state_var_ind].1
-    //         .request_dependencies_to_update_value(new_value, dependency_sources)
-    //         .expect(&format!("Failed requesting dependencies for {}", component_state));
+        // let dependency_sources = get_dependency_sources_for_state_var(dependencies, essential_data, component_state);
 
-    //     // log_debug!("{} wants its dependency to update to: {:?}", component_state, requests);
+        // log!("Dependency sources for {}, {:?}", component_state, dependency_sources);
+        let state_variable = &component_state_variables.get(&component.name).unwrap()[state_var_ind];
 
-    //     let update_requests = convert_dependency_values_to_update_request(component_nodes, dependencies, component_state, requests);
+        let requests = state_variable.request_dependencies_to_update_value();
+
+        let update_requests = requests
+            .map(|req| convert_dependency_values_to_update_request(component_nodes, dependencies, component_state, req))
+            .unwrap_or(vec![]);
+
 
     //     // log_debug!("{} generated update requests: {:#?}", component_state, update_requests);
 
-    //     update_requests
-    // }
+        update_requests
+    }
 }
 
 /// Detect if a state var is shadowing because of a CopySource

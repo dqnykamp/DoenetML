@@ -1,13 +1,18 @@
 use lazy_static::lazy_static;
 
 use super::*;
-use crate::{state::{StateVarMutableViewTyped, StateVarReadOnlyViewTyped, StateVarReadOnlyView}, utils::log};
+use crate::{
+    state::{
+        StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarReadOnlyView,
+        StateVarReadOnlyViewTyped, StateVarTyped, UpdatesRequested,
+    },
+    utils::log,
+};
 
 // use crate::base_definitions::*;
 
 #[derive(Debug)]
 struct Value {
-    val: StateVarMutableViewTyped<String>,
     essential_value: StateVarReadOnlyViewTyped<String>,
     immediate_value: StateVarReadOnlyViewTyped<String>,
     sync_values: StateVarReadOnlyViewTyped<bool>,
@@ -16,18 +21,19 @@ struct Value {
 impl Value {
     pub fn new() -> Self {
         Value {
-            val: StateVarMutableViewTyped::new(),
             essential_value: StateVarReadOnlyViewTyped::new(),
             immediate_value: StateVarReadOnlyViewTyped::new(),
             sync_values: StateVarReadOnlyViewTyped::new(),
         }
-    } 
+    }
 }
 
 impl StateVarInterface<String> for Value {
     fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
         vec![
-            DependencyInstruction::Essential { prefill: Some("prefill") },
+            DependencyInstruction::Essential {
+                prefill: Some("prefill"),
+            },
             DependencyInstruction::StateVar {
                 component_name: None,
                 state_var_name: "immediateValue",
@@ -35,12 +41,11 @@ impl StateVarInterface<String> for Value {
             DependencyInstruction::StateVar {
                 component_name: None,
                 state_var_name: "syncImmediateValue",
-            }
+            },
         ]
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-
         if let StateVarReadOnlyView::String(essential_value) = &dependencies[0][0].value {
             self.essential_value = essential_value.create_new_read_only_view();
         } else {
@@ -58,25 +63,46 @@ impl StateVarInterface<String> for Value {
         } else {
             panic!("Got a non-boolean sync values for value of text input.");
         }
-
     }
 
-    fn calculate_state_var_from_dependencies(&self) -> () {
-
-        log!("calc val for textinput: {}, {}, {}", *self.sync_values.get_value_assuming_fresh(), *self.immediate_value.get_value_assuming_fresh(), *self.essential_value.get_value_assuming_fresh());
-
-    
-        let value =
-        if *self.sync_values.get_value_assuming_fresh() {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
+        let value = if *self.sync_values.get_value_assuming_fresh() {
             self.immediate_value.get_value_assuming_fresh()
         } else {
             self.essential_value.get_value_assuming_fresh()
         };
-        
-        self.val.set_value(value.clone());
+
+        state_var.set_value(value.clone());
     }
 
-    fn request_dependencies_to_update_value(&self) -> Result<(),()> {
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<String>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+
+        let desired_value = state_var.get_requested_value();
+
+        self.essential_value.request_value(desired_value.clone());
+        self.immediate_value.request_value(desired_value.clone());
+        self.sync_values.request_value(true);
+
+        Ok(vec![
+            UpdatesRequested {
+                instruction_ind: 0,
+                dependency_ind: 0,
+            },
+            UpdatesRequested {
+                instruction_ind: 1,
+                dependency_ind: 0,
+            },
+            UpdatesRequested {
+                instruction_ind: 2,
+                dependency_ind: 0,
+            },
+        ])
 
         // vec![
         //     (0, Ok(vec![
@@ -98,71 +124,60 @@ impl StateVarInterface<String> for Value {
         //         }
         //     ])),
         // ]
-        Err(())
+        // Err(())
     }
-
-    fn get_value_assuming_fresh(&self) -> String {
-        self.val.get_value_assuming_fresh().clone()
-    }
-
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<String> {
-        self.val.create_new_mutable_view()
-    }
-
-    fn get_name(&self) -> &'static str {
-        "value"
-    }
-
 }
-
-
 
 #[derive(Debug)]
 struct ImmediateValue {
-    val: StateVarMutableViewTyped<String>,
     essential_value: StateVarReadOnlyViewTyped<String>,
 }
 
 impl ImmediateValue {
     pub fn new() -> Self {
         ImmediateValue {
-            val: StateVarMutableViewTyped::new(),
             essential_value: StateVarReadOnlyViewTyped::new(),
         }
-    } 
+    }
 }
 
 impl StateVarInterface<String> for ImmediateValue {
     fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
-        vec![
-            DependencyInstruction::Essential { prefill: Some("prefill") },
-        ]
-    }
-
-    fn return_for_renderer(&self) -> bool {
-        true
+        vec![DependencyInstruction::Essential {
+            prefill: Some("prefill"),
+        }]
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-
         if let StateVarReadOnlyView::String(essential_value) = &dependencies[0][0].value {
             self.essential_value = essential_value.create_new_read_only_view();
         } else {
             panic!("Got a non-string essential value for immediate value of text input.");
         }
-
     }
 
-    fn calculate_state_var_from_dependencies(&self) -> () {
-
-        log!("calc im val for textinput: {}", *self.essential_value.get_value_assuming_fresh());
-
-
-        self.val.set_value(self.essential_value.get_value_assuming_fresh().clone());
-
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
+        state_var.set_value(self.essential_value.get_value_assuming_fresh().clone());
     }
 
-    fn request_dependencies_to_update_value(&self) -> Result<(),()> {
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<String>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+
+        let desired_value = state_var.get_requested_value();
+
+        self.essential_value.request_value(desired_value.clone());
+
+        Ok(vec![
+            UpdatesRequested {
+                instruction_ind: 0,
+                dependency_ind: 0
+            }
+        ])
 
         // vec![
         //     (0, Ok(vec![
@@ -172,68 +187,57 @@ impl StateVarInterface<String> for ImmediateValue {
         //         }
         //     ]))
         // ]
-        Err(())
     }
-
-    fn get_value_assuming_fresh(&self) -> String {
-        self.val.get_value_assuming_fresh().clone()
-    }
-
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<String> {
-        self.val.create_new_mutable_view()
-    }
-
-    fn get_name(&self) -> &'static str {
-        "immediateValue"
-    }
-
 }
-
 
 #[derive(Debug)]
 struct SyncImmediateValue {
-    val: StateVarMutableViewTyped<bool>,
     essential_value: StateVarReadOnlyViewTyped<bool>,
 }
 
 impl SyncImmediateValue {
     pub fn new() -> Self {
         SyncImmediateValue {
-            val: StateVarMutableViewTyped::new(),
             essential_value: StateVarReadOnlyViewTyped::new(),
         }
-    } 
+    }
 }
 
 impl StateVarInterface<bool> for SyncImmediateValue {
     fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
-        vec![
-            DependencyInstruction::Essential { prefill: None },
-        ]
-    }
-
-    fn return_initial_essential_value(&self) -> bool {
-        true
+        vec![DependencyInstruction::Essential { prefill: None }]
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-
         if let StateVarReadOnlyView::Boolean(essential_value) = &dependencies[0][0].value {
             self.essential_value = essential_value.create_new_read_only_view();
         } else {
             panic!("Got a non-booloean essential value for syncImmediate of text input.");
         }
-
     }
 
-    fn calculate_state_var_from_dependencies(&self) -> () {
-
-        self.val.set_value(self.essential_value.get_value_assuming_fresh().clone());
-
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(self.essential_value.get_value_assuming_fresh().clone());
     }
 
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<bool>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
 
-    fn request_dependencies_to_update_value(&self) -> Result<(),()> {
+        let desired_value = state_var.get_requested_value();
+
+        self.essential_value.request_value(desired_value.clone());
+
+        Ok(vec![
+            UpdatesRequested {
+                instruction_ind: 0,
+                dependency_ind: 0
+            }
+        ])
 
         // vec![
         //     (0, Ok(vec![
@@ -243,222 +247,171 @@ impl StateVarInterface<bool> for SyncImmediateValue {
         //         }
         //     ]))
         // ]
-        Err(())
     }
-
-    fn get_value_assuming_fresh(&self) -> bool {
-        self.val.get_value_assuming_fresh().clone()
-    }
-
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-
-    fn get_name(&self) -> &'static str {
-        "syncImmediateValue"
-    }
-
 }
-
-
-
 
 #[derive(Debug)]
-struct Expanded {
-    val: StateVarMutableViewTyped<bool>,
-}
+struct Expanded {}
 
 impl Expanded {
     pub fn new() -> Self {
-        Expanded {
-            val: StateVarMutableViewTyped::new(),
-        }
-    } 
+        Expanded {}
+    }
 }
 
 impl StateVarInterface<bool> for Expanded {
-
-    fn calculate_state_var_from_dependencies(&self) -> () {
-
-        self.val.set_value(false);
-
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        self.val.get_value_assuming_fresh().clone()
-    }
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "expanded"
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(false);
     }
 }
-
-
-
 
 #[derive(Debug)]
-struct Size {
-    val: StateVarMutableViewTyped<f64>,
-}
+struct Size {}
 
 impl Size {
     pub fn new() -> Self {
-        Size {
-            val: StateVarMutableViewTyped::new(),
-        }
-    } 
+        Size {}
+    }
 }
 
 impl StateVarInterface<f64> for Size {
-
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(10.0);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> f64 {
-        self.val.get_value_assuming_fresh().clone()
-    }
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<f64> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "size"
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
+        state_var.set_value(10.0);
     }
 }
-
-
 
 #[derive(Debug)]
-struct Width {
-    val: StateVarMutableViewTyped<f64>,
-}
+struct Width {}
 
 impl Width {
     pub fn new() -> Self {
-        Width {
-            val: StateVarMutableViewTyped::new(),
-        }
-    } 
+        Width {}
+    }
 }
 
 impl StateVarInterface<f64> for Width {
-
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(600.0);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> f64 {
-        self.val.get_value_assuming_fresh().clone()
-    }
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<f64> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "width"
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
+        state_var.set_value(600.0);
     }
 }
-
-
 
 #[derive(Debug)]
-struct Hidden {
-    val: StateVarMutableViewTyped<bool>,
-}
+struct Hidden {}
 
 impl Hidden {
     pub fn new() -> Self {
-        Hidden {
-            val: StateVarMutableViewTyped::new(),
-        }
-    } 
+        Hidden {}
+    }
 }
 
 impl StateVarInterface<bool> for Hidden {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(false);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "hidden"
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(false);
     }
 }
 
 #[derive(Debug)]
-struct Disabled {
-    val: StateVarMutableViewTyped<bool>,
-}
+struct Disabled {}
 
 impl Disabled {
     pub fn new() -> Self {
-        Disabled {
-            val: StateVarMutableViewTyped::new(),
-        }
-    } 
+        Disabled {}
+    }
 }
 
 impl StateVarInterface<bool> for Disabled {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(false);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "disabled"
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(false);
     }
 }
 
-
-
-
-
-
 lazy_static! {
 
-    pub static ref GENERATE_STATE_VARS: fn () -> Vec<StateVarInterfaceBoxed> = || {
+    pub static ref GENERATE_STATE_VARS: fn () -> Vec<StateVar> = || {
         vec![
-            StateVarInterfaceBoxed::String(
-                Box::new(Value::new())
+            StateVar::String(
+                StateVarTyped::new(
+                    Box::new(Value::new()),
+                    StateVarParameters {
+                        name: "value",
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarInterfaceBoxed::String(
-                Box::new(ImmediateValue::new())
+            StateVar::String(
+                StateVarTyped::new(
+                    Box::new(ImmediateValue::new()),
+                    StateVarParameters {
+                        name: "immediateValue",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarInterfaceBoxed::Boolean(
-                Box::new(SyncImmediateValue::new())
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(SyncImmediateValue::new()),
+                    StateVarParameters {
+                        name: "syncImmediateValue",
+                        initial_essential_value: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarInterfaceBoxed::Number(
-                Box::new(Width::new())
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(Width::new()),
+                    StateVarParameters {
+                        name: "width",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarInterfaceBoxed::Number(
-                Box::new(Size::new())
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(Size::new()),
+                    StateVarParameters {
+                        name: "size",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarInterfaceBoxed::Boolean(
-                Box::new(Hidden::new())
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Hidden::new()),
+                    StateVarParameters {
+                        name: "hidden",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarInterfaceBoxed::Boolean(
-                Box::new(Disabled::new())
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Disabled::new()),
+                    StateVarParameters {
+                        name: "disabled",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
         ]
 
@@ -473,7 +426,7 @@ lazy_static! {
         state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER.iter().enumerate().map(|(i,v)| (*v,i) ).collect(),
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
-        
+
         generate_state_vars: *GENERATE_STATE_VARS,
 
         attribute_names: vec![

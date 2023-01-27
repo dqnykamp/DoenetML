@@ -10,7 +10,7 @@ use crate::lazy_static;
 
 pub mod text;
 // pub mod number;
-// pub mod text_input;
+pub mod text_input;
 pub mod document;
 // pub mod boolean;
 // pub mod p;
@@ -35,7 +35,7 @@ lazy_static! {
         let defs: Vec<&'static ComponentDefinition> = vec![
             &crate::text               ::MY_COMPONENT_DEFINITION,
             // &crate::number             ::MY_COMPONENT_DEFINITION,
-            // &crate::text_input         ::MY_COMPONENT_DEFINITION,
+            &crate::text_input         ::MY_COMPONENT_DEFINITION,
             &crate::document           ::MY_COMPONENT_DEFINITION,
             // &crate::boolean            ::MY_COMPONENT_DEFINITION,
             // &crate::p                  ::MY_COMPONENT_DEFINITION,
