@@ -1,349 +1,334 @@
 use lazy_static::lazy_static;
 
 // use crate::base_definitions::*;
-use crate::state::StateVarTyped;
+use crate::state::{StateVarMutableViewTyped, StateVarInterface, StateVarTyped, StateVarParameters};
 use crate::state_variables::*;
 
 use super::*;
 
 #[derive(Debug)]
-struct SubmitLabel {
-    val: StateVarTyped<String>,
+struct SubmitLabel {}
+
+impl SubmitLabel {
+    pub fn new() -> Self {
+        SubmitLabel {
+        }
+    } 
 }
 
-impl StateVariable<String> for SubmitLabel {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(String::from("Check work"));
-    }
-    fn get_value_assuming_fresh(&self) -> String {
-        self.val.get_value_assuming_fresh().clone()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<String> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "submitLabel"
+impl StateVarInterface<String> for SubmitLabel {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+        state_var.set_value(String::from("Check work"));
     }
 }
 
 #[derive(Debug)]
-struct SubmitLabelNoCorrectness {
-    val: StateVarTyped<String>,
+struct SubmitLabelNoCorrectness {}
+
+impl SubmitLabelNoCorrectness {
+    pub fn new() -> Self {
+        SubmitLabelNoCorrectness {
+        }
+    } 
 }
 
-impl StateVariable<String> for SubmitLabelNoCorrectness {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(String::from("Submit Response"));
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> String {
-        self.val.get_value_assuming_fresh().clone()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<String> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "submitLabelNoCorrectness"
+impl StateVarInterface<String> for SubmitLabelNoCorrectness {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+        state_var.set_value(String::from("Submit Response"));
     }
 }
 
 #[derive(Debug)]
-struct Hidden {
-    val: StateVarTyped<bool>,
+struct Hidden {}
+
+impl Hidden {
+    pub fn new() -> Self {
+        Hidden {
+        }
+    } 
 }
 
-impl StateVariable<bool> for Hidden {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(false);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "hidden"
+impl StateVarInterface<bool> for Hidden {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+        state_var.set_value(false);
     }
 }
 
 #[derive(Debug)]
-struct Disabled {
-    val: StateVarTyped<bool>,
+struct Disabled {}
+
+impl Disabled {
+    pub fn new() -> Self {
+        Disabled {
+        }
+    } 
 }
 
-impl StateVariable<bool> for Disabled {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(false);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "disabled"
+impl StateVarInterface<bool> for Disabled {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+        state_var.set_value(false);
     }
 }
 
 #[derive(Debug)]
-struct Fixed {
-    val: StateVarTyped<bool>,
+struct Fixed {}
+
+impl Fixed {
+    pub fn new() -> Self {
+        Fixed {
+        }
+    } 
 }
 
-impl StateVariable<bool> for Fixed {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(false);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "fixed"
+
+impl StateVarInterface<bool> for Fixed {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+        state_var.set_value(false);
     }
 }
 
 #[derive(Debug)]
-struct Title {
-    val: StateVarTyped<String>,
+struct Title {}
+
+impl Title {
+    pub fn new() -> Self {
+        Title {
+        }
+    } 
 }
 
-impl StateVariable<String> for Title {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(String::from(""));
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> String {
-        self.val.get_value_assuming_fresh().clone()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<String> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "title"
+
+impl StateVarInterface<String> for Title {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+        state_var.set_value(String::from(""));
     }
 }
 
 #[derive(Debug)]
-struct Level {
-    val: StateVarTyped<i64>,
+struct Level {}
+
+impl Level {
+    pub fn new() -> Self {
+        Level {
+        }
+    } 
 }
 
-impl StateVariable<i64> for Level {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(0)
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> i64 {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<i64> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "level"
+
+impl StateVarInterface<i64> for Level {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<i64>) -> () {
+        state_var.set_value(0);
     }
 }
 
 #[derive(Debug)]
-struct JustSubmitted {
-    val: StateVarTyped<bool>,
+struct JustSubmitted {}
+
+impl JustSubmitted {
+    pub fn new() -> Self {
+        JustSubmitted {
+        }
+    } 
 }
 
-impl StateVariable<bool> for JustSubmitted {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(true);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "justSubmitted"
+
+impl StateVarInterface<bool> for JustSubmitted {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+        state_var.set_value(true);
     }
 }
 
 #[derive(Debug)]
-struct ShowCorrectness {
-    val: StateVarTyped<bool>,
+struct ShowCorrectness {}
+
+impl ShowCorrectness {
+    pub fn new() -> Self {
+        ShowCorrectness {
+        }
+    } 
 }
 
-impl StateVariable<bool> for ShowCorrectness {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(true);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "showCorrectness"
+
+impl StateVarInterface<bool> for ShowCorrectness {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+        state_var.set_value(true);
     }
 }
 
 #[derive(Debug)]
-struct CreditAchieved {
-    val: StateVarTyped<f64>,
+struct CreditAchieved {}
+
+impl CreditAchieved {
+    pub fn new() -> Self {
+        CreditAchieved {
+        }
+    } 
 }
 
-impl StateVariable<f64> for CreditAchieved {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(1.0);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> f64 {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<f64> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "creditAchieved"
+
+impl StateVarInterface<f64> for CreditAchieved {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<f64>) -> () {
+        state_var.set_value(1.0);
     }
 }
 
 #[derive(Debug)]
-struct CreateSubmitAllButton {
-    val: StateVarTyped<bool>,
+struct CreateSubmitAllButton {}
+
+impl CreateSubmitAllButton {
+    pub fn new() -> Self {
+        CreateSubmitAllButton {
+        }
+    } 
 }
 
-impl StateVariable<bool> for CreateSubmitAllButton {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(false);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "createSubmitAllButton"
+impl StateVarInterface<bool> for CreateSubmitAllButton {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+        state_var.set_value(false);
     }
 }
 
 #[derive(Debug)]
-struct SuppressAnswerSubmitButtons {
-    val: StateVarTyped<bool>,
+struct SuppressAnswerSubmitButtons {}
+
+impl SuppressAnswerSubmitButtons {
+    pub fn new() -> Self {
+        SuppressAnswerSubmitButtons {
+        }
+    } 
 }
 
-impl StateVariable<bool> for SuppressAnswerSubmitButtons {
-    fn calculate_state_var_from_dependencies(&self) -> () {
-        self.val.set_value(true);
-    }
-    fn return_for_renderer(&self) -> bool {
-        true
-    }
-    fn get_value_assuming_fresh(&self) -> bool {
-        *self.val.get_value_assuming_fresh()
-    }
-    fn create_new_mutable_view(&self) -> StateVarTyped<bool> {
-        self.val.create_new_mutable_view()
-    }
-    fn get_name(&self) -> &'static str {
-        "suppressAnswerSubmitButtons"
+impl StateVarInterface<bool> for SuppressAnswerSubmitButtons {
+    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+        state_var.set_value(false);
     }
 }
 
 
 lazy_static! {
 
-    pub static ref GENERATE_STATE_VARS: fn () -> Vec<StateVarVariant> = || {
+    pub static ref GENERATE_STATE_VARS: fn () -> Vec<StateVar> = || {
         vec![
-            StateVarVariant::String(
-                Box::new(SubmitLabel {
-                    val: StateVarTyped::new()
-                })
+            StateVar::String(
+                StateVarTyped::new(
+                    Box::new(SubmitLabel::new()), 
+                    StateVarParameters {
+                        name: "submitLabel",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::String(
-                Box::new(SubmitLabelNoCorrectness {
-                    val: StateVarTyped::new()
-                })
+            StateVar::String(
+                StateVarTyped::new(
+                    Box::new(SubmitLabelNoCorrectness::new()), 
+                    StateVarParameters {
+                        name: "submitLabelNoCorrectness",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Boolean(
-                Box::new(Hidden {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Hidden::new()), 
+                    StateVarParameters {
+                        name: "hidden",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Boolean(
-                Box::new(Disabled {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Disabled::new()), 
+                    StateVarParameters {
+                        name: "disabled",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Boolean(
-                Box::new(Fixed {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Fixed::new()), 
+                    StateVarParameters {
+                        name: "fixed",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::String(
-                Box::new(Title {
-                    val: StateVarTyped::new()
-                })
+            StateVar::String(
+                StateVarTyped::new(
+                    Box::new(Title::new()), 
+                    StateVarParameters {
+                        name: "title",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Integer(
-                Box::new(Level {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Integer(
+                StateVarTyped::new(
+                    Box::new(Level::new()), 
+                    StateVarParameters {
+                        name: "level",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Boolean(
-                Box::new(JustSubmitted {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(JustSubmitted::new()), 
+                    StateVarParameters {
+                        name: "justSubmitted",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Boolean(
-                Box::new(ShowCorrectness {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(ShowCorrectness::new()), 
+                    StateVarParameters {
+                        name: "showCorrectness",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Number(
-                Box::new(CreditAchieved {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(CreditAchieved::new()), 
+                    StateVarParameters {
+                        name: "creditAchieved",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Boolean(
-                Box::new(CreateSubmitAllButton {
-                    val: StateVarTyped::new()
-                })
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(CreateSubmitAllButton::new()), 
+                    StateVarParameters {
+                        name: "createSubmitAllButton",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
             ),
-            StateVarVariant::Boolean(
-                Box::new(SuppressAnswerSubmitButtons {
-                    val: StateVarTyped::new()
-                })
-            )
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(SuppressAnswerSubmitButtons::new()), 
+                    StateVarParameters {
+                        name: "suppressAnswerSubmitButtons",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
         ]
 
 

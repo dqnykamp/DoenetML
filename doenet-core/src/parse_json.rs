@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 
+use crate::state::StateVar;
 use crate::utils::{log_json, log};
 use crate::{Action, ComponentName};
 use crate::component::{COMPONENT_DEFINITIONS, ComponentType, ComponentDefinition,
@@ -1219,14 +1220,15 @@ fn macro_comp_ref(
     Ok((macro_name, macro_end))
 }
 
-fn default_component_type_for_state_var(component: &StateVarVariant)
+fn default_component_type_for_state_var(component: &StateVar)
     -> ComponentType {
 
     match component {
-        StateVarVariant::Boolean(_) => "boolean",
-        StateVarVariant::Integer(_) => "number",
-        StateVarVariant::Number(_) => "number",
-        StateVarVariant::String(_) => "text",
+        StateVar::Boolean(_) => "boolean",
+        StateVar::Integer(_) => "number",
+        StateVar::Number(_) => "number",
+        StateVar::String(_) => "text",
+        StateVar::MathExpr(_) => unimplemented!("Should not have math expression state variable"),
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::state::StateVar;
 use crate::{ComponentRefState, ComponentName};
 use enum_as_inner::EnumAsInner;
 use serde::Serialize;
@@ -113,7 +114,7 @@ pub struct ComponentDefinition {
 
     pub state_var_names: Vec<&'static str>,
 
-    pub generate_state_vars: fn () -> Vec<StateVarVariant>,
+    pub generate_state_vars: fn () -> Vec<StateVar>,
 
     /// An ordered list of which profiles this component fulfills, along with the name of the
     /// state variable that fulfills it.
@@ -205,7 +206,7 @@ impl ComponentDefinition {
 // }
 
 
-fn empty_state_vars() -> Vec<StateVarVariant> {
+fn empty_state_vars() -> Vec<StateVar> {
     Vec::new()
 }
 

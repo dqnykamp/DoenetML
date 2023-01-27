@@ -2,10 +2,8 @@ use std::collections::HashMap;
 
 use crate::ComponentName;
 use crate::ComponentNode;
-use crate::StateVar;
-use crate::Dependency;
+use crate::StateVarMutableView;
 use crate::component::*;
-use crate::state_variables::{StateVarName,InstructionName};
 // use crate::state::EssentialStateVar;
 // use crate::EssentialDataOrigin;
 
@@ -52,7 +50,7 @@ pub(crate) use log_debug;
 /// List components and children in a JSON array
 pub fn json_components(
     components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, Vec<StateVar>>
+    component_states: &HashMap<ComponentName, Vec<StateVarMutableView>>
 ) -> Value {
 
     let json_components: Map<String, Value> = components
@@ -70,7 +68,7 @@ pub fn json_components(
 
 pub fn package_subtree_as_json(
     components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, Vec<StateVar>>,
+    component_states: &HashMap<ComponentName, Vec<StateVarMutableView>>,
     component: &ComponentNode
 ) -> Value {
 
@@ -148,26 +146,7 @@ pub fn package_subtree_as_json(
 // }
 
 
-pub fn json_dependencies<'a>(
-    dependencies: &'a HashMap<ComponentName, HashMap<StateVarName, HashMap<InstructionName, Vec<Dependency>>>>,
-) -> HashMap<String, HashMap<String, &'a Vec<Dependency>>> {
 
-    let mut display_deps = HashMap::new();
-
-
-    // for (component_name, dependencies) in dependencies.iter() {
-    //     for (state_var_name, dependencies) in dependencies.iter() {
-    //         for (instruction_name, dependencies) in dependencies.iter() {
-    //             let display_key = format!("{}:{} \"{}\"", component_name, state_var_name, instruction_name);
-
-    //             display_deps.entry(component_name.clone()).or_insert(HashMap::new())
-    //                 .entry(display_key).or_insert(dependencies.clone());
-    //         }
-    //     }
-    // }
-
-    display_deps
-}
 
 // pub fn json_essential_data(
 //     essential_data: &HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
