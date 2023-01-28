@@ -83,6 +83,15 @@ impl From<f64> for MathExpression {
     }
 }
 
+impl From<i64> for MathExpression {
+    fn from(input: i64) -> Self {
+        MathExpression {
+            tree: build_operator_tree(&input.to_string()).unwrap(),
+            variable_prefix: String::new(),
+            external_variables_count: 0,
+        }
+    }
+}
 
 impl Default for MathExpression {
     fn default() -> Self {

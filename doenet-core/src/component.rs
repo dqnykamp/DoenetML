@@ -27,7 +27,7 @@ pub mod number_input;
 // pub mod sources;
 // pub mod conditional_content;
 // pub mod case;
-// pub mod _error;
+pub mod _error;
 
 lazy_static! {
     pub static ref COMPONENT_DEFINITIONS: HashMap<ComponentType, &'static ComponentDefinition> = {
@@ -52,7 +52,7 @@ lazy_static! {
             // &crate::sources            ::MY_COMPONENT_DEFINITION,
             // &crate::conditional_content::MY_COMPONENT_DEFINITION,
             // &crate::case               ::MY_COMPONENT_DEFINITION,
-            // &crate::_error               ::MY_COMPONENT_DEFINITION,
+            &crate::_error               ::MY_COMPONENT_DEFINITION,
         ];
 
         defs.into_iter().map(|def| (def.component_type, def)).collect()
