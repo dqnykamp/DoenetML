@@ -366,6 +366,8 @@ fn create_dependencies_from_instruction_initialize_essential(
                         )
                     .unwrap_or(sv_def.return_initial_essential_value());
 
+
+
                 let initial_data = InitialEssentialData::Single(initial_data);
     
                 create_essential_data_for(
@@ -1215,62 +1217,16 @@ fn freshen_state_var(
 
         }
 
-        // let update_instruction = generate_update_instruction_for_state(
-        //     &component_state_to_update,
-        //     dependency_values,
-        // ).expect(&format!("Can't resolve {} (a {} component type)",
-        //     &component_state_to_update, component_state_to_update.0.definition.component_type)
-        // );
-    
-    
-        // match update_instruction {
-        //     StateVarUpdateInstruction::NoChange => {
-        //         // match current_state {
-        //         //     Freshness::Fresh(current_value) => {
-        //         //         // Do nothing. It's fresh, so we can use it as is
-        //         //         updated_value = current_value;
-        //         //     },
-        //         //     Freshness::Stale | Freshness::Unresolved => 
-        //                 panic!("Cannot use NoChange update instruction on a stale or unresolved value");
-        //         // }
-        //     },
-        //     StateVarUpdateInstruction::SetValue(new_value) => {
-    
-        //         updated_value = component_state_to_update.set_value(component_states, new_value);
-        //     }
-    
-        // };
-
     }
 
 
 
     // log_debug!("Dependency values for {}: {:#?}", component_state, dependency_values);
 
-            
-
 
     // log_debug!("Updated {} to {:?}", component_state, updated_value);
 
     // return updated_value;
-}
-
-
-/// This determines the state var given its dependency values.
-fn generate_update_instruction_for_state(
-    component_state: &ComponentState,
-    dependency_values: &Vec<Vec<DependencyValue>>
-
-) -> Result<StateVarUpdateInstruction<StateVarValue>, String> {
-
-    unimplemented!("Have not implemented generate_update_instruction_for_state")
-
-    // let (_, state_var_def) = &component_state.0.definition
-    //     .state_var_definitions[component_state.1];
-
-
-    // state_var_def.determine_state_var_from_dependencies(dependency_values)
-
 }
 
 
@@ -1313,54 +1269,6 @@ fn get_source_for_dependency(
         },
 
     }
-}
-
-/// Also includes the values of essential data
-fn get_dependency_sources_for_state_var<'a>(
-    dependencies: &'a HashMap<ComponentName, Vec<DependenciesForStateVar>>,
-    essential_data: &'a mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
-    component_state: &ComponentState,
-) -> Vec<Vec<(DependencySource, Option<StateVarValue>)>> {
-
-    unimplemented!("have not implemented get_dependency_sources_for_state_var")
-
-    // TODO: put this back into dependencies_of_state_var
-    // let my_dependencies_struct = dependencies.get(&component_state.0.name).unwrap().get(component_state.1).unwrap();
-
-    // let my_dependencies = &my_dependencies_struct.dependencies;
-    // let my_dependency_values = &my_dependencies_struct.dependency_values;
-
-    // // TODO: can we avoid allocating here as this function is called for every update
-    
-    // let mut dependency_sources: Vec<Vec<(DependencySource, Option<StateVarValue>)>> = Vec::with_capacity(my_dependencies.len());
-
-    
-    // for (instruction_ind, new_dependencies) in my_dependencies.iter().enumerate() {
-    //     let new_dependency_values = &my_dependency_values[instruction_ind];
-
-    //     let instruction_sources: Vec<(DependencySource, Option<StateVarValue>)> = new_dependencies.iter().enumerate()
-    //         .map(|(val_ind, dependency)| {
-            
-    //         let source = new_dependency_values[val_ind].source.clone();
-
-    //         let essential_value = if let Dependency::Essential { origin, .. } = dependency {
-    //             let data = essential_data
-    //                 .get(&component_state.0.name).unwrap()
-    //                 .get(origin).unwrap();
-    //             let value = data.0.clone();
-    //             Some(value)
-
-    //         } else {
-    //             None
-    //         };
-
-    //         (source, essential_value)
-    //     }).collect();
-
-    //     dependency_sources.push(instruction_sources);
-    // }
-
-    // dependency_sources
 }
 
 
@@ -1830,9 +1738,6 @@ fn request_dependencies_to_update_value_including_shadow<'a, 'b>(
 
     } else {
 
-        // let dependency_sources = get_dependency_sources_for_state_var(dependencies, essential_data, component_state);
-
-        // log!("Dependency sources for {}, {:?}", component_state, dependency_sources);
         let state_variable = &component_state_variables.get(&component.name).unwrap()[state_var_ind];
 
         let requests = state_variable.request_dependencies_to_update_value();

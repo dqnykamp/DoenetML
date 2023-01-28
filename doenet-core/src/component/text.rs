@@ -1,7 +1,10 @@
 use super::*;
 // use crate::base_definitions::*;
 
-use crate::state::{StateVarMutableViewTyped, StateVarReadOnlyViewTyped, StateVarReadOnlyView, StateVarInterface, StateVarTyped, StateVarParameters};
+use crate::state::{
+    StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarReadOnlyView,
+    StateVarReadOnlyViewTyped, StateVarTyped,
+};
 // use crate::state_variables::*;
 
 use crate::ComponentProfile;
@@ -18,7 +21,7 @@ impl Value {
         Value {
             string_child_values: Vec::new(),
         }
-    } 
+    }
 }
 
 impl StateVarInterface<String> for Value {
@@ -30,39 +33,42 @@ impl StateVarInterface<String> for Value {
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-
         let children = &dependencies[0];
 
         let mut string_vals = Vec::with_capacity(children.len());
 
-        for DependencyValue{value: child_value, ..} in children.iter() {
+        for DependencyValue {
+            value: child_value, ..
+        } in children.iter()
+        {
             if let StateVarReadOnlyView::String(child_string_value) = child_value {
-                string_vals.push(child_string_value.create_new_read_only_view() )
+                string_vals.push(child_string_value.create_new_read_only_view())
             } else {
                 panic!("Got a non-string value when asked for a Text component profile");
             }
         }
 
         self.string_child_values = string_vals;
-
     }
 
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
         // TODO: can we implement this without cloning the inner value?
-        let value: String = self.string_child_values.iter().map(|v| v.get_value_assuming_fresh().clone()).collect();
+        let value: String = self
+            .string_child_values
+            .iter()
+            .map(|v| v.get_value_assuming_fresh().clone())
+            .collect();
 
         state_var.set_value(value);
     }
-
-
-
 }
-
-
 
 #[derive(Debug)]
 struct Text {
-    value_sv: StateVarReadOnlyViewTyped<String>
+    value_sv: StateVarReadOnlyViewTyped<String>,
 }
 
 impl Text {
@@ -70,19 +76,18 @@ impl Text {
         Text {
             value_sv: StateVarReadOnlyViewTyped::new(),
         }
-    } 
+    }
 }
 
 impl StateVarInterface<String> for Text {
     fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
         vec![DependencyInstruction::StateVar {
             component_name: None,
-            state_var_name: "value"
+            state_var_name: "value",
         }]
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-        
         let dep_val = &dependencies[0][0].value;
 
         if let StateVarReadOnlyView::String(string_val) = dep_val {
@@ -92,26 +97,28 @@ impl StateVarInterface<String> for Text {
         }
     }
 
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
         state_var.set_value(self.value_sv.get_value_assuming_fresh().clone());
     }
-
-
 }
-
 
 #[derive(Debug)]
 struct Hidden {}
 
 impl Hidden {
     pub fn new() -> Self {
-        Hidden {
-        }
-    } 
+        Hidden {}
+    }
 }
 
 impl StateVarInterface<bool> for Hidden {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(false);
     }
 }
@@ -121,13 +128,15 @@ struct Disabled {}
 
 impl Disabled {
     pub fn new() -> Self {
-        Disabled {
-        }
-    } 
+        Disabled {}
+    }
 }
 
 impl StateVarInterface<bool> for Disabled {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(false);
     }
 }
@@ -137,107 +146,93 @@ struct Fixed {}
 
 impl Fixed {
     pub fn new() -> Self {
-        Fixed {
-        }
-    } 
+        Fixed {}
+    }
 }
 
 impl StateVarInterface<bool> for Fixed {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(false);
     }
 }
 
-
-
 lazy_static! {
-
-    pub static ref GENERATE_STATE_VARS: fn () -> Vec<StateVar> = || {
+    pub static ref GENERATE_STATE_VARS: fn() -> Vec<StateVar> = || {
         vec![
-            StateVar::String(
-                StateVarTyped::new(
-                    Box::new(Value::new()), 
-                    StateVarParameters {
-                        name: "value",
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::String(
-                StateVarTyped::new(
-                    Box::new(Text::new()), 
-                    StateVarParameters {
-                        name: "text",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Boolean(
-                StateVarTyped::new(
-                    Box::new(Hidden::new()), 
-                    StateVarParameters {
-                        name: "hidden",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Boolean(
-                StateVarTyped::new(
-                    Box::new(Disabled::new()), 
-                    StateVarParameters {
-                        name: "disabled",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Boolean(
-                StateVarTyped::new(
-                    Box::new(Fixed::new()), 
-                    StateVarParameters {
-                        name: "fixed",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
+            StateVar::String(StateVarTyped::new(
+                Box::new(Value::new()),
+                StateVarParameters {
+                    name: "value",
+                    ..Default::default()
+                },
+            )),
+            StateVar::String(StateVarTyped::new(
+                Box::new(Text::new()),
+                StateVarParameters {
+                    name: "text",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Boolean(StateVarTyped::new(
+                Box::new(Hidden::new()),
+                StateVarParameters {
+                    name: "hidden",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Boolean(StateVarTyped::new(
+                Box::new(Disabled::new()),
+                StateVarParameters {
+                    name: "disabled",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Boolean(StateVarTyped::new(
+                Box::new(Fixed::new()),
+                StateVarParameters {
+                    name: "fixed",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
         ]
-
-
     };
-
-    pub static ref STATE_VARIABLES_NAMES_IN_ORDER: Vec<&'static str> = GENERATE_STATE_VARS().iter().map(|sv| sv.get_name()).collect();
-
-
+    pub static ref STATE_VARIABLES_NAMES_IN_ORDER: Vec<&'static str> = GENERATE_STATE_VARS()
+        .iter()
+        .map(|sv| sv.get_name())
+        .collect();
     pub static ref MY_COMPONENT_DEFINITION: ComponentDefinition = ComponentDefinition {
         component_type: "text",
 
-        state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER.iter().enumerate().map(|(i,v)| (*v,i) ).collect(),
+        state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (*v, i))
+            .collect(),
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 
-        state_var_component_types:  GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
+        state_var_component_types: GENERATE_STATE_VARS()
+            .iter()
+            .map(|sv| sv.get_default_component_type())
+            .collect(),
 
         generate_state_vars: *GENERATE_STATE_VARS,
 
-        attribute_names: vec![
-            "hide",
-            "disabled",
-            "fixed",
-        ],
+        attribute_names: vec!["hide", "disabled", "fixed",],
 
         primary_input_state_var_ind: Some(0),
 
-        component_profiles: vec![
-            (ComponentProfile::Text, "value")
-        ],
+        component_profiles: vec![(ComponentProfile::Text, "value")],
 
         valid_children_profiles: ValidChildTypes::ValidProfiles(vec![ComponentProfile::Text]),
-        
+
         ..Default::default()
     };
-
-
 }

@@ -1,20 +1,20 @@
 use crate::state::StateVar;
-use crate::{ComponentRefState, ComponentName};
+use crate::state_variables::*;
+use crate::{ComponentName, ComponentRefState};
 use enum_as_inner::EnumAsInner;
 use serde::Serialize;
-use crate::state_variables::*;
 use std::collections::HashMap;
-use std::fmt::{Debug, self};
+use std::fmt::{self, Debug};
 
 use crate::lazy_static;
 
-pub mod text;
-// pub mod number;
-pub mod text_input;
 pub mod document;
+pub mod number;
+pub mod text;
+pub mod text_input;
 // pub mod boolean;
 // pub mod p;
-// pub mod number_input;
+pub mod number_input;
 // pub mod boolean_input;
 // pub mod sequence;
 // pub mod graph;
@@ -34,12 +34,12 @@ lazy_static! {
 
         let defs: Vec<&'static ComponentDefinition> = vec![
             &crate::text               ::MY_COMPONENT_DEFINITION,
-            // &crate::number             ::MY_COMPONENT_DEFINITION,
+            &crate::number             ::MY_COMPONENT_DEFINITION,
             &crate::text_input         ::MY_COMPONENT_DEFINITION,
             &crate::document           ::MY_COMPONENT_DEFINITION,
             // &crate::boolean            ::MY_COMPONENT_DEFINITION,
             // &crate::p                  ::MY_COMPONENT_DEFINITION,
-            // &crate::number_input       ::MY_COMPONENT_DEFINITION,
+            &crate::number_input       ::MY_COMPONENT_DEFINITION,
             // &crate::boolean_input      ::MY_COMPONENT_DEFINITION,
             // &crate::sequence           ::MY_COMPONENT_DEFINITION,
             // &crate::graph              ::MY_COMPONENT_DEFINITION,
@@ -59,23 +59,21 @@ lazy_static! {
     };
 }
 
-
 /// camelCase
 pub type ComponentType = &'static str;
 
 /// camelCase
 pub type AttributeName = &'static str;
 
-
 /// How a CopySource affects its component
 ///
 /// Component:
 /// - This only works if the source component is the same type.
-/// - In a `ChildUpdateInstruction`, the source's children are included before 
+/// - In a `ChildUpdateInstruction`, the source's children are included before
 ///   including its own. So without its own children, many of component'struct
 ///   state variables become exactly the same as the source's.
 /// - For the renderer, these 'inherited' children are copied but need
-///   a different name supplied by core's `aliases` HashMap. When the renderer 
+///   a different name supplied by core's `aliases` HashMap. When the renderer
 ///   sends an action that involves an alias, it is redirected
 ///   to the source's existing child.
 /// - An `EssentialDependencyInstruction` will point to the source's
@@ -96,7 +94,6 @@ pub enum CopySource {
     StateVar(ComponentRefState),
 }
 
-
 #[derive(Clone, PartialEq, Eq, Debug, Hash, Serialize)]
 pub enum ComponentProfile {
     Text,
@@ -109,14 +106,13 @@ pub enum ComponentProfile {
 /// The definition of a component type.
 pub struct ComponentDefinition {
     // pub state_var_definitions: &'static Vec<(StateVarName, StateVarVariant)>,
-
     pub state_var_index_map: HashMap<StateVarName, usize>,
 
     pub state_var_names: Vec<&'static str>,
 
     pub state_var_component_types: Vec<&'static str>,
 
-    pub generate_state_vars: fn () -> Vec<StateVar>,
+    pub generate_state_vars: fn() -> Vec<StateVar>,
 
     /// An ordered list of which profiles this component fulfills, along with the name of the
     /// state variable that fulfills it.
@@ -136,7 +132,7 @@ pub struct ComponentDefinition {
     pub on_action: for<'a> fn(
         action_name: &str,
         args: HashMap<String, Vec<StateVarValue>>,
-        resolve_and_retrieve_state_var: &'a mut dyn FnMut(usize) -> StateVarValue
+        resolve_and_retrieve_state_var: &'a mut dyn FnMut(usize) -> StateVarValue,
     ) -> Vec<(usize, StateVarValue)>,
 
     pub should_render_children: bool,
@@ -146,8 +142,7 @@ pub struct ComponentDefinition {
     /// These have to match `on_action` and with what the renderers have
     pub action_names: fn() -> Vec<&'static str>,
 
-
-    /// The primary input is a state variable, except it gets overridden if 
+    /// The primary input is a state variable, except it gets overridden if
     /// the component is being copied from another state var
     pub primary_input_state_var_ind: Option<usize>,
 
@@ -157,10 +152,7 @@ pub struct ComponentDefinition {
     pub replacement_components: Option<ReplacementComponents>,
 
     pub component_type: ComponentType,
-
 }
-
-
 
 pub enum ReplacementComponents {
     // Unlike the previous, Children cannot form a component group
@@ -168,20 +160,17 @@ pub enum ReplacementComponents {
     Children,
 }
 
-
 impl ComponentDefinition {
-
     /// Returns component definition of members, or itself if there are no replacement components
     /// Pass the static_attributes as a parameter
     pub fn definition_as_replacement_children(
         &self,
         _static_attributes: &HashMap<AttributeName, String>,
     ) -> Option<&ComponentDefinition> {
-
         match &self.replacement_components {
-            Some(ReplacementComponents::Children)  => None,
-            None  => Some(self),
-        }        
+            Some(ReplacementComponents::Children) => None,
+            None => Some(self),
+        }
     }
 
     pub fn component_profile_match(
@@ -190,7 +179,6 @@ impl ComponentDefinition {
     ) -> Option<StateVarName> {
         for profile in self.component_profiles.iter() {
             if desired_profiles.contains(&profile.0) {
-
                 let profile_state_var = profile.1;
 
                 return Some(profile_state_var);
@@ -198,7 +186,6 @@ impl ComponentDefinition {
         }
         None
     }
-
 }
 
 // lazy_static! {
@@ -206,7 +193,6 @@ impl ComponentDefinition {
 //         Vec::new()
 //     };
 // }
-
 
 fn empty_state_vars() -> Vec<StateVar> {
     Vec::new()
@@ -243,7 +229,10 @@ impl Debug for ComponentDefinition {
             // .field("state_var_definitions", &self.state_var_definitions)
             .field("should_render_children", &self.should_render_children)
             .field("renderer_type", &self.renderer_type)
-            .field("primary_input_state_var_ind", &self.primary_input_state_var_ind)
+            .field(
+                "primary_input_state_var_ind",
+                &self.primary_input_state_var_ind,
+            )
             .field("primary_output_traits", &self.component_profiles)
             .field("action_names", &(self.action_names)())
             .finish()
@@ -262,7 +251,7 @@ pub enum ObjectName {
 pub enum ValidChildTypes {
     AllComponents,
     /// All children need to match one of the given profiles
-    ValidProfiles(Vec<ComponentProfile>)
+    ValidProfiles(Vec<ComponentProfile>),
 }
 
 #[derive(Debug)]
@@ -275,12 +264,11 @@ pub enum RendererType {
     // DoNotRender,
 }
 
-
 pub trait KeyValueIgnoreCase<K, V> {
     fn get_key_value_ignore_case<'a>(&'a self, key: &str) -> Option<(&'a K, &'a V)>;
 }
 
-impl<K, V> KeyValueIgnoreCase<K,V> for HashMap<K, V>
+impl<K, V> KeyValueIgnoreCase<K, V> for HashMap<K, V>
 where
     K: ToString + std::cmp::Eq + std::hash::Hash,
 {

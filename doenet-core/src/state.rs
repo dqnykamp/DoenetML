@@ -46,7 +46,6 @@ pub enum StateVarReadOnlyView {
     MathExpr(StateVarReadOnlyViewTyped<MathExpression>),
 }
 
-
 #[derive(Debug)]
 pub struct StateVarTyped<T: Default + Clone> {
     value: StateVarMutableViewTyped<T>,
@@ -57,26 +56,27 @@ pub struct StateVarTyped<T: Default + Clone> {
 
 pub struct UpdatesRequested {
     pub instruction_ind: usize,
-    pub dependency_ind: usize
+    pub dependency_ind: usize,
 }
 
 pub trait StateVarInterface<T: Default + Clone>: std::fmt::Debug {
-
     fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
         Vec::new()
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {}
-    
+
     fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<T>) -> ();
 
-    fn request_dependencies_to_update_value(&self, state_var: &StateVarReadOnlyViewTyped<T>) -> Result<Vec<UpdatesRequested>,()> {
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<T>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
         Err(())
     }
-
 }
 
-#[derive(Debug,Default)]
+#[derive(Debug, Default)]
 pub struct StateVarParameters<T> {
     pub for_renderer: bool,
     pub initial_essential_value: T,
@@ -92,7 +92,7 @@ pub struct StateVarMutableViewTyped<T: Default + Clone> {
 struct StateVarInner<T: Default + Clone> {
     value: T,
     freshness: Freshness,
-    requested_value: T
+    requested_value: T,
 }
 
 impl<T: Default + Clone> StateVarInner<T> {
@@ -127,17 +127,17 @@ impl<T: Default + Clone> StateVarMutableViewTyped<T> {
             inner: Rc::new(RefCell::new(StateVarInner {
                 value: T::default(),
                 freshness: Freshness::Unresolved,
-                requested_value: T::default()
+                requested_value: T::default(),
             })),
         }
     }
 
-    pub fn new_with_value(val:T) -> Self {
+    pub fn new_with_value(val: T) -> Self {
         StateVarMutableViewTyped {
             inner: Rc::new(RefCell::new(StateVarInner {
                 value: val,
                 freshness: Freshness::Fresh,
-                requested_value: T::default()
+                requested_value: T::default(),
             })),
         }
     }
@@ -185,7 +185,6 @@ impl<T: Default + Clone> StateVarMutableViewTyped<T> {
         let mut inner = self.inner.borrow_mut();
         inner.value = inner.requested_value.clone();
     }
-
 }
 
 #[derive(Debug)]
@@ -200,7 +199,7 @@ impl<T: Default + Clone> StateVarReadOnlyViewTyped<T> {
             inner: Rc::new(RefCell::new(StateVarInner {
                 value: T::default(),
                 freshness: Freshness::Unresolved,
-                requested_value: T::default()
+                requested_value: T::default(),
             })),
         }
     }
@@ -209,7 +208,9 @@ impl<T: Default + Clone> StateVarReadOnlyViewTyped<T> {
     }
 
     pub fn create_new_read_only_view(&self) -> StateVarReadOnlyViewTyped<T> {
-        StateVarReadOnlyViewTyped { inner: self.inner.clone() }
+        StateVarReadOnlyViewTyped {
+            inner: self.inner.clone(),
+        }
     }
 
     pub fn request_value(&self, requested_val: T) {
@@ -220,7 +221,6 @@ impl<T: Default + Clone> StateVarReadOnlyViewTyped<T> {
         Ref::map(self.inner.borrow(), |v| v.get_requested_value())
     }
 }
-
 
 impl From<&StateVarMutableView> for serde_json::Value {
     fn from(state_var: &StateVarMutableView) -> serde_json::Value {
@@ -249,14 +249,23 @@ impl From<&StateVarMutableView> for serde_json::Value {
 }
 
 impl StateVarMutableView {
-
-    pub fn new_with_value(sv_val:StateVarValue) -> Self {
+    pub fn new_with_value(sv_val: StateVarValue) -> Self {
         match sv_val {
-            StateVarValue::Number(val) => StateVarMutableView::Number(StateVarMutableViewTyped::new_with_value(val)),
-            StateVarValue::Integer(val) => StateVarMutableView::Integer(StateVarMutableViewTyped::new_with_value(val)),
-            StateVarValue::String(val) => StateVarMutableView::String(StateVarMutableViewTyped::new_with_value(val)),
-            StateVarValue::Boolean(val) => StateVarMutableView::Boolean(StateVarMutableViewTyped::new_with_value(val)),
-            StateVarValue::MathExpr(val) => StateVarMutableView::MathExpr(StateVarMutableViewTyped::new_with_value(val)),
+            StateVarValue::Number(val) => {
+                StateVarMutableView::Number(StateVarMutableViewTyped::new_with_value(val))
+            }
+            StateVarValue::Integer(val) => {
+                StateVarMutableView::Integer(StateVarMutableViewTyped::new_with_value(val))
+            }
+            StateVarValue::String(val) => {
+                StateVarMutableView::String(StateVarMutableViewTyped::new_with_value(val))
+            }
+            StateVarValue::Boolean(val) => {
+                StateVarMutableView::Boolean(StateVarMutableViewTyped::new_with_value(val))
+            }
+            StateVarValue::MathExpr(val) => {
+                StateVarMutableView::MathExpr(StateVarMutableViewTyped::new_with_value(val))
+            }
         }
     }
 
@@ -345,13 +354,16 @@ impl StateVarMutableView {
 }
 
 impl<T: Default + Clone> StateVarTyped<T> {
-    pub fn new(interface: Box<dyn StateVarInterface<T>>, parameters: StateVarParameters<T>) -> Self {
+    pub fn new(
+        interface: Box<dyn StateVarInterface<T>>,
+        parameters: StateVarParameters<T>,
+    ) -> Self {
         let value = StateVarMutableViewTyped::new();
         StateVarTyped {
             immutable_view_of_value: value.create_new_read_only_view(),
             value,
             interface,
-            parameters
+            parameters,
         }
     }
 
@@ -390,7 +402,6 @@ impl<T: Default + Clone> StateVarTyped<T> {
         self.value.inner.borrow_mut().request_value(requested_val);
     }
 
-
     pub fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
         self.interface.return_dependency_instructions()
     }
@@ -398,13 +409,15 @@ impl<T: Default + Clone> StateVarTyped<T> {
     pub fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
         self.interface.set_dependencies(dependencies)
     }
-    
+
     fn calculate_state_var_from_dependencies(&self) -> () {
-        self.interface.calculate_state_var_from_dependencies(&self.value)
+        self.interface
+            .calculate_state_var_from_dependencies(&self.value)
     }
 
-    fn request_dependencies_to_update_value(&self) -> Result<Vec<UpdatesRequested>,()> {
-        self.interface.request_dependencies_to_update_value(&self.immutable_view_of_value)
+    fn request_dependencies_to_update_value(&self) -> Result<Vec<UpdatesRequested>, ()> {
+        self.interface
+            .request_dependencies_to_update_value(&self.immutable_view_of_value)
     }
 
     fn get_name(&self) -> &'static str {
@@ -418,13 +431,9 @@ impl<T: Default + Clone> StateVarTyped<T> {
     fn return_initial_essential_value(&self) -> T {
         self.parameters.initial_essential_value.clone()
     }
-
-    
 }
 
-
 impl StateVar {
-
     pub fn mark_stale(&mut self) {
         match self {
             StateVar::Number(sv_typed) => sv_typed.mark_stale(),
@@ -488,14 +497,19 @@ impl StateVar {
         }
     }
 
-
     pub fn request_value(&self, requested_val: StateVarValue) {
         match self {
             StateVar::Number(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
-            StateVar::Integer(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
+            StateVar::Integer(sv_typed) => {
+                sv_typed.request_value(requested_val.try_into().unwrap())
+            }
             StateVar::String(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
-            StateVar::Boolean(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
-            StateVar::MathExpr(sv_typed) => sv_typed.request_value(requested_val.try_into().unwrap()),
+            StateVar::Boolean(sv_typed) => {
+                sv_typed.request_value(requested_val.try_into().unwrap())
+            }
+            StateVar::MathExpr(sv_typed) => {
+                sv_typed.request_value(requested_val.try_into().unwrap())
+            }
         }
     }
 
@@ -539,7 +553,7 @@ impl StateVar {
         }
     }
 
-    pub fn request_dependencies_to_update_value(&self) -> Result<Vec<UpdatesRequested>,()> {
+    pub fn request_dependencies_to_update_value(&self) -> Result<Vec<UpdatesRequested>, ()> {
         match self {
             StateVar::Number(sv_typed) => sv_typed.request_dependencies_to_update_value(),
             StateVar::Integer(sv_typed) => sv_typed.request_dependencies_to_update_value(),
@@ -569,15 +583,23 @@ impl StateVar {
         }
     }
 
-
-
     pub fn return_initial_essential_value(&self) -> StateVarValue {
         match self {
-            StateVar::Number(sv_typed) => StateVarValue::Number(sv_typed.return_initial_essential_value()),
-            StateVar::Integer(sv_typed) =>  StateVarValue::Integer(sv_typed.return_initial_essential_value()),
-            StateVar::String(sv_typed) =>  StateVarValue::String(sv_typed.return_initial_essential_value()),
-            StateVar::Boolean(sv_typed) =>  StateVarValue::Boolean(sv_typed.return_initial_essential_value()),
-            StateVar::MathExpr(sv_typed) =>  StateVarValue::MathExpr(sv_typed.return_initial_essential_value()),
+            StateVar::Number(sv_typed) => {
+                StateVarValue::Number(sv_typed.return_initial_essential_value())
+            }
+            StateVar::Integer(sv_typed) => {
+                StateVarValue::Integer(sv_typed.return_initial_essential_value())
+            }
+            StateVar::String(sv_typed) => {
+                StateVarValue::String(sv_typed.return_initial_essential_value())
+            }
+            StateVar::Boolean(sv_typed) => {
+                StateVarValue::Boolean(sv_typed.return_initial_essential_value())
+            }
+            StateVar::MathExpr(sv_typed) => {
+                StateVarValue::MathExpr(sv_typed.return_initial_essential_value())
+            }
         }
     }
 
@@ -587,20 +609,18 @@ impl StateVar {
             StateVar::Integer(sv_typed) => "number",
             StateVar::String(sv_typed) => "text",
             StateVar::Boolean(sv_typed) => "boolean",
-            StateVar::MathExpr(sv_typed) => unimplemented!("Should not have math expression state variable"),
+            StateVar::MathExpr(sv_typed) => {
+                unimplemented!("Should not have math expression state variable")
+            }
         }
     }
-
 }
-
-
 
 pub type EssentialStateVar = StateVarMutableView;
 
 // /// A special endpoint on the dependency graph which is associated with a
 // /// particular state var. Actions often update these.
 // /// An EssentialStateVar cannot be stale
-
 
 // #[derive(Debug)]
 // pub enum EssentialStateVar {
@@ -610,7 +630,6 @@ pub type EssentialStateVar = StateVarMutableView;
 //     Boolean(EssentialStateVarTyped<bool>),
 //     MathExpr(EssentialStateVarTyped<MathExpression>),
 // }
-
 
 // #[derive(Debug)]
 // pub struct EssentialStateVarTyped<T: Default + Clone> {
@@ -655,9 +674,7 @@ pub type EssentialStateVar = StateVarMutableView;
 //         }
 //     }
 
-
 // }
-
 
 // impl From<&EssentialStateVar> for serde_json::Value {
 //     fn from(state_var: &EssentialStateVar) -> serde_json::Value {
@@ -723,7 +740,6 @@ pub type EssentialStateVar = StateVarMutableView;
 //         }
 //     }
 
-
 //     pub fn get_type_as_str(&self) -> &'static str {
 //         match self {
 //             Self::String(_) => "string",
@@ -734,10 +750,6 @@ pub type EssentialStateVar = StateVarMutableView;
 //         }
 //     }
 // }
-
-
-
-
 
 // Boilerplate to display EssentialStateVar and StateVar better
 

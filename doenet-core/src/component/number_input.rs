@@ -2,185 +2,501 @@ use std::collections::HashMap;
 
 use lazy_static::lazy_static;
 
-
 use super::*;
-use crate::base_definitions::*;
+// use crate::base_definitions::*;
 
+use crate::state::{
+    StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarReadOnlyView,
+    StateVarReadOnlyViewTyped, StateVarTyped, UpdatesRequested,
+};
 
 use crate::ComponentProfile;
 
+#[derive(Debug)]
+struct Value {
+    last_value: StateVarReadOnlyViewTyped<f64>,
+    immediate_value: StateVarReadOnlyViewTyped<f64>,
+    sync_values: StateVarReadOnlyViewTyped<bool>,
+}
 
+impl Value {
+    pub fn new() -> Self {
+        Value {
+            last_value: StateVarReadOnlyViewTyped::new(),
+            immediate_value: StateVarReadOnlyViewTyped::new(),
+            sync_values: StateVarReadOnlyViewTyped::new(),
+        }
+    }
+}
+
+impl StateVarInterface<f64> for Value {
+    fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+        vec![
+            DependencyInstruction::StateVar {
+                component_name: None,
+                state_var_name: "lastValue",
+            },
+            DependencyInstruction::StateVar {
+                component_name: None,
+                state_var_name: "immediateValue",
+            },
+            DependencyInstruction::StateVar {
+                component_name: None,
+                state_var_name: "syncImmediateValue",
+            },
+        ]
+    }
+
+    fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+        if let StateVarReadOnlyView::Number(last_value) = &dependencies[0][0].value {
+            self.last_value = last_value.create_new_read_only_view();
+        } else {
+            panic!("Got a non-number last value for value of number input.");
+        }
+
+        if let StateVarReadOnlyView::Number(immediate_value) = &dependencies[1][0].value {
+            self.immediate_value = immediate_value.create_new_read_only_view();
+        } else {
+            panic!("Got a non-number immediate value for value of number input.");
+        }
+
+        if let StateVarReadOnlyView::Boolean(sync_values) = &dependencies[2][0].value {
+            self.sync_values = sync_values.create_new_read_only_view();
+        } else {
+            panic!("Got a non-boolean sync values for value of number input.");
+        }
+    }
+
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
+        let value = if *self.sync_values.get_value_assuming_fresh() {
+            self.immediate_value.get_value_assuming_fresh()
+        } else {
+            self.last_value.get_value_assuming_fresh()
+        };
+
+        state_var.set_value(*value);
+    }
+
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<f64>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+        let desired_value = state_var.get_requested_value();
+
+        self.last_value.request_value(desired_value.clone());
+        self.immediate_value.request_value(desired_value.clone());
+        self.sync_values.request_value(true);
+
+        Ok(vec![
+            UpdatesRequested {
+                instruction_ind: 0,
+                dependency_ind: 0,
+            },
+            UpdatesRequested {
+                instruction_ind: 1,
+                dependency_ind: 0,
+            },
+            UpdatesRequested {
+                instruction_ind: 2,
+                dependency_ind: 0,
+            },
+        ])
+    }
+}
+
+#[derive(Debug)]
+struct ImmediateValue {
+    raw_renderer_value: StateVarReadOnlyViewTyped<String>,
+}
+
+impl ImmediateValue {
+    pub fn new() -> Self {
+        ImmediateValue {
+            raw_renderer_value: StateVarReadOnlyViewTyped::new(),
+        }
+    }
+}
+
+impl StateVarInterface<f64> for ImmediateValue {
+    fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+        vec![DependencyInstruction::StateVar {
+            component_name: None,
+            state_var_name: "rawRendererValue",
+        }]
+    }
+
+    fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+        if let StateVarReadOnlyView::String(raw_renderer_value) = &dependencies[0][0].value {
+            self.raw_renderer_value = raw_renderer_value.create_new_read_only_view();
+        } else {
+            panic!("Got a non-string raw renderer value for immediate value of number input.");
+        }
+    }
+
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
+        let value: f64 = self
+            .raw_renderer_value
+            .get_value_assuming_fresh()
+            .parse()
+            .unwrap_or(f64::NAN);
+        state_var.set_value(value);
+    }
+
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<f64>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+        let desired_value = state_var.get_requested_value();
+
+        self.raw_renderer_value
+            .request_value(desired_value.to_string());
+
+        Ok(vec![UpdatesRequested {
+            instruction_ind: 0,
+            dependency_ind: 0,
+        }])
+    }
+}
+
+#[derive(Debug)]
+struct LastValue {
+    essential_value: StateVarReadOnlyViewTyped<f64>,
+}
+
+impl LastValue {
+    pub fn new() -> Self {
+        LastValue {
+            essential_value: StateVarReadOnlyViewTyped::new(),
+        }
+    }
+}
+
+impl StateVarInterface<f64> for LastValue {
+    fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+        vec![DependencyInstruction::Essential {
+            prefill: Some("prefill"),
+        }]
+    }
+
+    fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+        if let StateVarReadOnlyView::Number(essential_value) = &dependencies[0][0].value {
+            self.essential_value = essential_value.create_new_read_only_view();
+        } else {
+            panic!("Got a non-number essential value for last value of number input.");
+        }
+    }
+
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
+        state_var.set_value(self.essential_value.get_value_assuming_fresh().clone());
+    }
+
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<f64>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+        let desired_value = state_var.get_requested_value();
+
+        self.essential_value.request_value(*desired_value);
+
+        Ok(vec![UpdatesRequested {
+            instruction_ind: 0,
+            dependency_ind: 0,
+        }])
+    }
+}
+
+#[derive(Debug)]
+struct SyncImmediateValue {
+    essential_value: StateVarReadOnlyViewTyped<bool>,
+}
+
+impl SyncImmediateValue {
+    pub fn new() -> Self {
+        SyncImmediateValue {
+            essential_value: StateVarReadOnlyViewTyped::new(),
+        }
+    }
+}
+
+impl StateVarInterface<bool> for SyncImmediateValue {
+    fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+        vec![DependencyInstruction::Essential { prefill: None }]
+    }
+
+    fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+        if let StateVarReadOnlyView::Boolean(essential_value) = &dependencies[0][0].value {
+            self.essential_value = essential_value.create_new_read_only_view();
+        } else {
+            panic!("Got a non-booloean essential value for syncImmediate of number input.");
+        }
+    }
+
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(self.essential_value.get_value_assuming_fresh().clone());
+    }
+
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<bool>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+        let desired_value = state_var.get_requested_value();
+
+        self.essential_value.request_value(*desired_value);
+
+        Ok(vec![UpdatesRequested {
+            instruction_ind: 0,
+            dependency_ind: 0,
+        }])
+    }
+}
+
+#[derive(Debug)]
+struct RawRendererValue {
+    essential_value: StateVarReadOnlyViewTyped<String>,
+}
+
+impl RawRendererValue {
+    pub fn new() -> Self {
+        RawRendererValue {
+            essential_value: StateVarReadOnlyViewTyped::new(),
+        }
+    }
+}
+
+impl StateVarInterface<String> for RawRendererValue {
+    fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+        vec![DependencyInstruction::Essential {
+            prefill: Some("prefill"),
+        }]
+    }
+
+    fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+        if let StateVarReadOnlyView::String(essential_value) = &dependencies[0][0].value {
+            self.essential_value = essential_value.create_new_read_only_view();
+        } else {
+            panic!("Got a non-string essential value for raw renderer value of number input.");
+        }
+    }
+
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
+        state_var.set_value(self.essential_value.get_value_assuming_fresh().clone());
+    }
+
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<String>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+        let desired_value = state_var.get_requested_value();
+
+        self.essential_value.request_value(desired_value.clone());
+
+        Ok(vec![UpdatesRequested {
+            instruction_ind: 0,
+            dependency_ind: 0,
+        }])
+    }
+}
+
+#[derive(Debug)]
+struct Size {}
+
+impl Size {
+    pub fn new() -> Self {
+        Size {}
+    }
+}
+
+impl StateVarInterface<f64> for Size {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
+        state_var.set_value(10.0);
+    }
+}
+
+#[derive(Debug)]
+struct Width {}
+
+impl Width {
+    pub fn new() -> Self {
+        Width {}
+    }
+}
+
+impl StateVarInterface<f64> for Width {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
+        state_var.set_value(600.0);
+    }
+}
+
+#[derive(Debug)]
+struct Hidden {}
+
+impl Hidden {
+    pub fn new() -> Self {
+        Hidden {}
+    }
+}
+
+impl StateVarInterface<bool> for Hidden {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(false);
+    }
+}
+
+#[derive(Debug)]
+struct Disabled {}
+
+impl Disabled {
+    pub fn new() -> Self {
+        Disabled {}
+    }
+}
+
+impl StateVarInterface<bool> for Disabled {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(false);
+    }
+}
 
 lazy_static! {
 
-    pub static ref MY_STATE_VAR_DEFINITIONS: Vec<(StateVarName, StateVarVariant)> = {
-
-        use StateVarUpdateInstruction::*;
-
+    pub static ref GENERATE_STATE_VARS: fn () -> Vec<StateVar> = || {
         vec![
-
-        ("value", StateVarVariant::Number(StateVarDefinition {
-            initial_essential_value: f64::NAN,
-            dependency_instructions: vec![
-                DependencyInstruction::StateVar {
-                    component_name: None,
-                    state_var_name: "lastValue",
-                },
-                DependencyInstruction::StateVar {
-                    component_name: None,
-                    state_var_name: "immediateValue",
-                },
-                DependencyInstruction::StateVar {
-                    component_name: None,
-                    state_var_name: "syncImmediateValue",
-                },
-            ],
-            determine_state_var_from_dependencies: |dependency_values| {
-                let essential_value = dependency_values[0][0]
-                    .into_number()?;
-                let immediate_value = dependency_values[1][0]
-                    .into_number()?;
-                let sync_values = dependency_values[2][0]
-                    .into_bool()?;
-
-                let value: f64 =
-                    if sync_values {
-                        immediate_value
-                    } else {
-                        essential_value
-                    };
-                Ok(SetValue(value))
-            } ,
-            request_dependencies_to_update_value: |desired_value, sources| {
-                vec![
-                    (0, Ok(vec![
-                        DependencyValue {
-                            source: sources[0][0].0.clone(),
-                            value: desired_value.clone().into(),
-                        }
-                    ])),
-                    (1, Ok(vec![
-                        DependencyValue {
-                            source: sources[1][0].0.clone(),
-                            value: desired_value.clone().into(),
-                        }
-                    ])),
-                    (2, Ok(vec![
-                        DependencyValue {
-                            source: sources[2][0].0.clone(),
-                            value: StateVarValue::Boolean(true),
-                        }
-                    ])),
-                ]
-            },
-            ..Default::default()
-        })),
-
-        ("immediateValue", StateVarVariant::Number(StateVarDefinition {
-            dependency_instructions: vec![
-                DependencyInstruction::StateVar {
-                    component_name: None,
-                    state_var_name: "rawRendererValue",
-                },
-                // ("sync", DependencyInstruction::StateVar {
-                //     component_ref: None,
-                //     state_var: StateVarSlice::Single(StateRef::Basic("syncImmediateValue")),
-                // }),
-            ],
-            determine_state_var_from_dependencies: |dependency_values| {
-                let string_value = dependency_values[0][0]
-                    .into_string()?;
-                let value: f64 = string_value.parse().unwrap_or(f64::NAN);
-
-                Ok(SetValue(value))
-            },
-            request_dependencies_to_update_value: |desired_value, sources| {
-                vec![
-                    (0, Ok(vec![
-                        DependencyValue {
-                            source: sources[0][0].0.clone(),
-                            value: desired_value.to_string().into(),
-                        }
-                    ])),
-                    // ("sync", Ok(vec![
-                    //     DependencyValue {
-                    //         source: sources.get("sync").unwrap().first().unwrap().0.clone(),
-                    //         value: StateVarValue::Boolean(false),
-                    //     }
-                    // ])),
-                ]
-            },
-            ..Default::default()
-        })),
-
-        ("lastValue", StateVarVariant::Number(StateVarDefinition {
-            dependency_instructions: vec![
-                DependencyInstruction::Essential { prefill: Some("prefill") }
-            ],
-            determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
-            request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
-            initial_essential_value: f64::NAN,
-            ..Default::default()
-        })),
-
-        ("syncImmediateValue", StateVarVariant::Boolean(StateVarDefinition {
-            dependency_instructions: USE_ESSENTIAL_DEPENDENCY_INSTRUCTION(),
-            determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
-            request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
-            initial_essential_value: true,
-            ..Default::default()
-        })),
-
-         ("rawRendererValue", StateVarVariant::String(StateVarDefinition {
-             for_renderer: true,
-             dependency_instructions: vec![
-                DependencyInstruction::Essential { prefill: Some("prefill") }
-            ],
-            determine_state_var_from_dependencies: DETERMINE_FROM_ESSENTIAL,
-            request_dependencies_to_update_value: REQUEST_ESSENTIAL_TO_UPDATE,
-            ..Default::default()
-         })),
-
-
-        ("expanded", StateVarVariant::Boolean(StateVarDefinition {
-            for_renderer: true,
-            determine_state_var_from_dependencies: |_| Ok(SetValue(false)),
-            ..Default::default()
-            
-        })),
-
-        ("size", StateVarVariant::Number(StateVarDefinition {
-            determine_state_var_from_dependencies: |_| {
-                Ok(SetValue(10.0))
-            },
-            for_renderer: true,
-            ..Default::default()
-        })),
-
-        ("width", StateVarVariant::Number(StateVarDefinition {
-            for_renderer: true,
-            determine_state_var_from_dependencies: |_| Ok(SetValue(600.0)),
-            ..Default::default()
-        })),
-
-        ("hidden", HIDDEN_DEFAULT_DEFINITION()),
-        ("disabled", DISABLED_DEFAULT_DEFINITION()),
-
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(Value::new()),
+                    StateVarParameters {
+                        name: "value",
+                        initial_essential_value: f64::NAN,
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(ImmediateValue::new()),
+                    StateVarParameters {
+                        name: "immediateValue",
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(LastValue::new()),
+                    StateVarParameters {
+                        name: "lastValue",
+                        initial_essential_value: f64::NAN,
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(SyncImmediateValue::new()),
+                    StateVarParameters {
+                        name: "syncImmediateValue",
+                        initial_essential_value: true,
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::String(
+                StateVarTyped::new(
+                    Box::new(RawRendererValue::new()),
+                    StateVarParameters {
+                        name: "rawRendererValue",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(Width::new()),
+                    StateVarParameters {
+                        name: "width",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::Number(
+                StateVarTyped::new(
+                    Box::new(Size::new()),
+                    StateVarParameters {
+                        name: "size",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Hidden::new()),
+                    StateVarParameters {
+                        name: "hidden",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Disabled::new()),
+                    StateVarParameters {
+                        name: "disabled",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
         ]
+
+
     };
 
 
-}
+    pub static ref STATE_VARIABLES_NAMES_IN_ORDER: Vec<&'static str> = GENERATE_STATE_VARS().iter().map(|sv| sv.get_name()).collect();
 
 
-
-lazy_static! {
     pub static ref MY_COMPONENT_DEFINITION: ComponentDefinition = ComponentDefinition {
         component_type: "numberInput",
 
-        state_var_definitions: &MY_STATE_VAR_DEFINITIONS,
-        
-        state_var_index_map: MY_STATE_VAR_DEFINITIONS.iter().enumerate().map(|(i,v)| (v.0,i) ).collect(),
+        state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER.iter().enumerate().map(|(i,v)| (*v,i) ).collect(),
+
+        state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
+
+        state_var_component_types: GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
+
+        generate_state_vars: *GENERATE_STATE_VARS,
+
 
         attribute_names: vec![
             "hide",
@@ -197,7 +513,7 @@ lazy_static! {
             (ComponentProfile::Number, "value"),
             // (ComponentProfile::Text, "value"),
         ],
-        
+
         action_names: || vec!["updateImmediateValue", "updateValue"],
 
         on_action: |action_name, args, resolve_and_retrieve_state_var| {

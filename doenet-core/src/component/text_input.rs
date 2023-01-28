@@ -82,7 +82,6 @@ impl StateVarInterface<String> for Value {
         &self,
         state_var: &StateVarReadOnlyViewTyped<String>,
     ) -> Result<Vec<UpdatesRequested>, ()> {
-
         let desired_value = state_var.get_requested_value();
 
         self.essential_value.request_value(desired_value.clone());
@@ -103,28 +102,6 @@ impl StateVarInterface<String> for Value {
                 dependency_ind: 0,
             },
         ])
-
-        // vec![
-        //     (0, Ok(vec![
-        //         DependencyValue {
-        //             source: sources[0][0].0.clone(),
-        //             value: desired_value.clone().into(),
-        //         }
-        //     ])),
-        //     (1, Ok(vec![
-        //         DependencyValue {
-        //             source: sources[1][0].0.clone(),
-        //             value: desired_value.into(),
-        //         }
-        //     ])),
-        //     (2, Ok(vec![
-        //         DependencyValue {
-        //             source: sources[2][0].0.clone(),
-        //             value: StateVarValue::Boolean(true),
-        //         }
-        //     ])),
-        // ]
-        // Err(())
     }
 }
 
@@ -167,26 +144,14 @@ impl StateVarInterface<String> for ImmediateValue {
         &self,
         state_var: &StateVarReadOnlyViewTyped<String>,
     ) -> Result<Vec<UpdatesRequested>, ()> {
-
         let desired_value = state_var.get_requested_value();
 
         self.essential_value.request_value(desired_value.clone());
 
-        Ok(vec![
-            UpdatesRequested {
-                instruction_ind: 0,
-                dependency_ind: 0
-            }
-        ])
-
-        // vec![
-        //     (0, Ok(vec![
-        //         DependencyValue {
-        //             source: sources[0][0].0.clone(),
-        //             value: desired_value.into(),
-        //         }
-        //     ]))
-        // ]
+        Ok(vec![UpdatesRequested {
+            instruction_ind: 0,
+            dependency_ind: 0,
+        }])
     }
 }
 
@@ -227,26 +192,14 @@ impl StateVarInterface<bool> for SyncImmediateValue {
         &self,
         state_var: &StateVarReadOnlyViewTyped<bool>,
     ) -> Result<Vec<UpdatesRequested>, ()> {
-
         let desired_value = state_var.get_requested_value();
 
-        self.essential_value.request_value(desired_value.clone());
+        self.essential_value.request_value(*desired_value);
 
-        Ok(vec![
-            UpdatesRequested {
-                instruction_ind: 0,
-                dependency_ind: 0
-            }
-        ])
-
-        // vec![
-        //     (0, Ok(vec![
-        //         DependencyValue {
-        //             source: sources[0][0].0.clone(),
-        //             value: desired_value.into(),
-        //         }
-        //     ]))
-        // ]
+        Ok(vec![UpdatesRequested {
+            instruction_ind: 0,
+            dependency_ind: 0,
+        }])
     }
 }
 
@@ -373,6 +326,16 @@ lazy_static! {
                     }
                 )
             ),
+            StateVar::Boolean(
+                StateVarTyped::new(
+                    Box::new(Expanded::new()),
+                    StateVarParameters {
+                        name: "expanded",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
             StateVar::Number(
                 StateVarTyped::new(
                     Box::new(Width::new()),
@@ -427,8 +390,8 @@ lazy_static! {
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 
-        state_var_component_types:  GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
-        
+        state_var_component_types: GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
+
         generate_state_vars: *GENERATE_STATE_VARS,
 
         attribute_names: vec![

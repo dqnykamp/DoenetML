@@ -1,8 +1,8 @@
 use lazy_static::lazy_static;
 
-// use crate::base_definitions::*;
-use crate::state::{StateVarMutableViewTyped, StateVarInterface, StateVarTyped, StateVarParameters};
-use crate::state_variables::*;
+use crate::state::{
+    StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarTyped,
+};
 
 use super::*;
 
@@ -11,13 +11,15 @@ struct SubmitLabel {}
 
 impl SubmitLabel {
     pub fn new() -> Self {
-        SubmitLabel {
-        }
-    } 
+        SubmitLabel {}
+    }
 }
 
 impl StateVarInterface<String> for SubmitLabel {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
         state_var.set_value(String::from("Check work"));
     }
 }
@@ -27,13 +29,15 @@ struct SubmitLabelNoCorrectness {}
 
 impl SubmitLabelNoCorrectness {
     pub fn new() -> Self {
-        SubmitLabelNoCorrectness {
-        }
-    } 
+        SubmitLabelNoCorrectness {}
+    }
 }
 
 impl StateVarInterface<String> for SubmitLabelNoCorrectness {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
         state_var.set_value(String::from("Submit Response"));
     }
 }
@@ -43,13 +47,15 @@ struct Hidden {}
 
 impl Hidden {
     pub fn new() -> Self {
-        Hidden {
-        }
-    } 
+        Hidden {}
+    }
 }
 
 impl StateVarInterface<bool> for Hidden {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(false);
     }
 }
@@ -59,13 +65,15 @@ struct Disabled {}
 
 impl Disabled {
     pub fn new() -> Self {
-        Disabled {
-        }
-    } 
+        Disabled {}
+    }
 }
 
 impl StateVarInterface<bool> for Disabled {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(false);
     }
 }
@@ -75,14 +83,15 @@ struct Fixed {}
 
 impl Fixed {
     pub fn new() -> Self {
-        Fixed {
-        }
-    } 
+        Fixed {}
+    }
 }
 
-
 impl StateVarInterface<bool> for Fixed {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(false);
     }
 }
@@ -92,14 +101,15 @@ struct Title {}
 
 impl Title {
     pub fn new() -> Self {
-        Title {
-        }
-    } 
+        Title {}
+    }
 }
 
-
 impl StateVarInterface<String> for Title {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<String>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<String>,
+    ) -> () {
         state_var.set_value(String::from(""));
     }
 }
@@ -109,14 +119,15 @@ struct Level {}
 
 impl Level {
     pub fn new() -> Self {
-        Level {
-        }
-    } 
+        Level {}
+    }
 }
 
-
 impl StateVarInterface<i64> for Level {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<i64>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<i64>,
+    ) -> () {
         state_var.set_value(0);
     }
 }
@@ -126,14 +137,15 @@ struct JustSubmitted {}
 
 impl JustSubmitted {
     pub fn new() -> Self {
-        JustSubmitted {
-        }
-    } 
+        JustSubmitted {}
+    }
 }
 
-
 impl StateVarInterface<bool> for JustSubmitted {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(true);
     }
 }
@@ -143,14 +155,15 @@ struct ShowCorrectness {}
 
 impl ShowCorrectness {
     pub fn new() -> Self {
-        ShowCorrectness {
-        }
-    } 
+        ShowCorrectness {}
+    }
 }
 
-
 impl StateVarInterface<bool> for ShowCorrectness {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(true);
     }
 }
@@ -160,14 +173,15 @@ struct CreditAchieved {}
 
 impl CreditAchieved {
     pub fn new() -> Self {
-        CreditAchieved {
-        }
-    } 
+        CreditAchieved {}
+    }
 }
 
-
 impl StateVarInterface<f64> for CreditAchieved {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<f64>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<f64>,
+    ) -> () {
         state_var.set_value(1.0);
     }
 }
@@ -177,13 +191,15 @@ struct CreateSubmitAllButton {}
 
 impl CreateSubmitAllButton {
     pub fn new() -> Self {
-        CreateSubmitAllButton {
-        }
-    } 
+        CreateSubmitAllButton {}
+    }
 }
 
 impl StateVarInterface<bool> for CreateSubmitAllButton {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
         state_var.set_value(false);
     }
 }
@@ -193,17 +209,18 @@ struct SuppressAnswerSubmitButtons {}
 
 impl SuppressAnswerSubmitButtons {
     pub fn new() -> Self {
-        SuppressAnswerSubmitButtons {
-        }
-    } 
-}
-
-impl StateVarInterface<bool> for SuppressAnswerSubmitButtons {
-    fn calculate_state_var_from_dependencies(&self, state_var: &StateVarMutableViewTyped<bool>) -> () {
-        state_var.set_value(false);
+        SuppressAnswerSubmitButtons {}
     }
 }
 
+impl StateVarInterface<bool> for SuppressAnswerSubmitButtons {
+    fn calculate_state_var_from_dependencies(
+        &self,
+        state_var: &StateVarMutableViewTyped<bool>,
+    ) -> () {
+        state_var.set_value(false);
+    }
+}
 
 lazy_static! {
 
@@ -211,7 +228,7 @@ lazy_static! {
         vec![
             StateVar::String(
                 StateVarTyped::new(
-                    Box::new(SubmitLabel::new()), 
+                    Box::new(SubmitLabel::new()),
                     StateVarParameters {
                         name: "submitLabel",
                         for_renderer: true,
@@ -221,7 +238,7 @@ lazy_static! {
             ),
             StateVar::String(
                 StateVarTyped::new(
-                    Box::new(SubmitLabelNoCorrectness::new()), 
+                    Box::new(SubmitLabelNoCorrectness::new()),
                     StateVarParameters {
                         name: "submitLabelNoCorrectness",
                         for_renderer: true,
@@ -231,7 +248,7 @@ lazy_static! {
             ),
             StateVar::Boolean(
                 StateVarTyped::new(
-                    Box::new(Hidden::new()), 
+                    Box::new(Hidden::new()),
                     StateVarParameters {
                         name: "hidden",
                         for_renderer: true,
@@ -241,7 +258,7 @@ lazy_static! {
             ),
             StateVar::Boolean(
                 StateVarTyped::new(
-                    Box::new(Disabled::new()), 
+                    Box::new(Disabled::new()),
                     StateVarParameters {
                         name: "disabled",
                         for_renderer: true,
@@ -251,7 +268,7 @@ lazy_static! {
             ),
             StateVar::Boolean(
                 StateVarTyped::new(
-                    Box::new(Fixed::new()), 
+                    Box::new(Fixed::new()),
                     StateVarParameters {
                         name: "fixed",
                         for_renderer: true,
@@ -261,7 +278,7 @@ lazy_static! {
             ),
             StateVar::String(
                 StateVarTyped::new(
-                    Box::new(Title::new()), 
+                    Box::new(Title::new()),
                     StateVarParameters {
                         name: "title",
                         for_renderer: true,
@@ -271,7 +288,7 @@ lazy_static! {
             ),
             StateVar::Integer(
                 StateVarTyped::new(
-                    Box::new(Level::new()), 
+                    Box::new(Level::new()),
                     StateVarParameters {
                         name: "level",
                         for_renderer: true,
@@ -281,7 +298,7 @@ lazy_static! {
             ),
             StateVar::Boolean(
                 StateVarTyped::new(
-                    Box::new(JustSubmitted::new()), 
+                    Box::new(JustSubmitted::new()),
                     StateVarParameters {
                         name: "justSubmitted",
                         for_renderer: true,
@@ -291,7 +308,7 @@ lazy_static! {
             ),
             StateVar::Boolean(
                 StateVarTyped::new(
-                    Box::new(ShowCorrectness::new()), 
+                    Box::new(ShowCorrectness::new()),
                     StateVarParameters {
                         name: "showCorrectness",
                         for_renderer: true,
@@ -301,7 +318,7 @@ lazy_static! {
             ),
             StateVar::Number(
                 StateVarTyped::new(
-                    Box::new(CreditAchieved::new()), 
+                    Box::new(CreditAchieved::new()),
                     StateVarParameters {
                         name: "creditAchieved",
                         for_renderer: true,
@@ -311,7 +328,7 @@ lazy_static! {
             ),
             StateVar::Boolean(
                 StateVarTyped::new(
-                    Box::new(CreateSubmitAllButton::new()), 
+                    Box::new(CreateSubmitAllButton::new()),
                     StateVarParameters {
                         name: "createSubmitAllButton",
                         for_renderer: true,
@@ -321,7 +338,7 @@ lazy_static! {
             ),
             StateVar::Boolean(
                 StateVarTyped::new(
-                    Box::new(SuppressAnswerSubmitButtons::new()), 
+                    Box::new(SuppressAnswerSubmitButtons::new()),
                     StateVarParameters {
                         name: "suppressAnswerSubmitButtons",
                         for_renderer: true,
@@ -345,8 +362,8 @@ lazy_static! {
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 
-        state_var_component_types:  GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
-        
+        state_var_component_types: GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
+
         generate_state_vars: *GENERATE_STATE_VARS,
 
         attribute_names: vec![],
