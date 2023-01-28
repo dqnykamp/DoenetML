@@ -1073,7 +1073,7 @@ fn macro_comp_ref(
 
         let variant_option = match source_def_option {
             Some(source_def) => match source_def.state_var_index_map.get(prop) {
-                Some(v) => unimplemented!("Have not implemented copy prop"),//Some(&source_def.state_var_definitions[*v].1),
+                Some(v) => Some(source_def.state_var_component_types[*v]),
                 None => {
                     if !found_error {
                         found_error = true;
@@ -1152,7 +1152,7 @@ fn macro_comp_ref(
 
         definition_option = match variant_option {
             Some(variant) => Some(&COMPONENT_DEFINITIONS
-            .get(default_component_type_for_state_var(variant))
+            .get(variant)
             .unwrap()),
             None => None
         };
@@ -1220,17 +1220,6 @@ fn macro_comp_ref(
     Ok((macro_name, macro_end))
 }
 
-fn default_component_type_for_state_var(component: &StateVar)
-    -> ComponentType {
-
-    match component {
-        StateVar::Boolean(_) => "boolean",
-        StateVar::Integer(_) => "number",
-        StateVar::Number(_) => "number",
-        StateVar::String(_) => "text",
-        StateVar::MathExpr(_) => unimplemented!("Should not have math expression state variable"),
-    }
-}
 
 fn name_macro_component(
     source_name: &str,

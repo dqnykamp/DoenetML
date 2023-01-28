@@ -114,6 +114,8 @@ pub struct ComponentDefinition {
 
     pub state_var_names: Vec<&'static str>,
 
+    pub state_var_component_types: Vec<&'static str>,
+
     pub generate_state_vars: fn () -> Vec<StateVar>,
 
     /// An ordered list of which profiles this component fulfills, along with the name of the
@@ -216,6 +218,7 @@ impl Default for ComponentDefinition {
             // state_var_definitions: &EMPTY_STATE_VARS,
             state_var_index_map: HashMap::new(),
             state_var_names: Vec::new(),
+            state_var_component_types: Vec::new(),
             generate_state_vars: empty_state_vars,
             attribute_names: Vec::new(),
             static_attribute_names: Vec::new(),

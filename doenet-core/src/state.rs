@@ -581,7 +581,15 @@ impl StateVar {
         }
     }
 
-    
+    pub fn get_default_component_type(&self) -> &'static str {
+        match self {
+            StateVar::Number(sv_typed) => "number",
+            StateVar::Integer(sv_typed) => "number",
+            StateVar::String(sv_typed) => "text",
+            StateVar::Boolean(sv_typed) => "boolean",
+            StateVar::MathExpr(sv_typed) => unimplemented!("Should not have math expression state variable"),
+        }
+    }
 
 }
 

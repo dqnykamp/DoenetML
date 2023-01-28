@@ -1161,55 +1161,38 @@ fn freshen_state_var(
 
                     for (val_ind, dep) in deps.iter().enumerate().skip(initial_val_ind) {
     
-                        match dep {
-                            Dependency::StateVar { component_name, state_var_ind } => {
-                                let new_node = component_nodes.get(component_name).unwrap();
-                                let new_component_state = ComponentState(new_node, *state_var_ind);
+                        if let Dependency::StateVar { component_name, state_var_ind } = dep {
+                            let new_node = component_nodes.get(component_name).unwrap();
+                            let new_component_state = ComponentState(new_node, *state_var_ind);
 
-                                let new_current_freshness = new_component_state.get_freshness(component_state_variables);
-    
-                                match new_current_freshness {
-                                    // No need to continue if the state var is already fresh
-                                    Freshness::Fresh => (),
-                                    // Freshness::Fresh => new_component_state.get_value_assuming_fresh(component_state_variables),
-                                    Freshness::Unresolved => {
-                                        panic!("How did a stale state variable depend on an unresolved state variable?")
-                                    }
-                                    Freshness::Stale => {
-                                        stack.push(
-                                            StateVarCalculationState::Stale(StaleCalculationState {
-                                                component_state,
-                                                instruction_ind,
-                                                val_ind,
-                                            })
-                                        );
-                                        stack.push(
-                                            StateVarCalculationState::Stale(StaleCalculationState {
-                                                component_state: new_component_state,
-                                                instruction_ind: 0,
-                                                val_ind: 0,
-                                            })
-                                        );
+                            let new_current_freshness = new_component_state.get_freshness(component_state_variables);
 
-                                        continue 'stack_loop;
-                                    }
-                                };
-                  
+                            match new_current_freshness {
+                                // No need to do anything if the state var is already fresh
+                                Freshness::Fresh => (),
+                                Freshness::Stale => {
+                                    stack.push(
+                                        StateVarCalculationState::Stale(StaleCalculationState {
+                                            component_state,
+                                            instruction_ind,
+                                            val_ind,
+                                        })
+                                    );
+                                    stack.push(
+                                        StateVarCalculationState::Stale(StaleCalculationState {
+                                            component_state: new_component_state,
+                                            instruction_ind: 0,
+                                            val_ind: 0,
+                                        })
+                                    );
 
-                                // dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = state_var_value;
-    
-                            },
-    
-                            Dependency::Essential { component_name, origin } => {
-  
-                                // let value = essential_data
-                                //     .get(&component_name.clone()).unwrap()
-                                //     .get(&origin).unwrap()
-                                //     .clone();
+                                    continue 'stack_loop;
+                                }
+                                Freshness::Unresolved => {
+                                    panic!("How did a stale state variable depend on an unresolved state variable?")
+                                }
+                            };
                 
-                                // dependencies.get_mut(&component_state.0.name).unwrap()[component_state.1].dependency_values[instruction_ind][val_ind].value = value.get_read_only_view();
-    
-                            },
                         }
                     }
 

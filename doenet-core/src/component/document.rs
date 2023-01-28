@@ -345,6 +345,8 @@ lazy_static! {
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 
+        state_var_component_types:  GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
+        
         generate_state_vars: *GENERATE_STATE_VARS,
 
         attribute_names: vec![],
