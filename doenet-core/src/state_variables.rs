@@ -45,6 +45,7 @@ pub enum DependencyInstruction {
     },
     Attribute {
         attribute_name: AttributeName,
+        default_value: StateVarValue
     },
     Essential {
         /// Use the string of this attribute

@@ -13,8 +13,8 @@ use lazy_static::lazy_static;
 use crate::base_definitions::*;
 
 
-integer_state_variable_from_attribute!("start_index", StartIndex);
-integer_state_variable_from_attribute!("end_index", EndIndex);
+integer_state_variable_from_attribute!("start_index", StateVarValue::Integer(0), StartIndex);
+integer_state_variable_from_attribute!("end_index", StateVarValue::Integer(0), EndIndex);
 
 
 #[derive(Debug)]

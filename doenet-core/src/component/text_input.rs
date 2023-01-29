@@ -9,13 +9,20 @@ use crate::{
     utils::log,
 };
 
-// use crate::base_definitions::*;
+use crate::base_definitions::*;
+
+string_state_variable_from_attribute!(
+    "bindValueTo",
+    StateVarValue::String(String::from("")),
+    BindValueTo
+);
 
 #[derive(Debug)]
 struct Value {
     essential_value: StateVarReadOnlyViewTyped<String>,
     immediate_value: StateVarReadOnlyViewTyped<String>,
     sync_values: StateVarReadOnlyViewTyped<bool>,
+    bind_value_to: StateVarReadOnlyViewTyped<String>,
 }
 
 impl Value {
@@ -24,6 +31,7 @@ impl Value {
             essential_value: StateVarReadOnlyViewTyped::new(),
             immediate_value: StateVarReadOnlyViewTyped::new(),
             sync_values: StateVarReadOnlyViewTyped::new(),
+            bind_value_to: StateVarReadOnlyViewTyped::new(),
         }
     }
 }
@@ -41,6 +49,10 @@ impl StateVarInterface<String> for Value {
             DependencyInstruction::StateVar {
                 component_name: None,
                 state_var_name: "syncImmediateValue",
+            },
+            DependencyInstruction::StateVar {
+                component_name: None,
+                state_var_name: "bindValueTo",
             },
         ]
     }
@@ -63,16 +75,26 @@ impl StateVarInterface<String> for Value {
         } else {
             panic!("Got a non-boolean sync values for value of text input.");
         }
+
+        if let StateVarReadOnlyView::String(bind_value_to) = &dependencies[3][0].value {
+            self.bind_value_to = bind_value_to.create_new_read_only_view();
+        } else {
+            panic!("Got a non-string bind_value_to for value of text input.");
+        }
     }
 
     fn calculate_state_var_from_dependencies(
         &self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
+        let bind_value_to_used_default = self.bind_value_to.get_used_default();
+
         let value = if *self.sync_values.get_value_assuming_fresh() {
             self.immediate_value.get_value_assuming_fresh()
-        } else {
+        } else if bind_value_to_used_default {
             self.essential_value.get_value_assuming_fresh()
+        } else {
+            self.bind_value_to.get_value_assuming_fresh()
         };
 
         state_var.set_value(value.clone());
@@ -83,14 +105,23 @@ impl StateVarInterface<String> for Value {
         state_var: &StateVarReadOnlyViewTyped<String>,
     ) -> Result<Vec<UpdatesRequested>, ()> {
         let desired_value = state_var.get_requested_value();
+        let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        self.essential_value.request_value(desired_value.clone());
+        let first_ind =
+        if bind_value_to_used_default {
+            self.essential_value.request_value(desired_value.clone());
+            0
+        } else {
+            self.bind_value_to.request_value(desired_value.clone());
+            3
+        };
+
         self.immediate_value.request_value(desired_value.clone());
         self.sync_values.request_value(true);
 
         Ok(vec![
             UpdatesRequested {
-                instruction_ind: 0,
+                instruction_ind: first_ind,
                 dependency_ind: 0,
             },
             UpdatesRequested {
@@ -108,21 +139,35 @@ impl StateVarInterface<String> for Value {
 #[derive(Debug)]
 struct ImmediateValue {
     essential_value: StateVarReadOnlyViewTyped<String>,
+    sync_values: StateVarReadOnlyViewTyped<bool>,
+    bind_value_to: StateVarReadOnlyViewTyped<String>,
 }
 
 impl ImmediateValue {
     pub fn new() -> Self {
         ImmediateValue {
             essential_value: StateVarReadOnlyViewTyped::new(),
+            sync_values: StateVarReadOnlyViewTyped::new(),
+            bind_value_to: StateVarReadOnlyViewTyped::new(),
         }
     }
 }
 
 impl StateVarInterface<String> for ImmediateValue {
     fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
-        vec![DependencyInstruction::Essential {
-            prefill: Some("prefill"),
-        }]
+        vec![
+            DependencyInstruction::Essential {
+                prefill: Some("prefill"),
+            },
+            DependencyInstruction::StateVar {
+                component_name: None,
+                state_var_name: "syncImmediateValue",
+            },
+            DependencyInstruction::StateVar {
+                component_name: None,
+                state_var_name: "bindValueTo",
+            },
+        ]
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
@@ -131,13 +176,35 @@ impl StateVarInterface<String> for ImmediateValue {
         } else {
             panic!("Got a non-string essential value for immediate value of text input.");
         }
+
+        if let StateVarReadOnlyView::Boolean(sync_values) = &dependencies[1][0].value {
+            self.sync_values = sync_values.create_new_read_only_view();
+        } else {
+            panic!("Got a non-boolean sync values for immediate value of text input.");
+        }
+
+        if let StateVarReadOnlyView::String(bind_value_to) = &dependencies[2][0].value {
+            self.bind_value_to = bind_value_to.create_new_read_only_view();
+        } else {
+            panic!("Got a non-string bind_value_to for immediate value of text input.");
+        }
     }
 
     fn calculate_state_var_from_dependencies(
         &self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
-        state_var.set_value(self.essential_value.get_value_assuming_fresh().clone());
+
+        let bind_value_to_used_default = self.bind_value_to.get_used_default();
+
+        let immediate_value = if !bind_value_to_used_default && *self.sync_values.get_value_assuming_fresh() {
+            self.bind_value_to.get_value_assuming_fresh()
+        } else {
+            self.essential_value.get_value_assuming_fresh()
+        };
+
+
+        state_var.set_value(immediate_value.clone());
     }
 
     fn request_dependencies_to_update_value(
@@ -326,6 +393,16 @@ lazy_static! {
                     }
                 )
             ),
+            StateVar::String(
+                StateVarTyped::new(
+                    Box::new(BindValueTo::new()),
+                    StateVarParameters {
+                        name: "bindValueTo",
+                        for_renderer: true,
+                        ..Default::default()
+                    }
+                )
+            ),
             StateVar::Boolean(
                 StateVarTyped::new(
                     Box::new(Expanded::new()),
@@ -398,6 +475,7 @@ lazy_static! {
             "hide",
             "disabled",
             "prefill",
+            "bindValueTo"
         ],
 
         action_names: || vec!["updateImmediateValue", "updateValue"],

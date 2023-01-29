@@ -325,7 +325,7 @@ pub struct MLComponent {
 pub fn create_components_tree_from_json(program: &str)
     -> Result<(
             HashMap<ComponentName, MLComponent>,
-            HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
+            HashMap<ComponentName, HashMap<AttributeName, Vec<ObjectName>>>,
             ComponentName,
             HashMap<String, ComponentName>,
             Vec<DoenetMLWarning>,
@@ -725,7 +725,7 @@ fn parse_attributes_and_macros(
 ) -> (
     HashMap<ComponentName, HashMap<usize, Vec<ObjectName>>>,
     Vec<MLComponent>,
-    HashMap<ComponentName, HashMap<AttributeName, HashMap<usize, Vec<ObjectName>>>>,
+    HashMap<ComponentName, HashMap<AttributeName, Vec<ObjectName>>>,
     HashMap<ComponentName, Vec<ObjectName>>,
     HashMap<ComponentName, Vec<ObjectName>>,
     )
@@ -810,17 +810,8 @@ fn parse_attributes_and_macros(
     // Attributes
     for (attribute_name, string_val, component) in all_attributes {
 
-        // The reason this uses a HashMap of usizes instead of another Vec is because
-        // later we might want to specify arrays of arrays in the attribute, so the key
-        // might be more complicated than an integer.
-        let objects: HashMap<usize, Vec<ObjectName>> = string_val.split(' ')
-            .enumerate()
-            .map(|(index, string_element)|
-
-                // DoenetML is 1-indexed
-                (index + 1,
-                    apply_macro_to_string(
-                        string_element.trim(),
+        let objects = apply_macro_to_string(
+                        string_val.trim(),  // TODO: do we trim, or is there a case where outside spaces matter?
                         &component.name,
                         components,
                         map_sources_alias,
@@ -828,9 +819,7 @@ fn parse_attributes_and_macros(
                         &mut components_to_add,
                         None,
                         warnings_encountered,
-                    )
-                )
-            ).collect();
+                    );
 
         attributes_parsed
             .entry(component.name.clone()).or_insert(HashMap::new())

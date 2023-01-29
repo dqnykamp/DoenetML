@@ -3,7 +3,7 @@ use super::*;
 
 use crate::state::{
     StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarReadOnlyView,
-    StateVarReadOnlyViewTyped, StateVarTyped,
+    StateVarReadOnlyViewTyped, StateVarTyped, UpdatesRequested,
 };
 // use crate::state_variables::*;
 
@@ -63,6 +63,25 @@ impl StateVarInterface<String> for Value {
             .collect();
 
         state_var.set_value(value);
+    }
+
+    fn request_dependencies_to_update_value(
+        &self,
+        state_var: &StateVarReadOnlyViewTyped<String>,
+    ) -> Result<Vec<UpdatesRequested>, ()> {
+        if self.string_child_values.len() != 1 {
+            // TODO: implement for no children where saves to essential value
+            Err(())
+        } else {
+            let desired_value = state_var.get_requested_value();
+
+            self.string_child_values[0].request_value(desired_value.clone());
+
+            Ok(vec![UpdatesRequested {
+                instruction_ind: 0,
+                dependency_ind: 0,
+            }])
+        }
     }
 }
 

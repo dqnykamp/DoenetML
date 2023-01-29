@@ -93,6 +93,7 @@ struct StateVarInner<T: Default + Clone> {
     value: T,
     freshness: Freshness,
     requested_value: T,
+    used_default: bool
 }
 
 impl<T: Default + Clone> StateVarInner<T> {
@@ -112,6 +113,16 @@ impl<T: Default + Clone> StateVarInner<T> {
         self.freshness = Freshness::Fresh;
     }
 
+    pub fn set_value_and_used_default(&mut self, new_val: T, used_default: bool) {
+        self.value = new_val;
+        self.freshness = Freshness::Fresh;
+        self.used_default = used_default;
+    }
+
+    pub fn get_used_default(&self) -> bool {
+        self.used_default
+    }
+
     pub fn request_value(&mut self, requested_val: T) {
         self.requested_value = requested_val;
     }
@@ -128,16 +139,18 @@ impl<T: Default + Clone> StateVarMutableViewTyped<T> {
                 value: T::default(),
                 freshness: Freshness::Unresolved,
                 requested_value: T::default(),
+                used_default: false
             })),
         }
     }
 
-    pub fn new_with_value(val: T) -> Self {
+    pub fn new_with_value(val: T, used_default: bool) -> Self {
         StateVarMutableViewTyped {
             inner: Rc::new(RefCell::new(StateVarInner {
                 value: val,
                 freshness: Freshness::Fresh,
                 requested_value: T::default(),
+                used_default
             })),
         }
     }
@@ -157,6 +170,14 @@ impl<T: Default + Clone> StateVarMutableViewTyped<T> {
 
     pub fn set_value(&self, new_val: T) {
         self.inner.borrow_mut().set_value(new_val);
+    }
+
+    pub fn set_value_and_used_default(&self, new_val: T, used_default: bool) {
+        self.inner.borrow_mut().set_value_and_used_default(new_val, used_default);
+    }
+
+    pub fn get_used_default(&self) -> bool {
+        self.inner.borrow().get_used_default()
     }
 
     // pub fn create_new_mutable_view(&self) -> StateVarTyped<T> {
@@ -200,11 +221,16 @@ impl<T: Default + Clone> StateVarReadOnlyViewTyped<T> {
                 value: T::default(),
                 freshness: Freshness::Unresolved,
                 requested_value: T::default(),
+                used_default: false
             })),
         }
     }
     pub fn get_value_assuming_fresh<'a>(&'a self) -> impl Deref<Target = T> + 'a {
         Ref::map(self.inner.borrow(), |v| v.get_value_assuming_fresh())
+    }
+
+    pub fn get_used_default(&self) -> bool {
+        self.inner.borrow().get_used_default()
     }
 
     pub fn create_new_read_only_view(&self) -> StateVarReadOnlyViewTyped<T> {
@@ -249,22 +275,22 @@ impl From<&StateVarMutableView> for serde_json::Value {
 }
 
 impl StateVarMutableView {
-    pub fn new_with_value(sv_val: StateVarValue) -> Self {
+    pub fn new_with_value(sv_val: StateVarValue, used_default: bool) -> Self {
         match sv_val {
             StateVarValue::Number(val) => {
-                StateVarMutableView::Number(StateVarMutableViewTyped::new_with_value(val))
+                StateVarMutableView::Number(StateVarMutableViewTyped::new_with_value(val, used_default))
             }
             StateVarValue::Integer(val) => {
-                StateVarMutableView::Integer(StateVarMutableViewTyped::new_with_value(val))
+                StateVarMutableView::Integer(StateVarMutableViewTyped::new_with_value(val, used_default))
             }
             StateVarValue::String(val) => {
-                StateVarMutableView::String(StateVarMutableViewTyped::new_with_value(val))
+                StateVarMutableView::String(StateVarMutableViewTyped::new_with_value(val, used_default))
             }
             StateVarValue::Boolean(val) => {
-                StateVarMutableView::Boolean(StateVarMutableViewTyped::new_with_value(val))
+                StateVarMutableView::Boolean(StateVarMutableViewTyped::new_with_value(val, used_default))
             }
             StateVarValue::MathExpr(val) => {
-                StateVarMutableView::MathExpr(StateVarMutableViewTyped::new_with_value(val))
+                StateVarMutableView::MathExpr(StateVarMutableViewTyped::new_with_value(val, used_default))
             }
         }
     }
@@ -286,6 +312,16 @@ impl StateVarMutableView {
             StateVarMutableView::String(sv_typed) => sv_typed.get_freshness(),
             StateVarMutableView::Boolean(sv_typed) => sv_typed.get_freshness(),
             StateVarMutableView::MathExpr(sv_typed) => sv_typed.get_freshness(),
+        }
+    }
+
+    pub fn get_used_default(&self) -> bool {
+        match self {
+            StateVarMutableView::Number(sv_typed) => sv_typed.get_used_default(),
+            StateVarMutableView::Integer(sv_typed) => sv_typed.get_used_default(),
+            StateVarMutableView::String(sv_typed) => sv_typed.get_used_default(),
+            StateVarMutableView::Boolean(sv_typed) => sv_typed.get_used_default(),
+            StateVarMutableView::MathExpr(sv_typed) => sv_typed.get_used_default(),
         }
     }
 
@@ -384,6 +420,14 @@ impl<T: Default + Clone> StateVarTyped<T> {
         self.value.inner.borrow_mut().set_value(new_val);
     }
 
+    pub fn set_value_and_used_default(&self, new_val: T, used_default: bool) {
+        self.value.inner.borrow_mut().set_value_and_used_default(new_val, used_default);
+    }
+
+    pub fn get_used_default(&self) -> bool {
+        self.value.inner.borrow().get_used_default()
+    }
+
     pub fn create_new_mutable_view(&self) -> StateVarMutableViewTyped<T> {
         StateVarMutableViewTyped {
             inner: self.value.inner.clone(),
@@ -451,6 +495,16 @@ impl StateVar {
             StateVar::String(sv_typed) => sv_typed.get_freshness(),
             StateVar::Boolean(sv_typed) => sv_typed.get_freshness(),
             StateVar::MathExpr(sv_typed) => sv_typed.get_freshness(),
+        }
+    }
+
+    pub fn get_used_default(&self) -> bool {
+        match self {
+            StateVar::Number(sv_typed) => sv_typed.get_used_default(),
+            StateVar::Integer(sv_typed) => sv_typed.get_used_default(),
+            StateVar::String(sv_typed) => sv_typed.get_used_default(),
+            StateVar::Boolean(sv_typed) => sv_typed.get_used_default(),
+            StateVar::MathExpr(sv_typed) => sv_typed.get_used_default(),
         }
     }
 

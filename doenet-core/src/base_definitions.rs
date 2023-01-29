@@ -8,59 +8,216 @@ use crate::state::{
     StateVarReadOnlyViewTyped, StateVarTyped, UpdatesRequested,
 };
 
-// macro_rules! number_definition_from_attribute {
-//     ( $attribute:expr, $default:expr ) => {
-//         {
-//             StateVarVariant::Number(StateVarDefinition {
-//                 for_renderer: true,
-
-//                 initial_essential_value: $default,
-
-//                 return_dependency_instructions: |_| {
-//                     let attribute = DependencyInstruction::Attribute{
-//                         attribute_name: $attribute,
-//                     };
-//                     HashMap::from([("attribute", attribute)])
-//                 },
-
-//                 determine_state_var_from_dependencies: |dependency_values| {
-//                     let (attribute, _) = dependency_values.dep_value("attribute")?;
-//                     if attribute.len() > 0 {
-
-//                         match DETERMINE_NUMBER(attribute) {
-//                             Ok(x) => Ok(SetValue(x)),
-//                             Err(msg) => {
-//                                 crate::utils::log!("Error determing number: {}", msg);
-//                                 Ok(SetValue(f64::NAN))
-//                             },
-//                         }
-//                     } else {
-//                         Ok ( crate::state_variables::StateVarUpdateInstruction::SetValue($default) )
-//                     }
-//                 },
-
-//                 request_dependencies_to_update_value: |desired_value, sources| {
-//                     let attribute_sources = sources.get("attribute").unwrap();
-//                     HashMap::from([
-//                         ("attribute", DETERMINE_NUMBER_DEPENDENCIES(desired_value, attribute_sources))
-//                     ])
-//                 },
-
-//                 ..Default::default()
-//             })
-//         }
-//     }
-// }
-// pub(crate) use number_definition_from_attribute;
-
 #[derive(Debug)]
 pub enum NumOrInt {
     Number(StateVarReadOnlyViewTyped<f64>),
     Integer(StateVarReadOnlyViewTyped<i64>),
 }
 
+macro_rules! number_state_variable_from_attribute {
+    ( $attribute:expr, $default_value:expr, $StructName:ident ) => {
+        #[derive(Debug)]
+        struct $StructName {
+            single_number_dep: Option<StateVarReadOnlyViewTyped<f64>>,
+            math_expression: Option<StateVarReadOnlyViewTyped<MathExpression>>,
+            numerical_deps: Vec<NumOrInt>,
+            math_expression_is_single_variable: bool,
+        }
+
+        impl $StructName {
+            pub fn new() -> Self {
+                $StructName {
+                    single_number_dep: None,
+                    math_expression: None,
+                    numerical_deps: Vec::new(),
+                    math_expression_is_single_variable: false,
+                }
+            }
+        }
+
+        impl StateVarInterface<f64> for $StructName {
+            fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+                vec![DependencyInstruction::Attribute {
+                    attribute_name: $attribute,
+                    default_value: $default_value
+                }]
+            }
+
+            fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+                let deps = &dependencies[0];
+
+                if deps[0].source
+                    != (DependencySource::Essential {
+                        value_type: "mathExpression",
+                    })
+                {
+                    // if copying another component, could get a single dep to that component's state variable
+                    if let StateVarReadOnlyView::Number(val) = &deps[0].value {
+                        self.single_number_dep = Some(val.create_new_read_only_view());
+                    } else {
+                        panic!(
+                            "The {} attribute had a single component that wasn't an number: {:?}",
+                            $attribute, deps[0].value
+                        );
+                    }
+
+                    if deps.len() > 1 {
+                        panic!(
+                            "The {} attribute should have been parsed into an expression",
+                            $attribute
+                        );
+                    }
+                } else {
+                    if let StateVarReadOnlyView::MathExpr(val) = &deps[0].value {
+                        self.math_expression = Some(val.create_new_read_only_view());
+                    } else {
+                        panic!(
+                            "The {} attribute should have been parsed into an expression",
+                            $attribute
+                        );
+                    }
+
+                    let mut numerical_deps = Vec::with_capacity(deps.len() - 1);
+
+                    for dep in deps.iter().skip(1) {
+                        if let StateVarReadOnlyView::Number(val) = &dep.value {
+                            numerical_deps.push(NumOrInt::Number(val.create_new_read_only_view()));
+                        } else if let StateVarReadOnlyView::Integer(val) = &dep.value {
+                            numerical_deps.push(NumOrInt::Integer(val.create_new_read_only_view()));
+                        } else {
+                            panic!("The {} attribute should have number deps", $attribute);
+                        }
+                    }
+
+                    if numerical_deps.len()
+                        != self
+                            .math_expression
+                            .as_ref()
+                            .unwrap()
+                            .get_value_assuming_fresh()
+                            .external_variables_count
+                    {
+                        panic!("The {} attribute not parsed correctly", $attribute);
+                    }
+
+                    let mut math_expression_is_single_variable = false;
+
+                    if numerical_deps.len() == 1 {
+                        let expression = &self
+                            .math_expression
+                            .as_ref()
+                            .unwrap()
+                            .get_value_assuming_fresh();
+
+                        let tree = &expression.tree;
+
+                        if tree.children().len() == 1 {
+                            let child = &tree.children()[0];
+                            if child.children().is_empty()
+                                && matches!(
+                                    child.operator(),
+                                    Operator::VariableIdentifierRead { .. }
+                                )
+                            {
+                                math_expression_is_single_variable = true;
+                            }
+                        }
+                    }
+
+                    self.math_expression_is_single_variable = math_expression_is_single_variable;
+
+                    self.numerical_deps = numerical_deps;
+                }
+            }
+
+            fn calculate_state_var_from_dependencies(
+                &self,
+                state_var: &StateVarMutableViewTyped<f64>,
+            ) -> () {
+                if let Some(single_child) = &self.single_number_dep {
+                    let used_default = single_child.get_used_default();
+                    state_var.set_value_and_used_default(*single_child.get_value_assuming_fresh(), used_default)
+                } else {
+                    let expression = &self
+                        .math_expression
+                        .as_ref()
+                        .unwrap()
+                        .get_value_assuming_fresh();
+
+                    let mut context = HashMapContext::new();
+
+                    for (id, value) in self.numerical_deps.iter().enumerate() {
+                        let variable_num = match value {
+                            NumOrInt::Number(num_val) => *num_val.get_value_assuming_fresh(),
+                            NumOrInt::Integer(int_val) => {
+                                *int_val.get_value_assuming_fresh() as f64
+                            }
+                        };
+
+                        let name = format!("{}{}", expression.variable_prefix, id);
+                        context.set_value(name, variable_num.into()).unwrap();
+                    }
+
+                    let num = if expression.tree.operator() == &Operator::RootNode
+                        && expression.tree.children().is_empty()
+                    {
+                        // Empty expression, set to 0
+                        0
+                    } else {
+                        expression.tree.eval_int_with_context(&context).unwrap_or(0)
+                    };
+
+                    state_var.set_value(num);
+                }
+            }
+
+            fn request_dependencies_to_update_value(
+                &self,
+                state_var: &StateVarReadOnlyViewTyped<f64>,
+            ) -> Result<Vec<UpdatesRequested>, ()> {
+                let desired_value = state_var.get_requested_value();
+
+                if let Some(single_child) = &self.single_number_dep {
+                    single_child.request_value(*desired_value);
+
+                    Ok(vec![UpdatesRequested {
+                        instruction_ind: 0,
+                        dependency_ind: 0,
+                    }])
+                } else if self.numerical_deps.len() == 0 {
+                    // have a constant math expression
+
+                    self.math_expression
+                        .as_ref()
+                        .unwrap()
+                        .request_value(MathExpression::from(*desired_value));
+
+                    Ok(vec![UpdatesRequested {
+                        instruction_ind: 0,
+                        dependency_ind: 0,
+                    }])
+                } else if self.math_expression_is_single_variable {
+                    match &self.numerical_deps[0] {
+                        NumOrInt::Number(num_dep) => num_dep.request_value(*desired_value),
+                        NumOrInt::Integer(num_dep) => num_dep.request_value(*desired_value as i64),
+                    }
+
+                    Ok(vec![UpdatesRequested {
+                        instruction_ind: 0,
+                        dependency_ind: 1,
+                    }])
+                } else {
+                    // have not implemented other cases
+                    Err(())
+                }
+            }
+        }
+    };
+}
+pub(crate) use number_state_variable_from_attribute;
+
 macro_rules! integer_state_variable_from_attribute {
-    ( $attribute:expr, $StructName:ident ) => {
+    ( $attribute:expr, $default_value:expr, $StructName:ident ) => {
         #[derive(Debug)]
         struct $StructName {
             single_integer_dep: Option<StateVarReadOnlyViewTyped<i64>>,
@@ -84,11 +241,11 @@ macro_rules! integer_state_variable_from_attribute {
             fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
                 vec![DependencyInstruction::Attribute {
                     attribute_name: $attribute,
+                    default_value: $default_value
                 }]
             }
 
             fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-
                 let deps = &dependencies[0];
 
                 if deps[0].source
@@ -180,7 +337,8 @@ macro_rules! integer_state_variable_from_attribute {
                 state_var: &StateVarMutableViewTyped<i64>,
             ) -> () {
                 if let Some(single_child) = &self.single_integer_dep {
-                    state_var.set_value(*single_child.get_value_assuming_fresh())
+                    let used_default = single_child.get_used_default();
+                    state_var.set_value_and_used_default(*single_child.get_value_assuming_fresh(), used_default)
                 } else {
                     let expression = &self
                         .math_expression
@@ -259,6 +417,131 @@ macro_rules! integer_state_variable_from_attribute {
     };
 }
 pub(crate) use integer_state_variable_from_attribute;
+
+macro_rules! string_state_variable_from_attribute {
+    ( $attribute:expr, $default_value:expr, $StructName:ident ) => {
+        #[derive(Debug)]
+        struct $StructName {
+            string_deps: Vec<StateVarReadOnlyViewTyped<String>>,
+        }
+
+        impl $StructName {
+            pub fn new() -> Self {
+                $StructName {
+                    string_deps: Vec::new(),
+                }
+            }
+        }
+
+        impl StateVarInterface<String> for $StructName {
+            fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+                vec![DependencyInstruction::Attribute {
+                    attribute_name: $attribute,
+                    default_value: $default_value
+                }]
+            }
+
+            fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+                let deps = &dependencies[0];
+
+                let mut string_deps = Vec::with_capacity(deps.len());
+
+                for dep in deps.iter() {
+                    if let StateVarReadOnlyView::String(val) = &dep.value {
+                        string_deps.push(val.create_new_read_only_view());
+                    } else {
+                        panic!("The {} attribute should have string deps", $attribute);
+                    }
+                }
+
+                self.string_deps = string_deps;
+            }
+
+            fn calculate_state_var_from_dependencies(
+                &self,
+                state_var: &StateVarMutableViewTyped<String>,
+            ) -> () {
+                // TODO: can we implement this without cloning the inner value?
+                let value: String = self
+                    .string_deps
+                    .iter()
+                    .map(|v| v.get_value_assuming_fresh().clone())
+                    .collect();
+
+                let mut used_default = false;
+
+                if self.string_deps.len() == 1 && self.string_deps[0].get_used_default() {
+                    used_default = true;
+                }
+
+                state_var.set_value_and_used_default(value, used_default);
+            }
+
+            fn request_dependencies_to_update_value(
+                &self,
+                state_var: &StateVarReadOnlyViewTyped<String>,
+            ) -> Result<Vec<UpdatesRequested>, ()> {
+                if self.string_deps.len() != 1 {
+                    Err(())
+                } else {
+                    let desired_value = state_var.get_requested_value();
+
+                    self.string_deps[0].request_value(desired_value.clone());
+
+                    Ok(vec![UpdatesRequested {
+                        instruction_ind: 0,
+                        dependency_ind: 0,
+                    }])
+                }
+            }
+        }
+    };
+}
+pub(crate) use string_state_variable_from_attribute;
+
+macro_rules! text_state_variable_from_number_state_variable {
+    ( $number_var:expr, $StructName:ident ) => {
+        #[derive(Debug)]
+        struct $StructName {
+            value_sv: StateVarReadOnlyViewTyped<f64>,
+        }
+
+        impl $StructName {
+            pub fn new() -> Self {
+                $StructName {
+                    value_sv: StateVarReadOnlyViewTyped::new(),
+                }
+            }
+        }
+
+        impl StateVarInterface<String> for $StructName {
+            fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
+                vec![DependencyInstruction::StateVar {
+                    component_name: None,
+                    state_var_name: $number_var,
+                }]
+            }
+
+            fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
+                let dep_val = &dependencies[0][0].value;
+
+                if let StateVarReadOnlyView::Number(number_val) = dep_val {
+                    self.value_sv = number_val.create_new_read_only_view();
+                } else {
+                    panic!("Something wrong with text state variable");
+                }
+            }
+
+            fn calculate_state_var_from_dependencies(
+                &self,
+                state_var: &StateVarMutableViewTyped<String>,
+            ) -> () {
+                state_var.set_value(self.value_sv.get_value_assuming_fresh().to_string());
+            }
+        }
+    };
+}
+pub(crate) use text_state_variable_from_number_state_variable;
 
 // macro_rules! boolean_definition_from_attribute {
 //     ( $attribute:expr, $default:expr ) => {
