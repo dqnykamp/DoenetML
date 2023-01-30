@@ -333,7 +333,7 @@ pub fn create_components_tree_from_json(program: &str)
         ), DoenetMLError> {
 
     // log!("Parsing string for component tree: {}", program);
-    let start = Instant::now();
+    // let start = Instant::now();
 
     // This fails if there is a problem with the parser, not the input doenetML.
     // Panic - it's not a DoenetML error.
@@ -357,9 +357,9 @@ pub fn create_components_tree_from_json(program: &str)
             allow_underscore_component_type: false
         });
 
-    log_json!(format!("Parsed JSON into tree"), component_tree);
-    log!("parsed into tree: {:?}", start.elapsed());
-    let start = Instant::now();
+    // log_json!(format!("Parsed JSON into tree"), component_tree);
+    // log!("parsed into tree: {:?}", start.elapsed());
+    // let start = Instant::now();
     
     let mut components: HashMap<ComponentName, MLComponent> = HashMap::new();
     let mut attributes: HashMap<ComponentName, HashMap<AttributeName, String>> = HashMap::new();
@@ -415,8 +415,8 @@ pub fn create_components_tree_from_json(program: &str)
     }
 
 
-    log!("created initial ML components: {:?}", start.elapsed());
-    let start = Instant::now();
+    // log!("created initial ML components: {:?}", start.elapsed());
+    // let start = Instant::now();
 
     let (replacement_children, macro_components, attributes_parsed, prop_indices_parsed, component_indices_parsed) =
  
@@ -431,8 +431,8 @@ pub fn create_components_tree_from_json(program: &str)
 
 
     
-    log!("parsed attributes and macros: {:?}", start.elapsed());
-    let start = Instant::now();
+    // log!("parsed attributes and macros: {:?}", start.elapsed());
+    // let start = Instant::now();
 
     // log_debug!("Components to add from macros: {:#?}", components_to_add);
     // log_debug!("Replacement children {:#?}", replacement_children);
@@ -472,7 +472,7 @@ pub fn create_components_tree_from_json(program: &str)
 
 
 
-    log!("added replacements to ML components: {:?}", start.elapsed());
+    // log!("added replacements to ML components: {:?}", start.elapsed());
 
     // log!("ML components: {:#?}", components);
 

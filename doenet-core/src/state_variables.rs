@@ -53,11 +53,6 @@ pub enum DependencyInstruction {
     },
 }
 
-#[derive(Debug)]
-pub enum StateVarUpdateInstruction<T> {
-    SetValue(T),
-    NoChange,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DependencySource {
@@ -78,10 +73,6 @@ pub struct DependencyValue {
     pub value: StateVarReadOnlyView,
 }
 
-// pub enum StateVarReadOnlyOrEssential {
-//     StateVar(StateVarReadOnlyView),
-//     Essential(StateVarMutableView)
-// }
 
 // /////////// StateVarValue boilerplate ///////////
 

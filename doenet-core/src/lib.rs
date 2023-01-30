@@ -11,6 +11,7 @@ use lazy_static::lazy_static;
 use parse_json::{DoenetMLError, DoenetMLWarning, MLComponent, RangeInDoenetML};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
+use std::fmt;
 use std::hash::Hash;
 
 use state::{Freshness, StateVarMutableView, StateVar, StateVarReadOnlyView, EssentialStateVar, UpdatesRequested};
@@ -145,15 +146,15 @@ pub fn create_doenet_core(
 
     log!("===== DoenetCore creation =====");
 
-    let start = Instant::now();
+    // let start = Instant::now();
 
     // Create component nodes and attributes
     let (ml_components, component_attributes, root_component_name, _map_sources_alias, warnings_encountered, errors_encountered) =
         parse_json::create_components_tree_from_json(program)?;
 
 
-    log!("create tree from json (summary): {:?}", start.elapsed());
-    let start = Instant::now();
+    // log!("create tree from json (summary): {:?}", start.elapsed());
+    // let start = Instant::now();
 
 
     let mut doenet_ml_warnings = vec![];
@@ -171,8 +172,8 @@ pub fn create_doenet_core(
 
     // log!("component_nodes: {:#?}", component_nodes);
 
-    log!("create component nodes: {:?}", start.elapsed());
-    let start = Instant::now();
+    // log!("create component nodes: {:?}", start.elapsed());
+    // let start = Instant::now();
 
     // let (dependencies, dependent_on_state_var, dependent_on_essential, essential_data) = 
     // create_dependencies_and_essential_data(
@@ -196,8 +197,8 @@ pub fn create_doenet_core(
 
     // log!("component_states: {:#?}", component_states);
 
-    log!("create unresolved states: {:?}", start.elapsed());
-    let start = Instant::now();
+    // log!("create unresolved states: {:?}", start.elapsed());
+    // let start = Instant::now();
 
     let should_initialize_essential_data = existing_essential_data.is_none();
     let essential_data = existing_essential_data.unwrap_or(HashMap::new());
@@ -210,7 +211,7 @@ pub fn create_doenet_core(
     //     utils::json_essential_data(&essential_data));
     // log_debug!("DoenetCore creation warnings, {:?}", doenet_ml_warnings);
 
-    log!("create json objects: {:?}", start.elapsed());
+    // log!("create json objects: {:?}", start.elapsed());
 
     Ok((DoenetCore {
         component_nodes,
@@ -419,8 +420,8 @@ fn create_dependencies_from_instruction_initialize_essential(
         DependencyInstruction::Child { desired_profiles, parse_into_expression } => {
 
             enum RelevantChild<'a> {
-                StateVar(Dependency),
-                String(&'a String, &'a ComponentNode), // value, parent name
+                StateVar {dependency: Dependency, parent: &'a ComponentNode },
+                String {value: &'a String, parent: &'a ComponentNode},
             }
 
             let mut relevant_children: Vec<RelevantChild> = Vec::new();
@@ -438,10 +439,13 @@ fn create_dependencies_from_instruction_initialize_essential(
                 let sv_ind = component_state.1.clone();
     
                 relevant_children.push(
-                    RelevantChild::StateVar(Dependency::StateVar { 
+                    RelevantChild::StateVar {
+                        dependency: Dependency::StateVar { 
                         component_name: comp_name,
                         state_var_ind: sv_ind
-                     })
+                     },
+                     parent: source
+                    }
                 );
             }
 
@@ -451,7 +455,7 @@ fn create_dependencies_from_instruction_initialize_essential(
             for child in children.iter() {
 
                 match child {
-                    (ComponentChild::Component(child_name), _) => {
+                    (ComponentChild::Component(child_name), parent) => {
 
                         let child_node = component_nodes.get(child_name).unwrap();
                         let child_def = definition_as_replacement_child(child_node);
@@ -462,10 +466,13 @@ fn create_dependencies_from_instruction_initialize_essential(
                             let prefile_sv_ind = *child_def.state_var_index_map.get(profile_sv).unwrap();
 
                             relevant_children.push(
-                                RelevantChild::StateVar(Dependency::StateVar { 
+                                RelevantChild::StateVar{
+                                    dependency: Dependency::StateVar { 
                                     component_name: child_node.name.clone(),
                                     state_var_ind: prefile_sv_ind
-                                 })
+                                 },
+                                 parent
+                                }
                             );
                         }
                     },
@@ -473,7 +480,7 @@ fn create_dependencies_from_instruction_initialize_essential(
                         if desired_profiles.contains(&ComponentProfile::Text)
                             || desired_profiles.contains(&ComponentProfile::Number) {
                             relevant_children.push(
-                                RelevantChild::String(string_value, actual_parent)
+                                RelevantChild::String{ value: string_value, parent: actual_parent}
                             );
                         }
                     },
@@ -489,18 +496,62 @@ fn create_dependencies_from_instruction_initialize_essential(
                     &relevant_children.iter().map(|child| match child {
                         // The component name doesn't matter, the expression just needs to know there is
                         // an external variable at that location
-                        RelevantChild::StateVar(_) => ObjectName::Component(String::new()),
-                        RelevantChild::String(string_value, _) => ObjectName::String(string_value.to_string()),
+                        RelevantChild::StateVar{..} => ObjectName::Component(String::new()),
+                        RelevantChild::String{value: string_value, ..} => ObjectName::String(string_value.to_string()),
                     }).collect()
                 );
+
+                // if all the children came from one parent, then the essential data should be saved with reference to that parent,
+                // otherwise, use the current parent
+                let parent_for_essential =
+                if relevant_children.len() == 0 {
+                    let source_name =
+                    get_recursive_copy_source_component_when_exists(component_nodes, component);
+
+                    component_nodes.get(&source_name).unwrap()
+                } else {
+                    
+
+                    let all_parents: Vec<&ComponentNode> = relevant_children.iter().map(|child|
+                        match child {
+                            RelevantChild::StateVar { parent, ..} => *parent,
+                            RelevantChild::String { parent, ..} => *parent
+                        }
+                    ).collect();
+
+                    let first_parent = &all_parents[0];
+
+                    let consistent_parent = all_parents.iter().skip(1).all(|parent| {
+                        std::ptr::eq(*parent, *first_parent)
+                    });
+
+                    if consistent_parent {
+                        first_parent
+                    } else {
+                        // return first copy source that is one of the parents
+                        let mut copy_sources = Vec::new();
+                        copy_sources.push(component);
+                        copy_sources.extend(get_all_recursive_copy_sources(component_nodes, component));
+
+
+                        // returns first element in copy_sources that is in all_parents
+                        copy_sources.into_iter().find(|source| {
+                            all_parents.iter().any(|parent| std::ptr::eq(parent, source))
+                        }).unwrap()
+
+
+                    }
+
+                };
+
 
                 // Assuming that no other child instruction exists which has already filled
                 // up the child essential data
                 let essential_origin = EssentialDataOrigin::ComponentChild(0);
 
-                if should_initialize_essential_data && !essential_data_exists_for(&component.name, &essential_origin, essential_data) {
+                if should_initialize_essential_data && !essential_data_exists_for(&parent_for_essential.name, &essential_origin, essential_data) {
                     create_essential_data_for(
-                        &component.name,
+                        &parent_for_essential.name,
                         essential_origin.clone(),
                         InitialEssentialData::Single{
                             value: StateVarValue::MathExpr(expression),
@@ -511,12 +562,12 @@ fn create_dependencies_from_instruction_initialize_essential(
                 }
 
                 dependencies.push(Dependency::Essential {
-                    component_name: component.name.clone(),
+                    component_name: parent_for_essential.name.clone(),
                     origin: essential_origin,
                 });
 
                 // We already dealt with the essential data, so now only retain the component children
-                relevant_children.retain(|child| matches!(child, RelevantChild::StateVar(_)));
+                relevant_children.retain(|child| matches!(child, RelevantChild::StateVar{..}));
                 
             }
 
@@ -526,11 +577,11 @@ fn create_dependencies_from_instruction_initialize_essential(
             for relevant_child in relevant_children {
                 match relevant_child {
 
-                    RelevantChild::StateVar(child_dep) => {
+                    RelevantChild::StateVar{dependency: child_dep, ..} => {
                         dependencies.push(child_dep);
                     },
 
-                    RelevantChild::String(string_value, actual_parent) => {
+                    RelevantChild::String{value: string_value, parent: actual_parent} => {
                         let index = essential_data_numbering
                             .entry(actual_parent.name.clone()).or_insert(0 as usize);
 
@@ -917,8 +968,18 @@ fn create_unresolved_component_states(component_nodes: &HashMap<ComponentName, C
 
 
 /// A single state variable
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct ComponentState<'a> (&'a ComponentNode, usize);
+
+impl<'a> fmt::Debug for ComponentState<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("ComponentState")
+        .field(&self.0.name)
+        .field(&self.1)
+        .field(&self.0.definition.state_var_names[self.1])
+        .finish()
+    }
+}
 
 
 struct UnresolvedCalculationState<'a> {
@@ -1158,8 +1219,6 @@ fn freshen_state_var(
     
                             Dependency::Essential { component_name: comp_name_inner, origin } => {
 
-                                log!("essential {}, {:?}", comp_name_inner, origin);
-
                                 let value = essential_data
                                     .get(&comp_name_inner.clone()).unwrap()
                                     .get(&origin).unwrap()
@@ -1382,7 +1441,7 @@ fn mark_stale_essential_datum_dependencies(
     let component_name = essential_state.0.clone();
     let origin = essential_state.1.clone();
 
-    // log_debug!("Marking stale essential {}:{}", component_name, state_var);
+    // log!("Marking stale essential {}:{:?}", component_name, origin);
 
     if let Some(vec_deps) = dependent_on_essential.get(&(component_name, origin)) {
         for (comp_name, sv_ind) in vec_deps.iter() {
@@ -1405,7 +1464,7 @@ pub fn update_renderers(core: &mut DoenetCore) -> String {
 }
 
 fn generate_render_tree(core: &mut DoenetCore) -> serde_json::Value {
-    let start = Instant::now();
+    // let start = Instant::now();
 
     let root_node = core.component_nodes.get(&core.root_component_name).unwrap();
 
@@ -1430,7 +1489,7 @@ fn generate_render_tree(core: &mut DoenetCore) -> serde_json::Value {
     );
 
 
-    log!("generated renderer tree: {:?}", start.elapsed());
+    // log!("generated renderer tree: {:?}", start.elapsed());
 
     serde_json::Value::Array(json_obj)
 }
@@ -1733,15 +1792,16 @@ fn process_update_request(
     initial_update_request: UpdateRequest
 ) {
 
-    // log_debug!("Processing update request {:?}", update_request);
-
     let mut stack = Vec::new();
 
     stack.push(initial_update_request);
 
+    let mut is_initial_change = true;
 
     while let Some(update_request) = stack.pop() {
 
+
+        // log!("Process update request: {:?}", update_request);
 
         match update_request {
             UpdateRequest::SetEssentialValue(essential_state) => {
@@ -1764,7 +1824,8 @@ fn process_update_request(
                     dependencies,
                     component_state_variables,
                     essential_data,
-                    &component_state
+                    &component_state,
+                    is_initial_change
                 );
 
                 // TODO: make sure that we do indeed want to reverse here to keep existing conventions
@@ -1777,6 +1838,8 @@ fn process_update_request(
             }
         }
 
+        is_initial_change = false;
+
     }
 }
 
@@ -1787,12 +1850,14 @@ fn request_dependencies_to_update_value_including_shadow<'a, 'b>(
     component_state_variables: &mut HashMap<ComponentName, Vec<StateVar>>,
     essential_data: &'b mut HashMap<ComponentName, HashMap<EssentialDataOrigin, EssentialStateVar>>,
     component_state: &'b ComponentState,
+    is_initial_change: bool,
 ) -> Vec<UpdateRequest<'a>> {
 
 
 
     let component = component_state.0;
     let state_var_ind = component_state.1;
+    let state_variable = &component_state_variables.get(&component.name).unwrap()[state_var_ind];
 
     if let Some(component_ref_state) = state_var_is_shadowing(&component_state) {
 
@@ -1800,14 +1865,59 @@ fn request_dependencies_to_update_value_including_shadow<'a, 'b>(
 
         let source_component = component_nodes.get(&component_ref_state.0).unwrap();
         let source_state_var_ind =component_ref_state.1;
+
+
+        let source_state_var = &component_state_variables.get(&component_ref_state.0).unwrap()[source_state_var_ind];
+
+
+        match state_variable {
+            StateVar::Number(sv_typed) => {
+                if let StateVar::Number(source_sv_type) = source_state_var {
+                    source_sv_type.request_value(*sv_typed.get_requested_value());
+                } else {
+                    panic!("Shadowing state variable of different type");
+                }
+            }
+            StateVar::Integer(sv_typed) => {
+                if let StateVar::Integer(source_sv_type) = source_state_var {
+                    source_sv_type.request_value(*sv_typed.get_requested_value());
+                } else {
+                    panic!("Shadowing state variable of different type");
+                }
+            }
+            StateVar::String(sv_typed) => {
+                if let StateVar::String(source_sv_type) = source_state_var {
+                    source_sv_type.request_value(sv_typed.get_requested_value().clone());
+                } else {
+                    panic!("Shadowing state variable of different type");
+                }
+            }
+            StateVar::Boolean(sv_typed) => {
+                if let StateVar::Boolean(source_sv_type) = source_state_var {
+                    source_sv_type.request_value(*sv_typed.get_requested_value());
+                } else {
+                    panic!("Shadowing state variable of different type");
+                }
+            }
+            StateVar::MathExpr(sv_typed) => {
+                if let StateVar::MathExpr(source_sv_type) = source_state_var {
+                    source_sv_type.request_value(sv_typed.get_requested_value().clone());
+                } else {
+                    panic!("Shadowing state variable of different type");
+                }
+            }
+        }
+
+
         let source_state = ComponentState(source_component, source_state_var_ind);
+
+
         vec![UpdateRequest::SetStateVar(source_state)]
 
     } else {
 
-        let state_variable = &component_state_variables.get(&component.name).unwrap()[state_var_ind];
 
-        let requests = state_variable.request_dependencies_to_update_value();
+        let requests = state_variable.request_dependencies_to_update_value(is_initial_change);
 
         let update_requests = requests
             .map(|req| convert_dependency_values_to_update_request(component_nodes, dependencies, component_state, req))
@@ -1906,6 +2016,26 @@ fn get_child_nodes_including_copy<'a>(
     children_vec
 }
 
+
+fn get_all_recursive_copy_sources<'a> (
+    component_nodes: &'a HashMap<ComponentName, ComponentNode>,
+    component: &'a ComponentNode,
+) -> Vec<&'a ComponentNode> {
+    
+    let mut copy_sources = Vec::new();
+
+    if let Some(CopySource::Component(ref source_name)) = component.copy_source {
+
+        let source_comp = component_nodes.get(&source_name.clone()).unwrap();
+
+        copy_sources.push(source_comp);
+
+        copy_sources.extend(get_all_recursive_copy_sources(component_nodes, source_comp));
+    }
+
+    copy_sources
+
+}
 
 
 // ==== Type Implementations ====

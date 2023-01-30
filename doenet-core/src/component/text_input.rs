@@ -103,36 +103,45 @@ impl StateVarInterface<String> for Value {
     fn request_dependencies_to_update_value(
         &self,
         state_var: &StateVarReadOnlyViewTyped<String>,
+        _is_initial_change: bool,
     ) -> Result<Vec<UpdatesRequested>, ()> {
         let desired_value = state_var.get_requested_value();
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        let first_ind =
         if bind_value_to_used_default {
             self.essential_value.request_value(desired_value.clone());
-            0
+            self.immediate_value.request_value(desired_value.clone());
+            self.sync_values.request_value(true);
+
+            Ok(vec![
+                UpdatesRequested {
+                    instruction_ind: 0,
+                    dependency_ind: 0,
+                },
+                UpdatesRequested {
+                    instruction_ind: 1,
+                    dependency_ind: 0,
+                },
+                UpdatesRequested {
+                    instruction_ind: 2,
+                    dependency_ind: 0,
+                },
+            ])
         } else {
             self.bind_value_to.request_value(desired_value.clone());
-            3
-        };
+            self.sync_values.request_value(true);
 
-        self.immediate_value.request_value(desired_value.clone());
-        self.sync_values.request_value(true);
-
-        Ok(vec![
-            UpdatesRequested {
-                instruction_ind: first_ind,
-                dependency_ind: 0,
-            },
-            UpdatesRequested {
-                instruction_ind: 1,
-                dependency_ind: 0,
-            },
-            UpdatesRequested {
-                instruction_ind: 2,
-                dependency_ind: 0,
-            },
-        ])
+            Ok(vec![
+                UpdatesRequested {
+                    instruction_ind: 3,
+                    dependency_ind: 0,
+                },
+                UpdatesRequested {
+                    instruction_ind: 2,
+                    dependency_ind: 0,
+                },
+            ])
+        }
     }
 }
 
@@ -194,15 +203,14 @@ impl StateVarInterface<String> for ImmediateValue {
         &self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
-
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        let immediate_value = if !bind_value_to_used_default && *self.sync_values.get_value_assuming_fresh() {
-            self.bind_value_to.get_value_assuming_fresh()
-        } else {
-            self.essential_value.get_value_assuming_fresh()
-        };
-
+        let immediate_value =
+            if !bind_value_to_used_default && *self.sync_values.get_value_assuming_fresh() {
+                self.bind_value_to.get_value_assuming_fresh()
+            } else {
+                self.essential_value.get_value_assuming_fresh()
+            };
 
         state_var.set_value(immediate_value.clone());
     }
@@ -210,15 +218,30 @@ impl StateVarInterface<String> for ImmediateValue {
     fn request_dependencies_to_update_value(
         &self,
         state_var: &StateVarReadOnlyViewTyped<String>,
+        is_initial_change: bool,
     ) -> Result<Vec<UpdatesRequested>, ()> {
         let desired_value = state_var.get_requested_value();
 
+        let mut updates = Vec::with_capacity(2);
+        let bind_value_to_used_default = self.bind_value_to.get_used_default();
+
         self.essential_value.request_value(desired_value.clone());
 
-        Ok(vec![UpdatesRequested {
+        updates.push(UpdatesRequested {
             instruction_ind: 0,
             dependency_ind: 0,
-        }])
+        });
+
+        if !is_initial_change && !bind_value_to_used_default {
+            self.bind_value_to.request_value(desired_value.clone());
+
+            updates.push(UpdatesRequested {
+                instruction_ind: 2,
+                dependency_ind: 0,
+            });
+        }
+
+        Ok(updates)
     }
 }
 
@@ -258,6 +281,7 @@ impl StateVarInterface<bool> for SyncImmediateValue {
     fn request_dependencies_to_update_value(
         &self,
         state_var: &StateVarReadOnlyViewTyped<bool>,
+        _is_initial_change: bool,
     ) -> Result<Vec<UpdatesRequested>, ()> {
         let desired_value = state_var.get_requested_value();
 
@@ -398,7 +422,6 @@ lazy_static! {
                     Box::new(BindValueTo::new()),
                     StateVarParameters {
                         name: "bindValueTo",
-                        for_renderer: true,
                         ..Default::default()
                     }
                 )
@@ -460,10 +483,12 @@ lazy_static! {
 
     pub static ref STATE_VARIABLES_NAMES_IN_ORDER: Vec<&'static str> = GENERATE_STATE_VARS().iter().map(|sv| sv.get_name()).collect();
 
+    pub static ref SV_MAP: HashMap<&'static str, usize> = STATE_VARIABLES_NAMES_IN_ORDER.iter().enumerate().map(|(i,v)| (*v,i) ).collect();
+
     pub static ref MY_COMPONENT_DEFINITION: ComponentDefinition = ComponentDefinition {
         component_type: "textInput",
 
-        state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER.iter().enumerate().map(|(i,v)| (*v,i) ).collect(),
+        state_var_index_map: SV_MAP.clone(),
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 
@@ -487,8 +512,8 @@ lazy_static! {
                     let new_val = args.get("text").expect("No text argument").first().unwrap();
 
                     vec![
-                        (1, new_val.clone()),
-                        (2, StateVarValue::Boolean(false)),
+                        (*SV_MAP.get("immediateValue").unwrap(), new_val.clone()),
+                        (*SV_MAP.get("syncImmediateValue").unwrap(), StateVarValue::Boolean(false)),
                     ]
                 },
 
@@ -499,8 +524,7 @@ lazy_static! {
                     let new_val = StateVarValue::String(new_val);
 
                     vec![
-                        (0, new_val),
-                        (2, StateVarValue::Boolean(true)),
+                        (*SV_MAP.get("value").unwrap(), new_val),
                     ]
 
                 }

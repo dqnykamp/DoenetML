@@ -12,10 +12,8 @@ use lazy_static::lazy_static;
 
 use crate::base_definitions::*;
 
-
 integer_state_variable_from_attribute!("start_index", StateVarValue::Integer(0), StartIndex);
 integer_state_variable_from_attribute!("end_index", StateVarValue::Integer(0), EndIndex);
-
 
 #[derive(Debug)]
 struct Message {
@@ -39,27 +37,26 @@ impl StateVarInterface<String> for Message {
     }
 
     fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-
-        if let DependencyValue{ value: StateVarReadOnlyView::String(child_string_value), ..} = &dependencies[0][0] {
-            self.string_child_value  = child_string_value.create_new_read_only_view();
+        if let DependencyValue {
+            value: StateVarReadOnlyView::String(child_string_value),
+            ..
+        } = &dependencies[0][0]
+        {
+            self.string_child_value = child_string_value.create_new_read_only_view();
         } else {
             panic!("Got a non-string message for error");
         }
-
     }
 
     fn calculate_state_var_from_dependencies(
         &self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
-
         state_var.set_value(self.string_child_value.get_value_assuming_fresh().clone());
     }
 }
 
-
 lazy_static! {
-
     pub static ref GENERATE_STATE_VARS: fn() -> Vec<StateVar> = || {
         vec![
             StateVar::Integer(StateVarTyped::new(
@@ -94,17 +91,15 @@ lazy_static! {
         .iter()
         .map(|sv| sv.get_name())
         .collect();
-
-
-
+    pub static ref SV_MAP: HashMap<&'static str, usize> = STATE_VARIABLES_NAMES_IN_ORDER
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (*v, i))
+        .collect();
     pub static ref MY_COMPONENT_DEFINITION: ComponentDefinition = ComponentDefinition {
         component_type: "_error",
 
-        state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER
-            .iter()
-            .enumerate()
-            .map(|(i, v)| (*v, i))
-            .collect(),
+        state_var_index_map: SV_MAP.clone(),
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 

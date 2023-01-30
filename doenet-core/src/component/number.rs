@@ -2,14 +2,13 @@ use lazy_static::lazy_static;
 
 use evalexpr::{ContextWithMutableVariables, HashMapContext, Operator};
 
+use crate::base_definitions::*;
 use crate::math_expression::MathExpression;
 use crate::state::{
     StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarReadOnlyView,
     StateVarReadOnlyViewTyped, StateVarTyped, UpdatesRequested,
 };
-use crate::state_variables::*;
 use crate::utils::log;
-use crate::base_definitions::*;
 
 use super::*;
 
@@ -110,7 +109,7 @@ impl StateVarInterface<f64> for Value {
         &self,
         state_var: &StateVarMutableViewTyped<f64>,
     ) -> () {
-        let expression = &self
+        let expression = self
             .math_expression
             .as_ref()
             .unwrap()
@@ -143,6 +142,7 @@ impl StateVarInterface<f64> for Value {
     fn request_dependencies_to_update_value(
         &self,
         state_var: &StateVarReadOnlyViewTyped<f64>,
+        _is_initial_change: bool,
     ) -> Result<Vec<UpdatesRequested>, ()> {
         let desired_value = state_var.get_requested_value();
 
@@ -276,14 +276,15 @@ lazy_static! {
         .iter()
         .map(|sv| sv.get_name())
         .collect();
+    pub static ref SV_MAP: HashMap<&'static str, usize> = STATE_VARIABLES_NAMES_IN_ORDER
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (*v, i))
+        .collect();
     pub static ref MY_COMPONENT_DEFINITION: ComponentDefinition = ComponentDefinition {
         component_type: "number",
 
-        state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER
-            .iter()
-            .enumerate()
-            .map(|(i, v)| (*v, i))
-            .collect(),
+        state_var_index_map: SV_MAP.clone(),
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 

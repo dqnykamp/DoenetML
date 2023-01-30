@@ -228,6 +228,7 @@ impl Debug for ComponentDefinition {
         f.debug_struct("ComponentDefinition")
             // .field("state_var_definitions", &self.state_var_definitions)
             .field("should_render_children", &self.should_render_children)
+            .field("component_type", &self.component_type)
             .field("renderer_type", &self.renderer_type)
             .field(
                 "primary_input_state_var_ind",

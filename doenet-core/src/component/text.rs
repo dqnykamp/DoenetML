@@ -68,6 +68,7 @@ impl StateVarInterface<String> for Value {
     fn request_dependencies_to_update_value(
         &self,
         state_var: &StateVarReadOnlyViewTyped<String>,
+        _is_initial_change: bool,
     ) -> Result<Vec<UpdatesRequested>, ()> {
         if self.string_child_values.len() != 1 {
             // TODO: implement for no children where saves to essential value
@@ -226,14 +227,15 @@ lazy_static! {
         .iter()
         .map(|sv| sv.get_name())
         .collect();
+    pub static ref SV_MAP: HashMap<&'static str, usize> = STATE_VARIABLES_NAMES_IN_ORDER
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (*v, i))
+        .collect();
     pub static ref MY_COMPONENT_DEFINITION: ComponentDefinition = ComponentDefinition {
         component_type: "text",
 
-        state_var_index_map: STATE_VARIABLES_NAMES_IN_ORDER
-            .iter()
-            .enumerate()
-            .map(|(i, v)| (*v, i))
-            .collect(),
+        state_var_index_map: SV_MAP.clone(),
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 

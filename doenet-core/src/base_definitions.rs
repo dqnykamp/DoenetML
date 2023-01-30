@@ -1,12 +1,9 @@
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
-use crate::{math_expression::MathExpression, state_variables::*, utils::log};
-use evalexpr::{ContextWithMutableVariables, HashMapContext, Operator};
+// use crate::{math_expression::MathExpression, state_variables::*, utils::log};
+// use evalexpr::{ContextWithMutableVariables, HashMapContext, Operator};
 
-use crate::state::{
-    StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarReadOnlyView,
-    StateVarReadOnlyViewTyped, StateVarTyped, UpdatesRequested,
-};
+use crate::state::StateVarReadOnlyViewTyped;
 
 #[derive(Debug)]
 pub enum NumOrInt {
@@ -16,6 +13,9 @@ pub enum NumOrInt {
 
 macro_rules! number_state_variable_from_attribute {
     ( $attribute:expr, $default_value:expr, $StructName:ident ) => {
+        use crate::math_expression::MathExpression;
+        use evalexpr::{ContextWithMutableVariables, HashMapContext, Operator};
+
         #[derive(Debug)]
         struct $StructName {
             single_number_dep: Option<StateVarReadOnlyViewTyped<f64>>,
@@ -39,7 +39,7 @@ macro_rules! number_state_variable_from_attribute {
             fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
                 vec![DependencyInstruction::Attribute {
                     attribute_name: $attribute,
-                    default_value: $default_value
+                    default_value: $default_value,
                 }]
             }
 
@@ -136,7 +136,10 @@ macro_rules! number_state_variable_from_attribute {
             ) -> () {
                 if let Some(single_child) = &self.single_number_dep {
                     let used_default = single_child.get_used_default();
-                    state_var.set_value_and_used_default(*single_child.get_value_assuming_fresh(), used_default)
+                    state_var.set_value_and_used_default(
+                        *single_child.get_value_assuming_fresh(),
+                        used_default,
+                    )
                 } else {
                     let expression = &self
                         .math_expression
@@ -162,9 +165,12 @@ macro_rules! number_state_variable_from_attribute {
                         && expression.tree.children().is_empty()
                     {
                         // Empty expression, set to 0
-                        0
+                        0.0
                     } else {
-                        expression.tree.eval_int_with_context(&context).unwrap_or(0)
+                        expression
+                            .tree
+                            .eval_float_with_context(&context)
+                            .unwrap_or(0.0)
                     };
 
                     state_var.set_value(num);
@@ -174,6 +180,7 @@ macro_rules! number_state_variable_from_attribute {
             fn request_dependencies_to_update_value(
                 &self,
                 state_var: &StateVarReadOnlyViewTyped<f64>,
+                _is_initial_change: bool,
             ) -> Result<Vec<UpdatesRequested>, ()> {
                 let desired_value = state_var.get_requested_value();
 
@@ -241,7 +248,7 @@ macro_rules! integer_state_variable_from_attribute {
             fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
                 vec![DependencyInstruction::Attribute {
                     attribute_name: $attribute,
-                    default_value: $default_value
+                    default_value: $default_value,
                 }]
             }
 
@@ -338,7 +345,10 @@ macro_rules! integer_state_variable_from_attribute {
             ) -> () {
                 if let Some(single_child) = &self.single_integer_dep {
                     let used_default = single_child.get_used_default();
-                    state_var.set_value_and_used_default(*single_child.get_value_assuming_fresh(), used_default)
+                    state_var.set_value_and_used_default(
+                        *single_child.get_value_assuming_fresh(),
+                        used_default,
+                    )
                 } else {
                     let expression = &self
                         .math_expression
@@ -376,6 +386,7 @@ macro_rules! integer_state_variable_from_attribute {
             fn request_dependencies_to_update_value(
                 &self,
                 state_var: &StateVarReadOnlyViewTyped<i64>,
+                _is_initial_change: bool,
             ) -> Result<Vec<UpdatesRequested>, ()> {
                 let desired_value = state_var.get_requested_value();
 
@@ -437,7 +448,7 @@ macro_rules! string_state_variable_from_attribute {
             fn return_dependency_instructions(&self) -> Vec<DependencyInstruction> {
                 vec![DependencyInstruction::Attribute {
                     attribute_name: $attribute,
-                    default_value: $default_value
+                    default_value: $default_value,
                 }]
             }
 
@@ -480,6 +491,7 @@ macro_rules! string_state_variable_from_attribute {
             fn request_dependencies_to_update_value(
                 &self,
                 state_var: &StateVarReadOnlyViewTyped<String>,
+                _is_initial_change: bool,
             ) -> Result<Vec<UpdatesRequested>, ()> {
                 if self.string_deps.len() != 1 {
                     Err(())
