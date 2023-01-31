@@ -186,6 +186,13 @@ impl ComponentDefinition {
         }
         None
     }
+
+    pub fn get_renderer_type_as_str(&self) -> &'static str {
+        match &self.renderer_type {
+            RendererType::Myself => self.component_type,
+            RendererType::Special { component_type, .. } => component_type,
+        }
+    }
 }
 
 // lazy_static! {

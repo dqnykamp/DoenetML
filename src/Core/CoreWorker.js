@@ -205,7 +205,8 @@ function handleAction(args) {
         {
           instructionType: "updateRendererStates",
           rendererStatesToUpdate: rendererStates,
-        }]
+        }],
+        actionId: completedActionId
     }
   };
 

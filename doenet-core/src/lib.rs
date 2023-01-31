@@ -998,6 +998,7 @@ struct ComponentState<'a> (&'a ComponentNode, usize);
 impl<'a> fmt::Debug for ComponentState<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("ComponentState")
+        .field(&self.0.ind)
         .field(&self.0.name)
         .field(&self.1)
         .field(&self.0.definition.state_var_names[self.1])
@@ -1634,6 +1635,7 @@ fn generate_render_tree_internal(
         "componentName": name_to_render,
         "stateValues": serde_json::Value::Object(state_values),
         "childrenInstructions": json!(children_instructions),
+        "rendererType": json!(component_definition.get_renderer_type_as_str())
     }));
 
 }
