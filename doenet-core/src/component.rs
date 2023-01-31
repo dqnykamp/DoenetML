@@ -1,6 +1,6 @@
 use crate::state::StateVar;
 use crate::state_variables::*;
-use crate::{ComponentName, ComponentRefState};
+use crate::{ComponentInd, ComponentRefState};
 use enum_as_inner::EnumAsInner;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -90,7 +90,7 @@ pub type AttributeName = &'static str;
 /// - If the component type has no primary input, a StateVar CopySource will not work.
 #[derive(Debug, Clone)]
 pub enum CopySource {
-    Component(ComponentName),
+    Component(ComponentInd),
     StateVar(ComponentRefState),
 }
 
@@ -245,7 +245,7 @@ pub type ComponentChild = ObjectName;
 /// An object refers to either a component or a string child.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, serde::Serialize, EnumAsInner)]
 pub enum ObjectName {
-    Component(ComponentName),
+    Component(ComponentInd),
     String(String),
 }
 

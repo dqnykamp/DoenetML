@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::state::StateVar;
 use crate::utils::{log_json, log};
-use crate::{Action, ComponentName};
+use crate::{Action, ComponentName, ComponentInd};
 use crate::component::{COMPONENT_DEFINITIONS, ComponentType, ComponentDefinition,
 KeyValueIgnoreCase, AttributeName, ObjectName };
 
@@ -303,7 +303,8 @@ enum ComponentOrString {
 #[derive(Debug, Clone)]
 pub struct MLComponent {
     pub name: ComponentName,
-    pub parent: Option<ComponentName>,
+    pub ind: ComponentInd,
+    pub parent: Option<ComponentInd>,
     pub children: Vec<ComponentChild>,
 
     pub copy_source: Option<String>,
@@ -324,10 +325,11 @@ pub struct MLComponent {
 /// Convert serialized JSON of doenetML into tree of MLComponents
 pub fn create_components_tree_from_json(program: &str)
     -> Result<(
-            HashMap<ComponentName, MLComponent>,
-            HashMap<ComponentName, HashMap<AttributeName, Vec<ObjectName>>>,
-            ComponentName,
-            HashMap<String, ComponentName>,
+            HashMap<ComponentName, ComponentInd>,
+            Vec<MLComponent>,
+            Vec<HashMap<AttributeName, Vec<ObjectName>>>,
+            ComponentInd,
+            HashMap<String, ComponentInd>,
             Vec<DoenetMLWarning>,
             Vec<DoenetMLError>
         ), DoenetMLError> {
@@ -361,18 +363,21 @@ pub fn create_components_tree_from_json(program: &str)
     // log!("parsed into tree: {:?}", start.elapsed());
     // let start = Instant::now();
     
-    let mut components: HashMap<ComponentName, MLComponent> = HashMap::new();
-    let mut attributes: HashMap<ComponentName, HashMap<AttributeName, String>> = HashMap::new();
-    let mut component_indices: HashMap<ComponentName, Option<String>> = HashMap::new();
-    let mut prop_indices: HashMap<ComponentName, Option<String>> = HashMap::new();
-    let mut map_sources_alias: HashMap<String, ComponentName> = HashMap::new();
+    let mut component_name_to_ind: HashMap<ComponentName, ComponentInd> = HashMap::new();
+
+    let mut components: Vec<MLComponent> = Vec::new();
+    let mut attributes: Vec<HashMap<AttributeName, String>> = Vec::new();
+    let mut component_indices: Vec<Option<String>> = Vec::new();
+    let mut prop_indices: Vec<Option<String>> = Vec::new();
+    let mut map_sources_alias: HashMap<String, ComponentInd> = HashMap::new();
 
     let mut component_type_counter: HashMap<String, u32> = HashMap::new();
 
     let mut warnings_encountered: Vec<DoenetMLWarning> = Vec::new();
     let mut errors_encountered: Vec<DoenetMLError> = Vec::new();
 
-    let root_component_name = add_component_from_json(
+    let root_component_ind = add_component_from_json(
+        &mut component_name_to_ind,
         &mut components,
         &mut attributes,
         &mut component_indices,
@@ -390,27 +395,27 @@ pub fn create_components_tree_from_json(program: &str)
     // Determine <sources>'s componentType static attribute, if not specified
     // TODO: <sources> inside <sources>
     // TODO: <sources> with copySource another <sources>
-    let mut sources_component_types: HashMap<ComponentName, ComponentType> = HashMap::new();
-    for (comp_name, comp) in components.iter().filter(|(_, c)|
+    let mut sources_component_types: HashMap<ComponentInd, ComponentType> = HashMap::new();
+    for (comp_ind, comp) in components.iter().enumerate().filter(|(_, c)|
         c.definition.component_type == "sources" && !c.static_attributes.contains_key("componentType")
     ) {
         let comp_children: Vec<&MLComponent> = comp.children.iter().filter_map(|child|
-            child.as_component().and_then(|name| Some(components.get(name).unwrap()))
+            child.as_component().and_then(|ind| Some(&components[*ind]))
         ).collect();
             
         if comp_children.len() == 0 {
             // Every <sources> needs a componentType attr, so default to <number> since it doesn't matter
-            sources_component_types.insert(comp_name.clone(), "number");
+            sources_component_types.insert(comp_ind.clone(), "number");
         } else {
-            // log!("{} is <source> without componentType attr, child is {}", comp_name, comp_children[0].name);
+            // log!("{} is <source> without componentType attr, child is {}", comp_ind, comp_children[0].name);
             let first_comp_child_def = comp_children[0].definition;
             let child_type = first_comp_child_def.definition_as_replacement_children(&HashMap::new()).unwrap().component_type;
-            sources_component_types.insert(comp_name.clone(), child_type);
+            sources_component_types.insert(comp_ind, child_type);
         }
     }
 
-    for (comp_name, child_comp_type) in sources_component_types {
-        let comp = components.get_mut(&comp_name).unwrap();
+    for (comp_ind, child_comp_type) in sources_component_types {
+        let comp = components.get_mut(comp_ind).unwrap();
         comp.static_attributes.insert("componentType", String::from(child_comp_type));
     }
 
@@ -418,10 +423,10 @@ pub fn create_components_tree_from_json(program: &str)
     // log!("created initial ML components: {:?}", start.elapsed());
     // let start = Instant::now();
 
-    let (replacement_children, macro_components, attributes_parsed, prop_indices_parsed, component_indices_parsed) =
- 
+    let attributes_parsed =
         parse_attributes_and_macros(
-            &components,
+            &mut component_name_to_ind,
+            &mut components,
             attributes,
             prop_indices,
             component_indices,
@@ -438,37 +443,37 @@ pub fn create_components_tree_from_json(program: &str)
     // log_debug!("Replacement children {:#?}", replacement_children);
     // log_debug!("Replacement attributes {:#?}", attributes_parsed);
 
-    let components = components.into_iter().map(|(name, c)| {
-        let mut new_children_vec: Vec<(usize, Vec<ObjectName>)> = replacement_children
-            .get(&name)
-            .unwrap_or(&HashMap::new())
-            .clone()
-            .into_iter()
-            .collect();
+    // let components = components.into_iter().enumerate().map(|(name, c)| {
+    //     let mut new_children_vec: Vec<(usize, Vec<ObjectName>)> = replacement_children
+    //         .get(&name)
+    //         .unwrap_or(&HashMap::new())
+    //         .clone()
+    //         .into_iter()
+    //         .collect();
 
-        // sort by decending order so that splicing does not affect next iteration
-        new_children_vec.sort_by(|(a,_),(b,_)| b.cmp(a));
+    //     // sort by decending order so that splicing does not affect next iteration
+    //     new_children_vec.sort_by(|(a,_),(b,_)| b.cmp(a));
 
-        let mut children = c.children.clone();
-        for (original_child_id, new_children) in new_children_vec.into_iter() {
+    //     let mut children = c.children.clone();
+    //     for (original_child_id, new_children) in new_children_vec.into_iter() {
 
-            // Remove the original element, and add the new children (in order) in its place
-            children.splice(
-                original_child_id..=original_child_id,
-                new_children
-            );
-        }
+    //         // Remove the original element, and add the new children (in order) in its place
+    //         children.splice(
+    //             original_child_id..=original_child_id,
+    //             new_children
+    //         );
+    //     }
 
-        (name.clone(), MLComponent {
-            component_index: component_indices_parsed.get(&name).unwrap().clone(),
-            prop_index: prop_indices_parsed.get(&name).unwrap().clone(),
-            children,
-            ..c
-        })
-    })
-    .chain(
-        macro_components.into_iter().map(|c| (c.name.clone(), c))
-    ).collect();
+    //     (name.clone(), MLComponent {
+    //         component_index: component_indices_parsed.get(&name).unwrap().clone(),
+    //         prop_index: prop_indices_parsed.get(&name).unwrap().clone(),
+    //         children,
+    //         ..c
+    //     })
+    // })
+    // .chain(
+    //     macro_components.into_iter().map(|c| (c.name.clone(), c))
+    // ).collect();
 
 
 
@@ -477,23 +482,24 @@ pub fn create_components_tree_from_json(program: &str)
     // log!("ML components: {:#?}", components);
 
 
-    Ok((components, attributes_parsed, root_component_name, map_sources_alias, warnings_encountered, errors_encountered))
+    Ok((component_name_to_ind, components, attributes_parsed, root_component_ind, map_sources_alias, warnings_encountered, errors_encountered))
 }
 
 /// Recursive function
 /// The return is the name of the child, if it exists
 /// (it might not because of invalid doenet ml)
 fn add_component_from_json(
-    components: &mut HashMap<String, MLComponent>,
-    attributes: &mut HashMap<ComponentName, HashMap<AttributeName, String>>,
-    component_indices: &mut HashMap<ComponentName, Option<String>>,
-    prop_indices: &mut HashMap<ComponentName, Option<String>>,
-    map_sources_alias: &mut HashMap<String, ComponentName>,
+    component_name_to_ind: &mut HashMap<ComponentName, ComponentInd>,
+    components: &mut Vec<MLComponent>,
+    attributes: &mut Vec<HashMap<AttributeName, String>>,
+    component_indices: &mut Vec<Option<String>>,
+    prop_indices: &mut Vec<Option<String>>,
+    map_sources_alias: &mut HashMap<String, ComponentInd>,
     component_tree: &ComponentTree,
-    parent: Option<String>,
+    parent: Option<ComponentInd>,
     component_type_counter: &mut HashMap<String, u32>,
     errors_encountered: &mut Vec<DoenetMLError>
-) -> Result<ComponentName, DoenetMLError> {
+) -> Result<ComponentInd, DoenetMLError> {
 
     let component_type: &str = &component_tree.component_type;
 
@@ -533,12 +539,16 @@ fn add_component_from_json(
         None => format!("/_{}{}", component_type, count),
     };
 
-    if components.contains_key(&name) {
+    if component_name_to_ind.contains_key(&name) {
         return Err(DoenetMLError::DuplicateName {
             name: name.clone(),
             doenetml_range: component_tree.doenetml_range.clone()
           });
     }
+
+    let component_ind = components.len();
+
+    component_name_to_ind.insert(name.clone(), component_ind);
 
     let mut static_attributes = HashMap::new();
     let mut component_attributes = HashMap::new();
@@ -572,9 +582,40 @@ fn add_component_from_json(
     // Add alias
     if component_type == "sources" {
         if let Some(alias) = static_attributes.get("alias") {
-            map_sources_alias.insert(alias.clone(), name.clone());
+            map_sources_alias.insert(alias.clone(), component_ind);
         }
     }
+
+
+    let (copy_source, copy_instance) = convert_copy_source_name(component_tree.props.copy_source.clone());
+
+    let component_node = MLComponent {
+        name: name.clone(),
+        ind: component_ind,
+        parent,
+        children: vec![],
+
+        copy_source,
+        copy_instance,
+        copy_collection: component_tree.props.copy_collection.clone(),
+        copy_prop: component_tree.props.copy_prop.clone(),
+        prop_index: vec![],
+        component_index: vec![],
+
+        static_attributes,
+
+        definition,
+
+        doenetml_range: component_tree.doenetml_range.clone(),
+    };
+
+    components.push(component_node);
+    attributes.push(component_attributes);
+
+    // The empty component and prop index will be filled when macros are parsed.
+    // Store them in separate HashMaps until they are ready.
+    component_indices.push(component_tree.props.component_index.clone());
+    prop_indices.push(component_tree.props.prop_index.clone());
 
     // Recurse the children
     let mut children: Vec<ComponentChild> = Vec::new();
@@ -586,21 +627,22 @@ fn add_component_from_json(
             },
 
             ComponentOrString::Component(child_tree) => {
-                let child_name_or_error = add_component_from_json(
+                let child_ind_or_error = add_component_from_json(
+                    component_name_to_ind,
                     components,
                     attributes,
                     component_indices,
                     prop_indices,
                     map_sources_alias,
                     &child_tree,
-                    Some(name.clone()),
+                    Some(component_ind),
                     component_type_counter,
                     errors_encountered
                 );
 
-                match child_name_or_error {
-                    Ok(child_name) => {
-                        children.push(ComponentChild::Component(child_name));
+                match child_ind_or_error {
+                    Ok(child_ind) => {
+                        children.push(ComponentChild::Component(child_ind));
                     }
                     Err(error) => {
                         if !definition.display_errors {
@@ -639,13 +681,14 @@ fn add_component_from_json(
                         };
 
                         let error_child_name= add_component_from_json(
+                            component_name_to_ind,
                             components,
                             attributes,
                             component_indices,
                             prop_indices,
                             map_sources_alias,
                             &error_component,
-                            Some(name.clone()),
+                            Some(component_ind),
                             component_type_counter,
                             errors_encountered,
                         )?;
@@ -661,36 +704,10 @@ fn add_component_from_json(
         }
     }
 
-    let (copy_source, copy_instance) = convert_copy_source_name(component_tree.props.copy_source.clone());
+    components[component_ind].children = children;
 
-    let component_node = MLComponent {
-        name: name.clone(),
-        parent,
-        children,
+    return Ok(component_ind);
 
-        copy_source,
-        copy_instance,
-        copy_collection: component_tree.props.copy_collection.clone(),
-        copy_prop: component_tree.props.copy_prop.clone(),
-        prop_index: vec![],
-        component_index: vec![],
-
-        static_attributes,
-
-        definition,
-
-        doenetml_range: component_tree.doenetml_range.clone(),
-    };
-
-    components.insert(name.clone(), component_node);
-    attributes.insert(name.clone(), component_attributes);
-
-    // The empty component and prop index will be filled when macros are parsed.
-    // Store them in separate HashMaps until they are ready.
-    component_indices.insert(name.clone(), component_tree.props.component_index.clone());
-    prop_indices.insert(name.clone(), component_tree.props.prop_index.clone());
-
-    return Ok(name);
 }
 
 /// Temporary implementation to test if maps are working.
@@ -716,172 +733,161 @@ fn convert_copy_source_name(name: Option<String>) -> (Option<String>, Option<Vec
 
 
 fn parse_attributes_and_macros(
-    components: &HashMap<ComponentName, MLComponent>,
-    attributes: HashMap<ComponentName, HashMap<AttributeName, String>>,
-    prop_indices: HashMap<ComponentName, Option<String>>,
-    component_indices: HashMap<ComponentName, Option<String>>,
-    map_sources_alias: &HashMap<String, ComponentName>,
+    component_name_to_ind: &mut HashMap<ComponentName, ComponentInd>,
+    components: &mut Vec<MLComponent>,
+    attributes: Vec<HashMap<AttributeName, String>>,
+    prop_indices: Vec<Option<String>>,
+    component_indices: Vec<Option<String>>,
+    map_sources_alias: &HashMap<String, ComponentInd>,
     warnings_encountered: &mut Vec<DoenetMLWarning>
-) -> (
-    HashMap<ComponentName, HashMap<usize, Vec<ObjectName>>>,
-    Vec<MLComponent>,
-    HashMap<ComponentName, HashMap<AttributeName, Vec<ObjectName>>>,
-    HashMap<ComponentName, Vec<ObjectName>>,
-    HashMap<ComponentName, Vec<ObjectName>>,
-    )
+) -> Vec<HashMap<AttributeName, Vec<ObjectName>>>
 {
-    use std::iter::repeat;
 
-    let mut attributes_parsed = HashMap::new();
-    let mut prop_indices_parsed = HashMap::new();
-    let mut component_indices_parsed = HashMap::new();
+    let mut attributes_parsed = Vec::new();
 
-    // Keyed by the component name and by the original position of the child we are replacing
-    let mut replacement_children: HashMap<ComponentName, HashMap<usize, Vec<ObjectName>>> = HashMap::new();
-    let mut components_to_add: Vec<MLComponent> = vec![];
 
     let mut macro_copy_counter: HashMap<ComponentName, usize> = HashMap::new();
     
 
-    // This iterator gives info for every string child:
-    // (original index of child, string value, component)
-    let all_string_children = components.iter()
-        .flat_map(|(_, comp)|
-            comp.children
-            .iter()
-            .enumerate()
-            .filter_map(|(id, child)| {
-                match child {
-                    ObjectName::String(string_val) => Some((id, string_val)),
-                    _ => None,
-                }
-            })
-            .zip(repeat(comp))
-            .map(|((id, val), comp)| (id, val, comp))
-        );
+    let n_components_orig = components.len();
 
-    let all_attributes = attributes.iter()
-        .flat_map(|(name, attrs)|
-            attrs
-            .iter()
-            .map(|(attr_name, val)| (*attr_name, val, components.get(name).unwrap()))
-            .collect::<Vec<(AttributeName, &String, &MLComponent)>>()
-        );
 
-    // Component string children
-    for (child_id, string_val, component) in all_string_children {
+    for comp_ind in 0..n_components_orig  {
 
-        let mut range_begin = None;
-        if let RangeInDoenetML::OpenClose(open_close) = &component.doenetml_range {
-            range_begin = Some(open_close.open_end);
+        let children = components[comp_ind].children.clone();
 
-            if child_id > 0 {
-                if let ObjectName::Component(comp_name) = &component.children[child_id-1] {
-                    let &previous_child = &components.get(comp_name).unwrap();
+        let mut new_children = Vec::new();
 
-                    range_begin = match &previous_child.doenetml_range {
-                        RangeInDoenetML::OpenClose(open_close) => Some(open_close.close_end),
-                        RangeInDoenetML::SelfClose(self_close) => Some(self_close.self_close_end),
-                        RangeInDoenetML::FromMacro(from_macro) => Some(from_macro.macro_end),
-                        RangeInDoenetML::None => range_begin
+        for child in children {
+            match child {
+                ObjectName::Component(_) => new_children.push(child),
+                ObjectName::String(string_val) => {
+
+                    let mut range_begin = None;
+                    if let RangeInDoenetML::OpenClose(open_close) = &components[comp_ind].doenetml_range {
+                        range_begin = Some(open_close.open_end);
+            
+                        if new_children.len() > 0 {
+                            if let ObjectName::Component(comp_ind) = new_children.last().unwrap() {
+                                let previous_child = &components[*comp_ind];
+            
+                                range_begin = match &previous_child.doenetml_range {
+                                    RangeInDoenetML::OpenClose(open_close) => Some(open_close.close_end),
+                                    RangeInDoenetML::SelfClose(self_close) => Some(self_close.self_close_end),
+                                    RangeInDoenetML::FromMacro(from_macro) => Some(from_macro.macro_end),
+                                    RangeInDoenetML::None => range_begin
+                                }
+            
+                            }
+                        }
                     }
 
+                    let objects = apply_macro_to_string(
+                        &string_val,
+                        comp_ind,
+                        component_name_to_ind,
+                        components,
+                        map_sources_alias,
+                        &mut macro_copy_counter,
+                        range_begin,
+                        warnings_encountered,
+                    );
+
+                    new_children.extend(objects);
+            
                 }
             }
         }
 
-        let objects = apply_macro_to_string(
-            string_val,
-            &component.name,
-            components,
-            map_sources_alias,
-            &mut macro_copy_counter,
-            &mut components_to_add,
-            range_begin,
-            warnings_encountered,
-        );
 
-        // For now, replace everything in the children field
-        replacement_children
-            .entry(component.name.clone()).or_insert(HashMap::new())
-            .entry(child_id).or_insert(objects);
+        components[comp_ind].children = new_children;
+
     }
+
 
     // Attributes
-    for (attribute_name, string_val, component) in all_attributes {
+    for (comp_ind, attrs) in attributes.iter().enumerate() {
 
-        let objects = apply_macro_to_string(
-                        string_val.trim(),  // TODO: do we trim, or is there a case where outside spaces matter?
-                        &component.name,
-                        components,
-                        map_sources_alias,
-                        &mut macro_copy_counter,
-                        &mut components_to_add,
-                        None,
-                        warnings_encountered,
-                    );
+        let mut component_attributes_parsed = HashMap::new();
 
-        attributes_parsed
-            .entry(component.name.clone()).or_insert(HashMap::new())
-            .entry(attribute_name.clone()).or_insert(objects);
-    }
+        for (attribute_name, string_val) in attrs.iter() {
 
-    // Prop indices
-    for (target_name, source_index_str) in prop_indices {
-        
-        let index_objects = match source_index_str {
-            Some(string) => apply_macro_to_string(
-                &string,
-                &target_name,
+            let objects = apply_macro_to_string(
+                string_val,
+                comp_ind,
+                component_name_to_ind,
                 components,
                 map_sources_alias,
                 &mut macro_copy_counter,
-                &mut components_to_add,
                 None,
                 warnings_encountered,
-            ),
-            None => vec![],
-        };
+            );
 
-        prop_indices_parsed.insert(target_name, index_objects);
+            component_attributes_parsed.entry(attribute_name.clone()).or_insert(objects);
+
+        }
+
+        attributes_parsed.push(component_attributes_parsed);
+
     }
 
-    // Component indices
-    for (target_name, source_index_str) in component_indices {
+
+
+    // // Prop indices
+    // for (target_name, source_index_str) in prop_indices {
         
-        let index_objects = match source_index_str {
-            Some(string) => apply_macro_to_string(
-                &string,
-                &target_name,
-                components,
-                map_sources_alias,
-                &mut macro_copy_counter,
-                &mut components_to_add,
-                None,
-                warnings_encountered,
-            ),
-            None => vec![],
-        };
+    //     let index_objects = match source_index_str {
+    //         Some(string) => apply_macro_to_string(
+    //             &string,
+    //             &target_name,
+    //             components,
+    //             map_sources_alias,
+    //             &mut macro_copy_counter,
+    //             None,
+    //             warnings_encountered,
+    //         ),
+    //         None => vec![],
+    //     };
 
-        component_indices_parsed.insert(target_name,index_objects);
+    //     prop_indices_parsed.insert(target_name, index_objects);
+    // }
+
+    // // Component indices
+    // for (target_name, source_index_str) in component_indices {
+        
+    //     let index_objects = match source_index_str {
+    //         Some(string) => apply_macro_to_string(
+    //             &string,
+    //             &target_name,
+    //             components,
+    //             map_sources_alias,
+    //             &mut macro_copy_counter,
+    //             None,
+    //             warnings_encountered,
+    //         ),
+    //         None => vec![],
+    //     };
+
+    //     component_indices_parsed.insert(target_name,index_objects);
+    // }
+
+
+    // add empty attributes for all the components that were made from the macros
+
+    for _ind in attributes.len()..components.len() {
+        attributes_parsed.push(HashMap::new());
     }
 
-    (
-        replacement_children,
-        components_to_add,
-        attributes_parsed,
-        prop_indices_parsed,
-        component_indices_parsed,
-    )
+    attributes_parsed
 }
 
 fn apply_macro_to_string(
     string: &str,
-    component_name: &ComponentName,
-    components: &HashMap<ComponentName, MLComponent>,
-    map_sources_alias: &HashMap<String, ComponentName>,
+    component_ind: ComponentInd,
+    component_name_to_ind: &mut HashMap<ComponentName, ComponentInd>,
+    components: &mut Vec<MLComponent>,
+    map_sources_alias: &HashMap<String, ComponentInd>,
     macro_copy_counter: &mut HashMap<ComponentName, usize>,
-    components_to_add: &mut Vec<MLComponent>,
     start_doenetml_ind: Option<usize>,
     warnings_encountered: &mut Vec<DoenetMLWarning>
 
@@ -908,11 +914,11 @@ fn apply_macro_to_string(
 
         match macro_comp_ref(string,
             next_macro.end(),
-            component_name,
+            component_ind,
+            component_name_to_ind,
             components,
             map_sources_alias,
             macro_copy_counter,
-            components_to_add,
             start_doenetml_ind,
             warnings_encountered
         ) {
@@ -946,14 +952,14 @@ fn apply_macro_to_string(
 fn macro_comp_ref(
     string: &str,
     start: usize,
-    macro_parent: &ComponentName,
-    components: &HashMap<ComponentName, MLComponent>,
-    map_sources_alias: &HashMap<String, ComponentName>,
+    macro_parent: ComponentInd,
+    component_name_to_ind: &mut HashMap<ComponentName, ComponentInd>,
+    components: &mut Vec<MLComponent>,
+    map_sources_alias: &HashMap<String, ComponentInd>,
     macro_copy_counter: &mut HashMap<ComponentName, usize>,
-    components_to_add: &mut Vec<MLComponent>,
     start_doenetml_ind: Option<usize>,
     warnings_encountered: &mut Vec<DoenetMLWarning>
-) -> Result<(ComponentName, usize), (String, usize, bool)> {
+) -> Result<(ComponentInd, usize), (String, usize, bool)> {
 
     // log_debug!("macro at {} of {}", start, string);
 
@@ -964,10 +970,10 @@ fn macro_comp_ref(
     let copy_source = copy_source.unwrap();
 
 
-    if let Some(sources_name) = map_sources_alias.get(&copy_source) {
+    if let Some(sources_ind) = map_sources_alias.get(&copy_source) {
         // Special case: the macro references a sources component
 
-        let component_type = components.get(sources_name).unwrap()
+        let component_type = components[*sources_ind]
             .static_attributes.get("componentType")
             .ok_or(("Sources did not define component type".to_string(), comp_match.end(), true))?;
         let definition = &COMPONENT_DEFINITIONS
@@ -975,8 +981,12 @@ fn macro_comp_ref(
             .ok_or(("Sources invalid component type".to_string(), comp_match.end(), true))?;
 
 
+        let macro_name = name_macro_component(&copy_source, &components[macro_parent].name, macro_copy_counter);
+        let macro_ind = components.len();
+
         let macro_copy = MLComponent {
-            name: name_macro_component(&copy_source, macro_parent, macro_copy_counter),
+            ind: macro_ind,
+            name: macro_name.clone(),
             parent: Some(macro_parent.clone()),
             children: vec![],
             copy_source: Some(copy_source),
@@ -990,16 +1000,18 @@ fn macro_comp_ref(
             doenetml_range: RangeInDoenetML::None,
         };
 
-        let macro_name = macro_copy.name.clone();
-        components_to_add.push(macro_copy);
-        return Ok((macro_name, comp_match.end()))
+        components.push(macro_copy);
+        component_name_to_ind.insert(macro_name, macro_ind);
+
+        return Ok((macro_ind, comp_match.end()))
     }
 
 
     let mut found_error = false;
     let mut error_message = String::new();
 
-    let source_component_option = components.get(&copy_source);
+    
+    let source_component_option = component_name_to_ind.get(&copy_source);
 
     if source_component_option.is_none() {
         found_error = true;
@@ -1016,7 +1028,7 @@ fn macro_comp_ref(
 
     let char_at = |c: usize| string.as_bytes().get(c).map(|c| *c as char);
 
-    let name: String;
+    let macro_name: String;
     let definition_option: Option<&ComponentDefinition>;
     let component_index: Vec<ObjectName>;
     let copy_prop: Option<String>;
@@ -1049,7 +1061,7 @@ fn macro_comp_ref(
         comp_end = comp_match.end();
         component_index = vec![];
         source_def_option = match source_component_option {
-            Some(source_component) => Some(source_component.definition),
+            Some(source_component_ind) => Some(components[*source_component_ind].definition),
             None => None
         }
     };
@@ -1060,7 +1072,7 @@ fn macro_comp_ref(
         let prop_match = regex_at(&PROP, string, comp_end + 1).map_err(|err| (err, comp_end, false))?;
         let prop = prop_match.as_str();
 
-        let variant_option = match source_def_option {
+        let source_sv_component_type = match source_def_option {
             Some(source_def) => match source_def.state_var_index_map.get(prop) {
                 Some(v) => Some(source_def.state_var_component_types[*v]),
                 None => {
@@ -1084,62 +1096,66 @@ fn macro_comp_ref(
             None => None
         };
 
-        // Handle possible prop index: brackets after the prop name
-        if string.as_bytes().get(prop_match.end()) == Some(&b'[') {
+        // // Handle possible prop index: brackets after the prop name
+        // if string.as_bytes().get(prop_match.end()) == Some(&b'[') {
 
-            let index_match = regex_at(&INDEX, string, prop_match.end() + 1).map_err(|err| (err, comp_end, false))?;
-            let index_str = index_match.as_str().trim();
-            let index_end: usize;
-            if index_str == "$" {
-                // dynamic index
-                // TODO: multiple components in []
-                let (index_name, index_macro_end) = macro_comp_ref(string,
-                    index_match.end(),
-                    &copy_source,
-                    components,
-                    map_sources_alias,
-                    macro_copy_counter,
-                    components_to_add,
-                    start_doenetml_ind,
-                    warnings_encountered
-                )?;
+        //     let index_match = regex_at(&INDEX, string, prop_match.end() + 1).map_err(|err| (err, comp_end, false))?;
+        //     let index_str = index_match.as_str().trim();
+        //     let index_end: usize;
+        //     if index_str == "$" {
+        //         // dynamic index
+        //         // TODO: multiple components in []
+        //         let (index_name, index_macro_end) = macro_comp_ref(string,
+        //             index_match.end(),
+        //             &copy_source,
+        //             components,
+        //             map_sources_alias,
+        //             macro_copy_counter,
+        //             components_to_add,
+        //             start_doenetml_ind,
+        //             warnings_encountered
+        //         )?;
 
-                index_end = index_macro_end;
-                prop_index = vec![ObjectName::Component(index_name.clone())];
-            } else {
-                // static index
-                index_end = index_match.end();
-                prop_index = vec![ObjectName::String(index_str.to_string())];
-            }
-            let close_bracket_match = regex_at(&INDEX_END, string, index_end).map_err(|err| (err, comp_end, false))?;
-            macro_end = close_bracket_match.end();
+        //         index_end = index_macro_end;
+        //         prop_index = vec![ObjectName::Component(index_name.clone())];
+        //     } else {
+        //         // static index
+        //         index_end = index_match.end();
+        //         prop_index = vec![ObjectName::String(index_str.to_string())];
+        //     }
+        //     let close_bracket_match = regex_at(&INDEX_END, string, index_end).map_err(|err| (err, comp_end, false))?;
+        //     macro_end = close_bracket_match.end();
 
-            if let Some(_variant) = variant_option {
-                if !found_error {
-                    found_error = true;
-                    error_message = format!("{}.{} cannot be indexed", copy_source, prop);
+        //     if let Some(_variant) = source_sv_component_type {
+        //         if !found_error {
+        //             found_error = true;
+        //             error_message = format!("{}.{} cannot be indexed", copy_source, prop);
 
-                    let doenetml_range = match start_doenetml_ind {
-                        Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + macro_end}),
-                        None => RangeInDoenetML::None
-                    };
-                    warnings_encountered.push(DoenetMLWarning::InvalidArrayIndex {
-                        comp_name: copy_source.to_string(),
-                        sv_name: Some(prop.to_string()),
-                        array_index: index_str.trim().to_string(),
-                        doenetml_range,
-                    });
-                }
-            }
-        } else {
+        //             let doenetml_range = match start_doenetml_ind {
+        //                 Some(start_ind) => RangeInDoenetML::FromMacro(MacroRange{macro_begin: start_ind + start, macro_end: start_ind + macro_end}),
+        //                 None => RangeInDoenetML::None
+        //             };
+        //             warnings_encountered.push(DoenetMLWarning::InvalidArrayIndex {
+        //                 comp_name: copy_source.to_string(),
+        //                 sv_name: Some(prop.to_string()),
+        //                 array_index: index_str.trim().to_string(),
+        //                 doenetml_range,
+        //             });
+        //         }
+        //     }
+        // } else {
+
+
             // no index
             macro_end = prop_match.end();
             prop_index = vec![];
-        }
+
+
+        // }
 
         let source_comp_sv_name = format!("{}:{}", copy_source, prop);
 
-        definition_option = match variant_option {
+        definition_option = match source_sv_component_type {
             Some(variant) => Some(&COMPONENT_DEFINITIONS
             .get(variant)
             .unwrap()),
@@ -1148,9 +1164,9 @@ fn macro_comp_ref(
         
         
 
-        name = name_macro_component(
+        macro_name = name_macro_component(
             &source_comp_sv_name,
-            macro_parent,
+            &components[macro_parent].name,
             macro_copy_counter,
         );
         copy_prop = Some(prop.to_string());
@@ -1160,9 +1176,9 @@ fn macro_comp_ref(
         copy_prop = None;
         prop_index = vec![];
 
-        name = name_macro_component(
+        macro_name = name_macro_component(
             &copy_source,
-            macro_parent,
+            &components[macro_parent].name,
             macro_copy_counter,
         );
         definition_option = source_def_option;
@@ -1185,8 +1201,12 @@ fn macro_comp_ref(
         None => RangeInDoenetML::None
     };
 
+    let macro_ind = components.len();
+
+
     let macro_copy = MLComponent {
-        name,
+        ind: macro_ind,
+        name: macro_name.clone(),
         parent: Some(macro_parent.clone()),
         children: vec![],
 
@@ -1203,10 +1223,13 @@ fn macro_comp_ref(
 
         doenetml_range
     };
-    let macro_name = macro_copy.name.clone();
-    components_to_add.push(macro_copy);
 
-    Ok((macro_name, macro_end))
+
+    components.push(macro_copy);
+    component_name_to_ind.insert(macro_name, macro_ind);
+
+
+    Ok((macro_ind, macro_end))
 }
 
 

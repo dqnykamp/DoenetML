@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 
 use crate::component::*;
 use crate::ComponentName;
@@ -47,11 +46,11 @@ pub(crate) use log_json;
 
 /// List components and children in a JSON array
 pub fn json_components(
-    components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, Vec<StateVarMutableView>>,
+    components: &Vec<ComponentNode>,
+    component_states: &Vec<Vec<StateVarMutableView>>,
 ) -> Value {
     let json_components: Map<String, Value> = components
-        .values()
+        .iter()
         .map(|component| {
             (
                 component.name.to_string(),
@@ -64,8 +63,8 @@ pub fn json_components(
 }
 
 pub fn package_subtree_as_json(
-    components: &HashMap<ComponentName, ComponentNode>,
-    component_states: &HashMap<ComponentName, Vec<StateVarMutableView>>,
+    components: &Vec<ComponentNode>,
+    component_states: &Vec<Vec<StateVarMutableView>>,
     component: &ComponentNode,
 ) -> Value {
     let children: Map<String, Value> = component
@@ -73,10 +72,10 @@ pub fn package_subtree_as_json(
         .iter()
         .enumerate()
         .map(|(child_num, child)| match child {
-            ComponentChild::Component(comp_child_name) => {
-                let comp_child = components.get(comp_child_name).unwrap();
+            ComponentChild::Component(comp_child_ind) => {
+                let comp_child = &components[*comp_child_ind];
                 (
-                    format!("{} {}", child_num, comp_child_name),
+                    format!("{} {}", child_num, comp_child_ind),
                     package_subtree_as_json(components, component_states, comp_child),
                 )
             }
@@ -92,7 +91,7 @@ pub fn package_subtree_as_json(
     my_json_props.insert(
         "parent".to_owned(),
         match component.parent {
-            Some(ref parent_name) => Value::String(parent_name.into()),
+            Some(parent_ind) => Value::String(components[parent_ind].name.clone().into()),
             None => Value::Null,
         },
     );
@@ -120,7 +119,7 @@ pub fn package_subtree_as_json(
         );
     }
 
-    let component_state = component_states.get(&component.name).unwrap();
+    let component_state = &component_states[component.ind];
 
     for (state_var_name, state_var_ind) in component.definition.state_var_index_map.iter() {
         let state_for_state_var = &component_state[*state_var_ind];
