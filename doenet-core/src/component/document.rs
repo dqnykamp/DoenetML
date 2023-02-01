@@ -17,7 +17,7 @@ impl SubmitLabel {
 
 impl StateVarInterface<String> for SubmitLabel {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
         state_var.set_value(String::from("Check work"));
@@ -35,7 +35,7 @@ impl SubmitLabelNoCorrectness {
 
 impl StateVarInterface<String> for SubmitLabelNoCorrectness {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
         state_var.set_value(String::from("Submit Response"));
@@ -53,7 +53,7 @@ impl Hidden {
 
 impl StateVarInterface<bool> for Hidden {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -71,7 +71,7 @@ impl Disabled {
 
 impl StateVarInterface<bool> for Disabled {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -89,7 +89,7 @@ impl Fixed {
 
 impl StateVarInterface<bool> for Fixed {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -107,7 +107,7 @@ impl Title {
 
 impl StateVarInterface<String> for Title {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
         state_var.set_value(String::from(""));
@@ -125,7 +125,7 @@ impl Level {
 
 impl StateVarInterface<i64> for Level {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<i64>,
     ) -> () {
         state_var.set_value(0);
@@ -143,7 +143,7 @@ impl JustSubmitted {
 
 impl StateVarInterface<bool> for JustSubmitted {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(true);
@@ -161,7 +161,7 @@ impl ShowCorrectness {
 
 impl StateVarInterface<bool> for ShowCorrectness {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(true);
@@ -179,7 +179,7 @@ impl CreditAchieved {
 
 impl StateVarInterface<f64> for CreditAchieved {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<f64>,
     ) -> () {
         state_var.set_value(1.0);
@@ -197,7 +197,7 @@ impl CreateSubmitAllButton {
 
 impl StateVarInterface<bool> for CreateSubmitAllButton {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -215,7 +215,7 @@ impl SuppressAnswerSubmitButtons {
 
 impl StateVarInterface<bool> for SuppressAnswerSubmitButtons {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);

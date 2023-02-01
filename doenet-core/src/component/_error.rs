@@ -49,10 +49,10 @@ impl StateVarInterface<String> for Message {
     }
 
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
-        state_var.set_value(self.string_child_value.get_value_assuming_fresh().clone());
+        state_var.set_value(self.string_child_value.get_fresh_value_record_viewed().clone());
     }
 }
 

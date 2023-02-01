@@ -70,9 +70,9 @@ impl StateVarInterface<f64> for Value {
             if numerical_children.len()
                 != self
                     .math_expression
-                    .as_ref()
+                    .as_mut()
                     .unwrap()
-                    .get_value_assuming_fresh()
+                    .get_fresh_value_record_viewed()
                     .external_variables_count
             {
                 panic!("Number not parsed correctly");
@@ -83,9 +83,9 @@ impl StateVarInterface<f64> for Value {
             if numerical_children.len() == 1 {
                 let expression = &self
                     .math_expression
-                    .as_ref()
+                    .as_mut()
                     .unwrap()
-                    .get_value_assuming_fresh();
+                    .get_fresh_value_record_viewed();
 
                 let tree = &expression.tree;
 
@@ -106,37 +106,48 @@ impl StateVarInterface<f64> for Value {
     }
 
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<f64>,
     ) -> () {
-        let expression = self
-            .math_expression
-            .as_ref()
-            .unwrap()
-            .get_value_assuming_fresh();
+        let mut found_changed = false;
+
+        let expression_var = self.math_expression.as_mut().unwrap();
+
+        if expression_var.check_if_changed_since_last_viewed() {
+            found_changed = true;
+        }
+
+        let expression = expression_var.get_fresh_value_record_viewed();
 
         let mut context = HashMapContext::new();
 
-        for (id, value) in self.numerical_children.iter().enumerate() {
-            let variable_num = *value.get_value_assuming_fresh();
+        for (id, value) in self.numerical_children.iter_mut().enumerate() {
+            if value.check_if_changed_since_last_viewed() {
+                found_changed = true;
+            }
+            let variable_num = *value.get_fresh_value_record_viewed();
 
             let name = format!("{}{}", expression.variable_prefix, id);
             context.set_value(name, variable_num.into()).unwrap();
         }
 
-        let num = if expression.tree.operator() == &Operator::RootNode
-            && expression.tree.children().is_empty()
-        {
-            // Empty expression, set to 0
-            0.0
-        } else {
-            expression
-                .tree
-                .eval_number_with_context(&context)
-                .unwrap_or(f64::NAN)
-        };
+        if found_changed {
+            let num = if expression.tree.operator() == &Operator::RootNode
+                && expression.tree.children().is_empty()
+            {
+                // Empty expression, set to 0
+                0.0
+            } else {
+                expression
+                    .tree
+                    .eval_number_with_context(&context)
+                    .unwrap_or(f64::NAN)
+            };
 
-        state_var.set_value(num);
+            state_var.set_value(num);
+        } else {
+            state_var.restore_previous_value();
+        }
     }
 
     fn request_dependencies_to_update_value(
@@ -152,14 +163,14 @@ impl StateVarInterface<f64> for Value {
             self.math_expression
                 .as_ref()
                 .unwrap()
-                .request_value(MathExpression::from(*desired_value));
+                .request_change_value_to(MathExpression::from(*desired_value));
 
             Ok(vec![UpdatesRequested {
                 instruction_ind: 0,
                 dependency_ind: 0,
             }])
         } else if self.math_expression_is_single_variable {
-            self.numerical_children[0].request_value(*desired_value);
+            self.numerical_children[0].request_change_value_to(*desired_value);
 
             Ok(vec![UpdatesRequested {
                 instruction_ind: 0,
@@ -185,7 +196,7 @@ impl Hidden {
 
 impl StateVarInterface<bool> for Hidden {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -203,7 +214,7 @@ impl Disabled {
 
 impl StateVarInterface<bool> for Disabled {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -221,7 +232,7 @@ impl Fixed {
 
 impl StateVarInterface<bool> for Fixed {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);

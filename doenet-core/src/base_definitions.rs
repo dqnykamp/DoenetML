@@ -92,9 +92,9 @@ macro_rules! number_state_variable_from_attribute {
                     if numerical_deps.len()
                         != self
                             .math_expression
-                            .as_ref()
+                            .as_mut()
                             .unwrap()
-                            .get_value_assuming_fresh()
+                            .get_fresh_value_record_viewed()
                             .external_variables_count
                     {
                         panic!("The {} attribute not parsed correctly", $attribute);
@@ -105,9 +105,9 @@ macro_rules! number_state_variable_from_attribute {
                     if numerical_deps.len() == 1 {
                         let expression = &self
                             .math_expression
-                            .as_ref()
+                            .as_mut()
                             .unwrap()
-                            .get_value_assuming_fresh();
+                            .get_fresh_value_record_viewed();
 
                         let tree = &expression.tree;
 
@@ -131,29 +131,29 @@ macro_rules! number_state_variable_from_attribute {
             }
 
             fn calculate_state_var_from_dependencies(
-                &self,
+                &mut self,
                 state_var: &StateVarMutableViewTyped<f64>,
             ) -> () {
-                if let Some(single_child) = &self.single_number_dep {
+                if let Some(single_child) = &mut self.single_number_dep {
                     let used_default = single_child.get_used_default();
                     state_var.set_value_and_used_default(
-                        *single_child.get_value_assuming_fresh(),
+                        *single_child.get_fresh_value_record_viewed(),
                         used_default,
                     )
                 } else {
                     let expression = &self
                         .math_expression
-                        .as_ref()
+                        .as_mut()
                         .unwrap()
-                        .get_value_assuming_fresh();
+                        .get_fresh_value_record_viewed();
 
                     let mut context = HashMapContext::new();
 
-                    for (id, value) in self.numerical_deps.iter().enumerate() {
+                    for (id, value) in self.numerical_deps.iter_mut().enumerate() {
                         let variable_num = match value {
-                            NumOrInt::Number(num_val) => *num_val.get_value_assuming_fresh(),
+                            NumOrInt::Number(num_val) => *num_val.get_fresh_value_record_viewed(),
                             NumOrInt::Integer(int_val) => {
-                                *int_val.get_value_assuming_fresh() as f64
+                                *int_val.get_fresh_value_record_viewed() as f64
                             }
                         };
 
@@ -185,7 +185,7 @@ macro_rules! number_state_variable_from_attribute {
                 let desired_value = state_var.get_requested_value();
 
                 if let Some(single_child) = &self.single_number_dep {
-                    single_child.request_value(*desired_value);
+                    single_child.request_change_value_to(*desired_value);
 
                     Ok(vec![UpdatesRequested {
                         instruction_ind: 0,
@@ -197,7 +197,7 @@ macro_rules! number_state_variable_from_attribute {
                     self.math_expression
                         .as_ref()
                         .unwrap()
-                        .request_value(MathExpression::from(*desired_value));
+                        .request_change_value_to(MathExpression::from(*desired_value));
 
                     Ok(vec![UpdatesRequested {
                         instruction_ind: 0,
@@ -205,8 +205,8 @@ macro_rules! number_state_variable_from_attribute {
                     }])
                 } else if self.math_expression_is_single_variable {
                     match &self.numerical_deps[0] {
-                        NumOrInt::Number(num_dep) => num_dep.request_value(*desired_value),
-                        NumOrInt::Integer(num_dep) => num_dep.request_value(*desired_value as i64),
+                        NumOrInt::Number(num_dep) => num_dep.request_change_value_to(*desired_value),
+                        NumOrInt::Integer(num_dep) => num_dep.request_change_value_to(*desired_value as i64),
                     }
 
                     Ok(vec![UpdatesRequested {
@@ -301,9 +301,9 @@ macro_rules! integer_state_variable_from_attribute {
                     if numerical_deps.len()
                         != self
                             .math_expression
-                            .as_ref()
+                            .as_mut()
                             .unwrap()
-                            .get_value_assuming_fresh()
+                            .get_fresh_value_record_viewed()
                             .external_variables_count
                     {
                         panic!("The {} attribute not parsed correctly", $attribute);
@@ -314,9 +314,9 @@ macro_rules! integer_state_variable_from_attribute {
                     if numerical_deps.len() == 1 {
                         let expression = &self
                             .math_expression
-                            .as_ref()
+                            .as_mut()
                             .unwrap()
-                            .get_value_assuming_fresh();
+                            .get_fresh_value_record_viewed();
 
                         let tree = &expression.tree;
 
@@ -340,29 +340,29 @@ macro_rules! integer_state_variable_from_attribute {
             }
 
             fn calculate_state_var_from_dependencies(
-                &self,
+                &mut self,
                 state_var: &StateVarMutableViewTyped<i64>,
             ) -> () {
-                if let Some(single_child) = &self.single_integer_dep {
+                if let Some(single_child) = &mut self.single_integer_dep {
                     let used_default = single_child.get_used_default();
                     state_var.set_value_and_used_default(
-                        *single_child.get_value_assuming_fresh(),
+                        *single_child.get_fresh_value_record_viewed(),
                         used_default,
                     )
                 } else {
                     let expression = &self
                         .math_expression
-                        .as_ref()
+                        .as_mut()
                         .unwrap()
-                        .get_value_assuming_fresh();
+                        .get_fresh_value_record_viewed();
 
                     let mut context = HashMapContext::new();
 
-                    for (id, value) in self.numerical_deps.iter().enumerate() {
+                    for (id, value) in self.numerical_deps.iter_mut().enumerate() {
                         let variable_num = match value {
-                            NumOrInt::Number(num_val) => *num_val.get_value_assuming_fresh(),
+                            NumOrInt::Number(num_val) => *num_val.get_fresh_value_record_viewed(),
                             NumOrInt::Integer(int_val) => {
-                                *int_val.get_value_assuming_fresh() as f64
+                                *int_val.get_fresh_value_record_viewed() as f64
                             }
                         };
 
@@ -391,7 +391,7 @@ macro_rules! integer_state_variable_from_attribute {
                 let desired_value = state_var.get_requested_value();
 
                 if let Some(single_child) = &self.single_integer_dep {
-                    single_child.request_value(*desired_value);
+                    single_child.request_change_value_to(*desired_value);
 
                     Ok(vec![UpdatesRequested {
                         instruction_ind: 0,
@@ -403,7 +403,7 @@ macro_rules! integer_state_variable_from_attribute {
                     self.math_expression
                         .as_ref()
                         .unwrap()
-                        .request_value(MathExpression::from(*desired_value));
+                        .request_change_value_to(MathExpression::from(*desired_value));
 
                     Ok(vec![UpdatesRequested {
                         instruction_ind: 0,
@@ -411,8 +411,8 @@ macro_rules! integer_state_variable_from_attribute {
                     }])
                 } else if self.math_expression_is_single_variable {
                     match &self.numerical_deps[0] {
-                        NumOrInt::Number(num_dep) => num_dep.request_value(*desired_value as f64),
-                        NumOrInt::Integer(num_dep) => num_dep.request_value(*desired_value),
+                        NumOrInt::Number(num_dep) => num_dep.request_change_value_to(*desired_value as f64),
+                        NumOrInt::Integer(num_dep) => num_dep.request_change_value_to(*desired_value),
                     }
 
                     Ok(vec![UpdatesRequested {
@@ -469,14 +469,14 @@ macro_rules! string_state_variable_from_attribute {
             }
 
             fn calculate_state_var_from_dependencies(
-                &self,
+                &mut self,
                 state_var: &StateVarMutableViewTyped<String>,
             ) -> () {
                 // TODO: can we implement this without cloning the inner value?
                 let value: String = self
                     .string_deps
-                    .iter()
-                    .map(|v| v.get_value_assuming_fresh().clone())
+                    .iter_mut()
+                    .map(|v| v.get_fresh_value_record_viewed().clone())
                     .collect();
 
                 let mut used_default = false;
@@ -498,7 +498,7 @@ macro_rules! string_state_variable_from_attribute {
                 } else {
                     let desired_value = state_var.get_requested_value();
 
-                    self.string_deps[0].request_value(desired_value.clone());
+                    self.string_deps[0].request_change_value_to(desired_value.clone());
 
                     Ok(vec![UpdatesRequested {
                         instruction_ind: 0,
@@ -545,10 +545,16 @@ macro_rules! text_state_variable_from_number_state_variable {
             }
 
             fn calculate_state_var_from_dependencies(
-                &self,
+                &mut self,
                 state_var: &StateVarMutableViewTyped<String>,
             ) -> () {
-                state_var.set_value(self.value_sv.get_value_assuming_fresh().to_string());
+
+                if self.value_sv.check_if_changed_since_last_viewed() {
+                    state_var.set_value(self.value_sv.get_fresh_value_record_viewed().to_string());
+                } else {
+                    state_var.restore_previous_value();
+                }
+
             }
         }
     };

@@ -328,7 +328,6 @@ pub fn create_components_tree_from_json(program: &str)
             HashMap<ComponentName, ComponentInd>,
             Vec<MLComponent>,
             Vec<HashMap<AttributeName, Vec<ObjectName>>>,
-            ComponentInd,
             HashMap<String, ComponentInd>,
             Vec<DoenetMLWarning>,
             Vec<DoenetMLError>
@@ -376,7 +375,7 @@ pub fn create_components_tree_from_json(program: &str)
     let mut warnings_encountered: Vec<DoenetMLWarning> = Vec::new();
     let mut errors_encountered: Vec<DoenetMLError> = Vec::new();
 
-    let root_component_ind = add_component_from_json(
+    add_component_from_json(
         &mut component_name_to_ind,
         &mut components,
         &mut attributes,
@@ -482,7 +481,7 @@ pub fn create_components_tree_from_json(program: &str)
     // log!("ML components: {:#?}", components);
 
 
-    Ok((component_name_to_ind, components, attributes_parsed, root_component_ind, map_sources_alias, warnings_encountered, errors_encountered))
+    Ok((component_name_to_ind, components, attributes_parsed, map_sources_alias, warnings_encountered, errors_encountered))
 }
 
 /// Recursive function

@@ -52,14 +52,14 @@ impl StateVarInterface<String> for Value {
     }
 
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
         // TODO: can we implement this without cloning the inner value?
         let value: String = self
             .string_child_values
-            .iter()
-            .map(|v| v.get_value_assuming_fresh().clone())
+            .iter_mut()
+            .map(|v| v.get_fresh_value_record_viewed().clone())
             .collect();
 
         state_var.set_value(value);
@@ -76,7 +76,7 @@ impl StateVarInterface<String> for Value {
         } else {
             let desired_value = state_var.get_requested_value();
 
-            self.string_child_values[0].request_value(desired_value.clone());
+            self.string_child_values[0].request_change_value_to(desired_value.clone());
 
             Ok(vec![UpdatesRequested {
                 instruction_ind: 0,
@@ -118,10 +118,10 @@ impl StateVarInterface<String> for Text {
     }
 
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
-        state_var.set_value(self.value_sv.get_value_assuming_fresh().clone());
+        state_var.set_value(self.value_sv.get_fresh_value_record_viewed().clone());
     }
 }
 
@@ -136,7 +136,7 @@ impl Hidden {
 
 impl StateVarInterface<bool> for Hidden {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -154,7 +154,7 @@ impl Disabled {
 
 impl StateVarInterface<bool> for Disabled {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -172,7 +172,7 @@ impl Fixed {
 
 impl StateVarInterface<bool> for Fixed {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);

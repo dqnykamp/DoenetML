@@ -84,17 +84,17 @@ impl StateVarInterface<String> for Value {
     }
 
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        let value = if *self.sync_values.get_value_assuming_fresh() {
-            self.immediate_value.get_value_assuming_fresh()
+        let value = if *self.sync_values.get_fresh_value_record_viewed() {
+            self.immediate_value.get_fresh_value_record_viewed()
         } else if bind_value_to_used_default {
-            self.essential_value.get_value_assuming_fresh()
+            self.essential_value.get_fresh_value_record_viewed()
         } else {
-            self.bind_value_to.get_value_assuming_fresh()
+            self.bind_value_to.get_fresh_value_record_viewed()
         };
 
         state_var.set_value(value.clone());
@@ -109,9 +109,9 @@ impl StateVarInterface<String> for Value {
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
         if bind_value_to_used_default {
-            self.essential_value.request_value(desired_value.clone());
-            self.immediate_value.request_value(desired_value.clone());
-            self.sync_values.request_value(true);
+            self.essential_value.request_change_value_to(desired_value.clone());
+            self.immediate_value.request_change_value_to(desired_value.clone());
+            self.sync_values.request_change_value_to(true);
 
             Ok(vec![
                 UpdatesRequested {
@@ -128,8 +128,8 @@ impl StateVarInterface<String> for Value {
                 },
             ])
         } else {
-            self.bind_value_to.request_value(desired_value.clone());
-            self.sync_values.request_value(true);
+            self.bind_value_to.request_change_value_to(desired_value.clone());
+            self.sync_values.request_change_value_to(true);
 
             Ok(vec![
                 UpdatesRequested {
@@ -200,16 +200,16 @@ impl StateVarInterface<String> for ImmediateValue {
     }
 
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
         let immediate_value =
-            if !bind_value_to_used_default && *self.sync_values.get_value_assuming_fresh() {
-                self.bind_value_to.get_value_assuming_fresh()
+            if !bind_value_to_used_default && *self.sync_values.get_fresh_value_record_viewed() {
+                self.bind_value_to.get_fresh_value_record_viewed()
             } else {
-                self.essential_value.get_value_assuming_fresh()
+                self.essential_value.get_fresh_value_record_viewed()
             };
 
         state_var.set_value(immediate_value.clone());
@@ -225,7 +225,7 @@ impl StateVarInterface<String> for ImmediateValue {
         let mut updates = Vec::with_capacity(2);
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        self.essential_value.request_value(desired_value.clone());
+        self.essential_value.request_change_value_to(desired_value.clone());
 
         updates.push(UpdatesRequested {
             instruction_ind: 0,
@@ -233,7 +233,7 @@ impl StateVarInterface<String> for ImmediateValue {
         });
 
         if !is_initial_change && !bind_value_to_used_default {
-            self.bind_value_to.request_value(desired_value.clone());
+            self.bind_value_to.request_change_value_to(desired_value.clone());
 
             updates.push(UpdatesRequested {
                 instruction_ind: 2,
@@ -272,10 +272,10 @@ impl StateVarInterface<bool> for SyncImmediateValue {
     }
 
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
-        state_var.set_value(self.essential_value.get_value_assuming_fresh().clone());
+        state_var.set_value(self.essential_value.get_fresh_value_record_viewed().clone());
     }
 
     fn request_dependencies_to_update_value(
@@ -285,7 +285,7 @@ impl StateVarInterface<bool> for SyncImmediateValue {
     ) -> Result<Vec<UpdatesRequested>, ()> {
         let desired_value = state_var.get_requested_value();
 
-        self.essential_value.request_value(*desired_value);
+        self.essential_value.request_change_value_to(*desired_value);
 
         Ok(vec![UpdatesRequested {
             instruction_ind: 0,
@@ -305,7 +305,7 @@ impl Expanded {
 
 impl StateVarInterface<bool> for Expanded {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -323,7 +323,7 @@ impl Size {
 
 impl StateVarInterface<f64> for Size {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<f64>,
     ) -> () {
         state_var.set_value(10.0);
@@ -341,7 +341,7 @@ impl Width {
 
 impl StateVarInterface<f64> for Width {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<f64>,
     ) -> () {
         state_var.set_value(600.0);
@@ -359,7 +359,7 @@ impl Hidden {
 
 impl StateVarInterface<bool> for Hidden {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
@@ -377,7 +377,7 @@ impl Disabled {
 
 impl StateVarInterface<bool> for Disabled {
     fn calculate_state_var_from_dependencies(
-        &self,
+        &mut self,
         state_var: &StateVarMutableViewTyped<bool>,
     ) -> () {
         state_var.set_value(false);
