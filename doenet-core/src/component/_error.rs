@@ -3,9 +3,7 @@ use crate::state::{
     StateVarInterface, StateVarMutableViewTyped, StateVarParameters, StateVarReadOnlyView,
     StateVarReadOnlyViewTyped, StateVarTyped, UpdatesRequested,
 };
-use evalexpr::{ContextWithMutableVariables, HashMapContext, Operator};
 
-use crate::math_expression::MathExpression;
 use crate::ComponentProfile;
 
 use lazy_static::lazy_static;

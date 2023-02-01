@@ -1,8 +1,3 @@
-// use std::collections::HashMap;
-
-// use crate::{math_expression::MathExpression, state_variables::*, utils::log};
-// use evalexpr::{ContextWithMutableVariables, HashMapContext, Operator};
-
 use crate::state::StateVarReadOnlyViewTyped;
 
 #[derive(Debug)]
@@ -13,13 +8,11 @@ pub enum NumOrInt {
 
 macro_rules! number_state_variable_from_attribute {
     ( $attribute:expr, $default_value:expr, $StructName:ident ) => {
-        use crate::math_expression::MathExpression;
-        use evalexpr::{ContextWithMutableVariables, HashMapContext, Operator};
-
         #[derive(Debug)]
         struct $StructName {
             single_number_dep: Option<StateVarReadOnlyViewTyped<f64>>,
-            math_expression: Option<StateVarReadOnlyViewTyped<MathExpression>>,
+            math_expression:
+                Option<StateVarReadOnlyViewTyped<crate::math_expression::MathExpression>>,
             numerical_deps: Vec<NumOrInt>,
             math_expression_is_single_variable: bool,
         }
@@ -116,7 +109,7 @@ macro_rules! number_state_variable_from_attribute {
                             if child.children().is_empty()
                                 && matches!(
                                     child.operator(),
-                                    Operator::VariableIdentifierRead { .. }
+                                    evalexpr::Operator::VariableIdentifierRead { .. }
                                 )
                             {
                                 math_expression_is_single_variable = true;
@@ -147,7 +140,8 @@ macro_rules! number_state_variable_from_attribute {
                         .unwrap()
                         .get_fresh_value_record_viewed();
 
-                    let mut context = HashMapContext::new();
+                    use evalexpr::ContextWithMutableVariables;
+                    let mut context = evalexpr::HashMapContext::new();
 
                     for (id, value) in self.numerical_deps.iter_mut().enumerate() {
                         let variable_num = match value {
@@ -161,11 +155,11 @@ macro_rules! number_state_variable_from_attribute {
                         context.set_value(name, variable_num.into()).unwrap();
                     }
 
-                    let num = if expression.tree.operator() == &Operator::RootNode
+                    let num = if expression.tree.operator() == &evalexpr::Operator::RootNode
                         && expression.tree.children().is_empty()
                     {
-                        // Empty expression, set to 0
-                        0.0
+                        // Empty expression, set to NaN
+                        f64::NAN
                     } else {
                         expression
                             .tree
@@ -197,7 +191,9 @@ macro_rules! number_state_variable_from_attribute {
                     self.math_expression
                         .as_ref()
                         .unwrap()
-                        .request_change_value_to(MathExpression::from(*desired_value));
+                        .request_change_value_to(crate::math_expression::MathExpression::from(
+                            *desired_value,
+                        ));
 
                     Ok(vec![UpdatesRequested {
                         instruction_ind: 0,
@@ -232,7 +228,8 @@ macro_rules! integer_state_variable_from_attribute {
         #[derive(Debug)]
         struct $StructName {
             single_integer_dep: Option<StateVarReadOnlyViewTyped<i64>>,
-            math_expression: Option<StateVarReadOnlyViewTyped<MathExpression>>,
+            math_expression:
+                Option<StateVarReadOnlyViewTyped<crate::math_expression::MathExpression>>,
             numerical_deps: Vec<NumOrInt>,
             math_expression_is_single_variable: bool,
         }
@@ -329,7 +326,7 @@ macro_rules! integer_state_variable_from_attribute {
                             if child.children().is_empty()
                                 && matches!(
                                     child.operator(),
-                                    Operator::VariableIdentifierRead { .. }
+                                    evalexpr::Operator::VariableIdentifierRead { .. }
                                 )
                             {
                                 math_expression_is_single_variable = true;
@@ -360,7 +357,8 @@ macro_rules! integer_state_variable_from_attribute {
                         .unwrap()
                         .get_fresh_value_record_viewed();
 
-                    let mut context = HashMapContext::new();
+                    use evalexpr::ContextWithMutableVariables;
+                    let mut context = evalexpr::HashMapContext::new();
 
                     for (id, value) in self.numerical_deps.iter_mut().enumerate() {
                         let variable_num = match value {
@@ -374,7 +372,7 @@ macro_rules! integer_state_variable_from_attribute {
                         context.set_value(name, variable_num.into()).unwrap();
                     }
 
-                    let num = if expression.tree.operator() == &Operator::RootNode
+                    let num = if expression.tree.operator() == &evalexpr::Operator::RootNode
                         && expression.tree.children().is_empty()
                     {
                         // Empty expression, set to 0
@@ -407,7 +405,9 @@ macro_rules! integer_state_variable_from_attribute {
                     self.math_expression
                         .as_ref()
                         .unwrap()
-                        .request_change_value_to(MathExpression::from(*desired_value));
+                        .request_change_value_to(crate::math_expression::MathExpression::from(
+                            *desired_value,
+                        ));
 
                     Ok(vec![UpdatesRequested {
                         instruction_ind: 0,

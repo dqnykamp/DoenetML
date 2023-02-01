@@ -19,6 +19,7 @@ struct Value {
     math_expression: Option<StateVarReadOnlyViewTyped<MathExpression>>,
     numerical_children: Vec<StateVarReadOnlyViewTyped<f64>>,
     math_expression_is_single_variable: bool,
+    hash_map_context: HashMapContext,
 }
 
 impl Value {
@@ -27,6 +28,7 @@ impl Value {
             math_expression: None,
             numerical_children: Vec::new(),
             math_expression_is_single_variable: false,
+            hash_map_context: HashMapContext::new(),
         }
     }
 }
@@ -109,28 +111,32 @@ impl StateVarInterface<f64> for Value {
         &mut self,
         state_var: &StateVarMutableViewTyped<f64>,
     ) -> () {
-        let expression_var = self.math_expression.as_mut().unwrap();
-
-        let expression = expression_var.get_fresh_value_record_viewed();
-
-        let mut context = HashMapContext::new();
+        let expression = self
+            .math_expression
+            .as_mut()
+            .unwrap()
+            .get_fresh_value_record_viewed();
 
         for (id, value) in self.numerical_children.iter_mut().enumerate() {
             let variable_num = *value.get_fresh_value_record_viewed();
 
+            // TODO: since expression cannot change if there are numerical children,
+            // we could precompute the names and store in a vector
             let name = format!("{}{}", expression.variable_prefix, id);
-            context.set_value(name, variable_num.into()).unwrap();
+            self.hash_map_context
+                .set_value(name, variable_num.into())
+                .unwrap();
         }
 
         let num = if expression.tree.operator() == &Operator::RootNode
             && expression.tree.children().is_empty()
         {
-            // Empty expression, set to 0
-            0.0
+            // Empty expression, set to NaN
+            f64::NAN
         } else {
             expression
                 .tree
-                .eval_number_with_context(&context)
+                .eval_number_with_context(&self.hash_map_context)
                 .unwrap_or(f64::NAN)
         };
 
