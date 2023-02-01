@@ -90,14 +90,28 @@ impl StateVarInterface<String> for Value {
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
         let value = if *self.sync_values.get_fresh_value_record_viewed() {
-            self.immediate_value.get_fresh_value_record_viewed()
+            self.immediate_value.get_fresh_value_record_viewed().clone()
         } else if bind_value_to_used_default {
-            self.essential_value.get_fresh_value_record_viewed()
+            self.essential_value.get_fresh_value_record_viewed().clone()
         } else {
-            self.bind_value_to.get_fresh_value_record_viewed()
+            self.bind_value_to.get_fresh_value_record_viewed().clone()
         };
 
-        state_var.set_value(value.clone());
+        let value_changed = if let Some(old_value) = state_var.try_get_last_value() {
+            if value != *old_value {
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        };
+
+        if value_changed {
+            state_var.set_value(value);
+        } else {
+            state_var.restore_previous_value();
+        }
     }
 
     fn request_dependencies_to_update_value(
@@ -109,8 +123,10 @@ impl StateVarInterface<String> for Value {
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
         if bind_value_to_used_default {
-            self.essential_value.request_change_value_to(desired_value.clone());
-            self.immediate_value.request_change_value_to(desired_value.clone());
+            self.essential_value
+                .request_change_value_to(desired_value.clone());
+            self.immediate_value
+                .request_change_value_to(desired_value.clone());
             self.sync_values.request_change_value_to(true);
 
             Ok(vec![
@@ -128,7 +144,8 @@ impl StateVarInterface<String> for Value {
                 },
             ])
         } else {
-            self.bind_value_to.request_change_value_to(desired_value.clone());
+            self.bind_value_to
+                .request_change_value_to(desired_value.clone());
             self.sync_values.request_change_value_to(true);
 
             Ok(vec![
@@ -207,12 +224,26 @@ impl StateVarInterface<String> for ImmediateValue {
 
         let immediate_value =
             if !bind_value_to_used_default && *self.sync_values.get_fresh_value_record_viewed() {
-                self.bind_value_to.get_fresh_value_record_viewed()
+                self.bind_value_to.get_fresh_value_record_viewed().clone()
             } else {
-                self.essential_value.get_fresh_value_record_viewed()
+                self.essential_value.get_fresh_value_record_viewed().clone()
             };
 
-        state_var.set_value(immediate_value.clone());
+        let value_changed = if let Some(old_value) = state_var.try_get_last_value() {
+            if immediate_value != *old_value {
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        };
+
+        if value_changed {
+            state_var.set_value(immediate_value);
+        } else {
+            state_var.restore_previous_value();
+        }
     }
 
     fn request_dependencies_to_update_value(
@@ -225,7 +256,8 @@ impl StateVarInterface<String> for ImmediateValue {
         let mut updates = Vec::with_capacity(2);
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        self.essential_value.request_change_value_to(desired_value.clone());
+        self.essential_value
+            .request_change_value_to(desired_value.clone());
 
         updates.push(UpdatesRequested {
             instruction_ind: 0,
@@ -233,7 +265,8 @@ impl StateVarInterface<String> for ImmediateValue {
         });
 
         if !is_initial_change && !bind_value_to_used_default {
-            self.bind_value_to.request_change_value_to(desired_value.clone());
+            self.bind_value_to
+                .request_change_value_to(desired_value.clone());
 
             updates.push(UpdatesRequested {
                 instruction_ind: 2,

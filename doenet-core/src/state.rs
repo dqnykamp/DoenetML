@@ -1,5 +1,4 @@
 use enum_as_inner::EnumAsInner;
-use serde::Serialize;
 
 use crate::state_variables::*;
 use std::{
@@ -50,6 +49,7 @@ pub struct StateVarTyped<T: Default + Clone> {
     interface: Box<dyn StateVarInterface<T>>,
     parameters: StateVarParameters<T>,
     change_counter_when_last_rendered: u32,
+    all_dependency_values: Vec<StateVarReadOnlyView>,
 }
 
 pub struct UpdatesRequested {
@@ -108,11 +108,12 @@ impl<T: Default + Clone> StateVarInner<T> {
         &self.value
     }
 
-    pub fn get_last_value_even_if_stale<'a>(&'a self) -> &'a T {
+    pub fn try_get_last_value<'a>(&'a self) -> Option<&'a T> {
         if self.freshness == Freshness::Unresolved {
-            panic!("State variable is unresolved, cannot get its value");
+            None
+        } else {
+            Some(&self.value)
         }
-        &self.value
     }
 
     pub fn mark_stale(&mut self) {
@@ -217,9 +218,18 @@ impl<T: Default + Clone> StateVarMutableViewTyped<T> {
         self.change_counter_when_last_viewed = inner.get_change_counter();
     }
 
-    // Note: getting last value does not count as a view so don't update change_counter_when_last_viewed
-    pub fn get_last_value_even_if_stale<'a>(&'a self) -> impl Deref<Target = T> + 'a {
-        Ref::map(self.inner.borrow(), |v| v.get_last_value_even_if_stale())
+    pub fn try_get_last_value<'a>(&'a self) -> Option<impl Deref<Target = T> + 'a> {
+        // Note: slower than it seems necessary due to two borrows.
+        // Another option is to use the ref_filter_map crate or see if there will eventually be a way
+        // to convert Ref<Option<T>> to Option<Ref<T>>.
+        // See: https://stackoverflow.com/a/62474266
+        if self.inner.borrow().try_get_last_value().is_none() {
+            None
+        } else {
+            Some(Ref::map(self.inner.borrow(), |v| {
+                v.try_get_last_value().unwrap()
+            }))
+        }
     }
 
     pub fn set_value(&self, new_val: T) {
@@ -267,6 +277,7 @@ impl<T: Default + Clone> StateVarMutableViewTyped<T> {
     pub fn set_value_to_requested_value(&self) {
         let mut inner = self.inner.borrow_mut();
         inner.value = inner.requested_value.clone();
+        inner.change_counter += 1;
     }
 
     pub fn get_change_counter(&self) -> u32 {
@@ -315,9 +326,18 @@ impl<T: Default + Clone> StateVarReadOnlyViewTyped<T> {
         self.change_counter_when_last_viewed = inner.get_change_counter();
     }
 
-    // Note: getting last value does not count as a view so don't update change_counter_when_last_viewed
-    pub fn get_last_value_even_if_stale<'a>(&'a self) -> impl Deref<Target = T> + 'a {
-        Ref::map(self.inner.borrow(), |v| v.get_last_value_even_if_stale())
+    pub fn try_get_last_value<'a>(&'a self) -> Option<impl Deref<Target = T> + 'a> {
+        // Note: slower than it seems necessary due to two borrows.
+        // Another option is to use the ref_filter_map crate or see if there will eventually be a way
+        // to convert Ref<Option<T>> to Option<Ref<T>>.
+        // See: https://stackoverflow.com/a/62474266
+        if self.inner.borrow().try_get_last_value().is_none() {
+            None
+        } else {
+            Some(Ref::map(self.inner.borrow(), |v| {
+                v.try_get_last_value().unwrap()
+            }))
+        }
     }
 
     pub fn get_freshness(&self) -> Freshness {
@@ -350,21 +370,20 @@ impl From<&StateVarMutableView> for serde_json::Value {
     fn from(state_var: &StateVarMutableView) -> serde_json::Value {
         match state_var.get_freshness() {
             Freshness::Fresh => match state_var {
-                // Note: use last value so that don't increment change_counter_when_last_viewed
                 StateVarMutableView::Number(inner_sv) => {
-                    serde_json::json!(*inner_sv.get_last_value_even_if_stale())
+                    serde_json::json!(*inner_sv.get_fresh_value())
                 }
                 StateVarMutableView::Integer(inner_sv) => {
-                    serde_json::json!(*inner_sv.get_last_value_even_if_stale())
+                    serde_json::json!(*inner_sv.get_fresh_value())
                 }
                 StateVarMutableView::String(inner_sv) => {
-                    serde_json::json!(inner_sv.get_last_value_even_if_stale().clone())
+                    serde_json::json!(inner_sv.get_fresh_value().clone())
                 }
                 StateVarMutableView::Boolean(inner_sv) => {
-                    serde_json::json!(*inner_sv.get_last_value_even_if_stale())
+                    serde_json::json!(*inner_sv.get_fresh_value())
                 }
                 StateVarMutableView::MathExpr(inner_sv) => {
-                    serde_json::json!(*inner_sv.get_last_value_even_if_stale())
+                    serde_json::json!(*inner_sv.get_fresh_value())
                 }
             },
             Freshness::Stale => serde_json::Value::Null,
@@ -529,6 +548,52 @@ impl StateVarReadOnlyView {
         }
     }
 
+    pub fn create_new_read_only_view(&self) -> StateVarReadOnlyView {
+        match self {
+            StateVarReadOnlyView::Number(sv_inner) => {
+                StateVarReadOnlyView::Number(sv_inner.create_new_read_only_view())
+            }
+            StateVarReadOnlyView::Integer(sv_inner) => {
+                StateVarReadOnlyView::Integer(sv_inner.create_new_read_only_view())
+            }
+            StateVarReadOnlyView::String(sv_inner) => {
+                StateVarReadOnlyView::String(sv_inner.create_new_read_only_view())
+            }
+            StateVarReadOnlyView::Boolean(sv_inner) => {
+                StateVarReadOnlyView::Boolean(sv_inner.create_new_read_only_view())
+            }
+            StateVarReadOnlyView::MathExpr(sv_inner) => {
+                StateVarReadOnlyView::MathExpr(sv_inner.create_new_read_only_view())
+            }
+        }
+    }
+
+    pub fn check_if_changed_since_last_viewed(&self) -> bool {
+        match self {
+            StateVarReadOnlyView::Number(sv_inner) => sv_inner.check_if_changed_since_last_viewed(),
+            StateVarReadOnlyView::Integer(sv_inner) => {
+                sv_inner.check_if_changed_since_last_viewed()
+            }
+            StateVarReadOnlyView::String(sv_inner) => sv_inner.check_if_changed_since_last_viewed(),
+            StateVarReadOnlyView::Boolean(sv_inner) => {
+                sv_inner.check_if_changed_since_last_viewed()
+            }
+            StateVarReadOnlyView::MathExpr(sv_inner) => {
+                sv_inner.check_if_changed_since_last_viewed()
+            }
+        }
+    }
+
+    pub fn record_viewed(&mut self) {
+        match self {
+            StateVarReadOnlyView::Number(sv_inner) => sv_inner.record_viewed(),
+            StateVarReadOnlyView::Integer(sv_inner) => sv_inner.record_viewed(),
+            StateVarReadOnlyView::String(sv_inner) => sv_inner.record_viewed(),
+            StateVarReadOnlyView::Boolean(sv_inner) => sv_inner.record_viewed(),
+            StateVarReadOnlyView::MathExpr(sv_inner) => sv_inner.record_viewed(),
+        }
+    }
+
     pub fn get_type_as_str(&self) -> &'static str {
         match self {
             Self::String(_) => "string",
@@ -552,6 +617,7 @@ impl<T: Default + Clone> StateVarTyped<T> {
             interface,
             parameters,
             change_counter_when_last_rendered: 0,
+            all_dependency_values: vec![],
         }
     }
 
@@ -578,6 +644,10 @@ impl<T: Default + Clone> StateVarTyped<T> {
             .inner
             .borrow_mut()
             .set_value_and_used_default(new_val, used_default);
+    }
+
+    pub fn restore_previous_value(&self) {
+        self.value.inner.borrow_mut().restore_previous_value();
     }
 
     pub fn get_used_default(&self) -> bool {
@@ -615,7 +685,11 @@ impl<T: Default + Clone> StateVarTyped<T> {
     }
 
     pub fn set_dependencies(&mut self, dependencies: &Vec<Vec<DependencyValue>>) -> () {
-        self.interface.set_dependencies(dependencies)
+        self.interface.set_dependencies(dependencies);
+        self.all_dependency_values = dependencies
+            .iter()
+            .flat_map(|vec| vec.iter().map(|elt| elt.value.create_new_read_only_view()))
+            .collect();
     }
 
     fn calculate_state_var_from_dependencies(&mut self) -> () {
@@ -651,6 +725,18 @@ impl<T: Default + Clone> StateVarTyped<T> {
     pub fn check_if_changed_since_last_rendered(&self) -> bool {
         self.value.inner.borrow().get_change_counter() > self.change_counter_when_last_rendered
     }
+
+    pub fn check_if_any_dependency_changed_since_last_viewed(&self) -> bool {
+        self.all_dependency_values
+            .iter()
+            .any(|state_var| state_var.check_if_changed_since_last_viewed())
+    }
+
+    pub fn record_all_dependencies_viewed(&mut self) {
+        self.all_dependency_values
+            .iter_mut()
+            .for_each(|state_var| state_var.record_viewed())
+    }
 }
 
 impl StateVar {
@@ -671,6 +757,16 @@ impl StateVar {
             StateVar::String(sv_typed) => sv_typed.get_freshness(),
             StateVar::Boolean(sv_typed) => sv_typed.get_freshness(),
             StateVar::MathExpr(sv_typed) => sv_typed.get_freshness(),
+        }
+    }
+
+    pub fn restore_previous_value(&self) {
+        match self {
+            StateVar::Number(sv_typed) => sv_typed.restore_previous_value(),
+            StateVar::Integer(sv_typed) => sv_typed.restore_previous_value(),
+            StateVar::String(sv_typed) => sv_typed.restore_previous_value(),
+            StateVar::Boolean(sv_typed) => sv_typed.restore_previous_value(),
+            StateVar::MathExpr(sv_typed) => sv_typed.restore_previous_value(),
         }
     }
 
@@ -756,6 +852,36 @@ impl StateVar {
             StateVar::String(sv_typed) => sv_typed.check_if_changed_since_last_rendered(),
             StateVar::Boolean(sv_typed) => sv_typed.check_if_changed_since_last_rendered(),
             StateVar::MathExpr(sv_typed) => sv_typed.check_if_changed_since_last_rendered(),
+        }
+    }
+
+    pub fn check_if_any_dependency_changed_since_last_viewed(&self) -> bool {
+        match self {
+            StateVar::Number(sv_typed) => {
+                sv_typed.check_if_any_dependency_changed_since_last_viewed()
+            }
+            StateVar::Integer(sv_typed) => {
+                sv_typed.check_if_any_dependency_changed_since_last_viewed()
+            }
+            StateVar::String(sv_typed) => {
+                sv_typed.check_if_any_dependency_changed_since_last_viewed()
+            }
+            StateVar::Boolean(sv_typed) => {
+                sv_typed.check_if_any_dependency_changed_since_last_viewed()
+            }
+            StateVar::MathExpr(sv_typed) => {
+                sv_typed.check_if_any_dependency_changed_since_last_viewed()
+            }
+        }
+    }
+
+    pub fn record_all_dependencies_viewed(&mut self) {
+        match self {
+            StateVar::Number(sv_typed) => sv_typed.record_all_dependencies_viewed(),
+            StateVar::Integer(sv_typed) => sv_typed.record_all_dependencies_viewed(),
+            StateVar::String(sv_typed) => sv_typed.record_all_dependencies_viewed(),
+            StateVar::Boolean(sv_typed) => sv_typed.record_all_dependencies_viewed(),
+            StateVar::MathExpr(sv_typed) => sv_typed.record_all_dependencies_viewed(),
         }
     }
 

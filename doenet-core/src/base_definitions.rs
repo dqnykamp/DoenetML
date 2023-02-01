@@ -205,8 +205,12 @@ macro_rules! number_state_variable_from_attribute {
                     }])
                 } else if self.math_expression_is_single_variable {
                     match &self.numerical_deps[0] {
-                        NumOrInt::Number(num_dep) => num_dep.request_change_value_to(*desired_value),
-                        NumOrInt::Integer(num_dep) => num_dep.request_change_value_to(*desired_value as i64),
+                        NumOrInt::Number(num_dep) => {
+                            num_dep.request_change_value_to(*desired_value)
+                        }
+                        NumOrInt::Integer(num_dep) => {
+                            num_dep.request_change_value_to(*desired_value as i64)
+                        }
                     }
 
                     Ok(vec![UpdatesRequested {
@@ -411,8 +415,12 @@ macro_rules! integer_state_variable_from_attribute {
                     }])
                 } else if self.math_expression_is_single_variable {
                     match &self.numerical_deps[0] {
-                        NumOrInt::Number(num_dep) => num_dep.request_change_value_to(*desired_value as f64),
-                        NumOrInt::Integer(num_dep) => num_dep.request_change_value_to(*desired_value),
+                        NumOrInt::Number(num_dep) => {
+                            num_dep.request_change_value_to(*desired_value as f64)
+                        }
+                        NumOrInt::Integer(num_dep) => {
+                            num_dep.request_change_value_to(*desired_value)
+                        }
                     }
 
                     Ok(vec![UpdatesRequested {
@@ -548,13 +556,7 @@ macro_rules! text_state_variable_from_number_state_variable {
                 &mut self,
                 state_var: &StateVarMutableViewTyped<String>,
             ) -> () {
-
-                if self.value_sv.check_if_changed_since_last_viewed() {
-                    state_var.set_value(self.value_sv.get_fresh_value_record_viewed().to_string());
-                } else {
-                    state_var.restore_previous_value();
-                }
-
+                state_var.set_value(self.value_sv.get_fresh_value_record_viewed().to_string());
             }
         }
     };

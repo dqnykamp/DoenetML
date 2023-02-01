@@ -109,45 +109,32 @@ impl StateVarInterface<f64> for Value {
         &mut self,
         state_var: &StateVarMutableViewTyped<f64>,
     ) -> () {
-        let mut found_changed = false;
-
         let expression_var = self.math_expression.as_mut().unwrap();
-
-        if expression_var.check_if_changed_since_last_viewed() {
-            found_changed = true;
-        }
 
         let expression = expression_var.get_fresh_value_record_viewed();
 
         let mut context = HashMapContext::new();
 
         for (id, value) in self.numerical_children.iter_mut().enumerate() {
-            if value.check_if_changed_since_last_viewed() {
-                found_changed = true;
-            }
             let variable_num = *value.get_fresh_value_record_viewed();
 
             let name = format!("{}{}", expression.variable_prefix, id);
             context.set_value(name, variable_num.into()).unwrap();
         }
 
-        if found_changed {
-            let num = if expression.tree.operator() == &Operator::RootNode
-                && expression.tree.children().is_empty()
-            {
-                // Empty expression, set to 0
-                0.0
-            } else {
-                expression
-                    .tree
-                    .eval_number_with_context(&context)
-                    .unwrap_or(f64::NAN)
-            };
-
-            state_var.set_value(num);
+        let num = if expression.tree.operator() == &Operator::RootNode
+            && expression.tree.children().is_empty()
+        {
+            // Empty expression, set to 0
+            0.0
         } else {
-            state_var.restore_previous_value();
-        }
+            expression
+                .tree
+                .eval_number_with_context(&context)
+                .unwrap_or(f64::NAN)
+        };
+
+        state_var.set_value(num);
     }
 
     fn request_dependencies_to_update_value(

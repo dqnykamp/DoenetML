@@ -1384,7 +1384,9 @@ fn freshen_state_var(
                 dependencies_for_component[state_var_ind].dependency_values =
                     dependency_values_for_state_var;
 
-                state_variables[state_var_ind].calculate_state_var_from_dependencies();
+                let state_var = &mut state_variables[state_var_ind];
+                state_var.calculate_state_var_from_dependencies();
+                state_var.record_all_dependencies_viewed();
 
                 // dependency_values = &dependencies_for_component[state_var_ind].dependency_values;
 
@@ -1453,8 +1455,14 @@ fn freshen_state_var(
 
                 let component_ind = component_state.0.ind;
                 let state_var_ind = component_state.1;
-                let state_variables = &mut component_state_variables[component_ind];
-                state_variables[state_var_ind].calculate_state_var_from_dependencies();
+                let state_var = &mut component_state_variables[component_ind][state_var_ind];
+
+                if state_var.check_if_any_dependency_changed_since_last_viewed() {
+                    state_var.calculate_state_var_from_dependencies();
+                    state_var.record_all_dependencies_viewed();
+                } else {
+                    state_var.restore_previous_value();
+                }
 
                 // dependency_values = &dependencies.get(&component_state.0.name).unwrap()[component_state.1].dependency_values;
 

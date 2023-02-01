@@ -86,31 +86,29 @@ impl StateVarInterface<f64> for Value {
     ) -> () {
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        let sync_changed = self.sync_values.check_if_changed_since_last_viewed();
-        if *self.sync_values.get_fresh_value_record_viewed() {
-            if !(sync_changed || self.immediate_value.check_if_changed_since_last_viewed()) {
-                state_var.restore_previous_value();
-            } else {
-                state_var.set_value(*self.immediate_value.get_fresh_value_record_viewed());
-            }
-            if bind_value_to_used_default {
-                self.essential_value.record_viewed()
-            } else {
-                self.bind_value_to.record_viewed()
-            }
+        let value = if *self.sync_values.get_fresh_value_record_viewed() {
+            *self.immediate_value.get_fresh_value_record_viewed()
         } else if bind_value_to_used_default {
-            if !self.essential_value.check_if_changed_since_last_viewed() {
-                state_var.restore_previous_value();
+            *self.essential_value.get_fresh_value_record_viewed()
+        } else {
+            *self.bind_value_to.get_fresh_value_record_viewed()
+        };
+
+        let value_changed = if let Some(old_value) = state_var.try_get_last_value() {
+            if value != *old_value {
+                true
             } else {
-                state_var.set_value(*self.essential_value.get_fresh_value_record_viewed());
+                false
             }
         } else {
-            if !self.bind_value_to.check_if_changed_since_last_viewed() {
-                state_var.restore_previous_value();
-            } else {
-                state_var.set_value(*self.bind_value_to.get_fresh_value_record_viewed());
-            }
+            true
         };
+
+        if value_changed {
+            state_var.set_value(value);
+        } else {
+            state_var.restore_previous_value();
+        }
     }
 
     fn request_dependencies_to_update_value(
@@ -223,7 +221,21 @@ impl StateVarInterface<f64> for ImmediateValue {
                     .unwrap_or(f64::NAN)
             };
 
-        state_var.set_value(immediate_value);
+        let value_changed = if let Some(old_value) = state_var.try_get_last_value() {
+            if immediate_value != *old_value {
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        };
+
+        if value_changed {
+            state_var.set_value(immediate_value);
+        } else {
+            state_var.restore_previous_value();
+        }
     }
 
     fn request_dependencies_to_update_value(
@@ -376,7 +388,21 @@ impl StateVarInterface<String> for RawRendererValue {
                 self.essential_value.get_fresh_value_record_viewed().clone()
             };
 
-        state_var.set_value(raw_renderer_value);
+        let value_changed = if let Some(old_value) = state_var.try_get_last_value() {
+            if raw_renderer_value != *old_value {
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        };
+
+        if value_changed {
+            state_var.set_value(raw_renderer_value);
+        } else {
+            state_var.restore_previous_value();
+        }
     }
 
     fn request_dependencies_to_update_value(
