@@ -1,6 +1,6 @@
 use crate::state::StateVar;
 use crate::state_variables::*;
-use crate::{ComponentInd, ComponentRefState};
+use crate::{ComponentInd, ComponentState};
 use enum_as_inner::EnumAsInner;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -91,7 +91,7 @@ pub type AttributeName = &'static str;
 #[derive(Debug, Clone)]
 pub enum CopySource {
     Component(ComponentInd),
-    StateVar(ComponentRefState),
+    StateVar(ComponentState),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash, Serialize)]
