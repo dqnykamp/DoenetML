@@ -20,7 +20,7 @@ impl StateVarInterface<String> for SubmitLabel {
         &mut self,
         state_var: &StateVarMutableViewTyped<String>,
     ) -> () {
-        state_var.set_value(String::from("Check work"));
+        state_var.set_value(String::from("Check Work"));
     }
 }
 

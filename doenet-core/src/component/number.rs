@@ -301,7 +301,7 @@ lazy_static! {
 
         attribute_names: vec!["hide", "disabled",],
 
-        primary_input_state_var_ind: Some(0),
+        primary_input_state_var_ind: Some(*SV_MAP.get("value").unwrap()),
 
         component_profiles: vec![
             (ComponentProfile::Number, "value"),

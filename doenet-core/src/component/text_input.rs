@@ -418,106 +418,89 @@ impl StateVarInterface<bool> for Disabled {
 }
 
 lazy_static! {
-
-    pub static ref GENERATE_STATE_VARS: fn () -> Vec<StateVar> = || {
+    pub static ref GENERATE_STATE_VARS: fn() -> Vec<StateVar> = || {
         vec![
-            StateVar::String(
-                StateVarTyped::new(
-                    Box::new(Value::new()),
-                    StateVarParameters {
-                        name: "value",
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::String(
-                StateVarTyped::new(
-                    Box::new(ImmediateValue::new()),
-                    StateVarParameters {
-                        name: "immediateValue",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Boolean(
-                StateVarTyped::new(
-                    Box::new(SyncImmediateValue::new()),
-                    StateVarParameters {
-                        name: "syncImmediateValue",
-                        initial_essential_value: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::String(
-                StateVarTyped::new(
-                    Box::new(BindValueTo::new()),
-                    StateVarParameters {
-                        name: "bindValueTo",
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Boolean(
-                StateVarTyped::new(
-                    Box::new(Expanded::new()),
-                    StateVarParameters {
-                        name: "expanded",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Number(
-                StateVarTyped::new(
-                    Box::new(Width::new()),
-                    StateVarParameters {
-                        name: "width",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Number(
-                StateVarTyped::new(
-                    Box::new(Size::new()),
-                    StateVarParameters {
-                        name: "size",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Boolean(
-                StateVarTyped::new(
-                    Box::new(Hidden::new()),
-                    StateVarParameters {
-                        name: "hidden",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
-            StateVar::Boolean(
-                StateVarTyped::new(
-                    Box::new(Disabled::new()),
-                    StateVarParameters {
-                        name: "disabled",
-                        for_renderer: true,
-                        ..Default::default()
-                    }
-                )
-            ),
+            StateVar::String(StateVarTyped::new(
+                Box::new(Value::new()),
+                StateVarParameters {
+                    name: "value",
+                    ..Default::default()
+                },
+            )),
+            StateVar::String(StateVarTyped::new(
+                Box::new(ImmediateValue::new()),
+                StateVarParameters {
+                    name: "immediateValue",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Boolean(StateVarTyped::new(
+                Box::new(SyncImmediateValue::new()),
+                StateVarParameters {
+                    name: "syncImmediateValue",
+                    initial_essential_value: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::String(StateVarTyped::new(
+                Box::new(BindValueTo::new()),
+                StateVarParameters {
+                    name: "bindValueTo",
+                    ..Default::default()
+                },
+            )),
+            StateVar::Boolean(StateVarTyped::new(
+                Box::new(Expanded::new()),
+                StateVarParameters {
+                    name: "expanded",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Number(StateVarTyped::new(
+                Box::new(Width::new()),
+                StateVarParameters {
+                    name: "width",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Number(StateVarTyped::new(
+                Box::new(Size::new()),
+                StateVarParameters {
+                    name: "size",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Boolean(StateVarTyped::new(
+                Box::new(Hidden::new()),
+                StateVarParameters {
+                    name: "hidden",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
+            StateVar::Boolean(StateVarTyped::new(
+                Box::new(Disabled::new()),
+                StateVarParameters {
+                    name: "disabled",
+                    for_renderer: true,
+                    ..Default::default()
+                },
+            )),
         ]
-
-
     };
-
-    pub static ref STATE_VARIABLES_NAMES_IN_ORDER: Vec<&'static str> = GENERATE_STATE_VARS().iter().map(|sv| sv.get_name()).collect();
-
-    pub static ref SV_MAP: HashMap<&'static str, usize> = STATE_VARIABLES_NAMES_IN_ORDER.iter().enumerate().map(|(i,v)| (*v,i) ).collect();
-
+    pub static ref STATE_VARIABLES_NAMES_IN_ORDER: Vec<&'static str> = GENERATE_STATE_VARS()
+        .iter()
+        .map(|sv| sv.get_name())
+        .collect();
+    pub static ref SV_MAP: HashMap<&'static str, usize> = STATE_VARIABLES_NAMES_IN_ORDER
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (*v, i))
+        .collect();
     pub static ref MY_COMPONENT_DEFINITION: ComponentDefinition = ComponentDefinition {
         component_type: "textInput",
 
@@ -525,44 +508,39 @@ lazy_static! {
 
         state_var_names: STATE_VARIABLES_NAMES_IN_ORDER.to_vec(),
 
-        state_var_component_types: GENERATE_STATE_VARS().iter().map(|sv| sv.get_default_component_type()).collect(),
+        state_var_component_types: GENERATE_STATE_VARS()
+            .iter()
+            .map(|sv| sv.get_default_component_type())
+            .collect(),
 
         generate_state_vars: *GENERATE_STATE_VARS,
 
-        attribute_names: vec![
-            "hide",
-            "disabled",
-            "prefill",
-            "bindValueTo"
-        ],
+        attribute_names: vec!["hide", "disabled", "prefill", "bindValueTo"],
 
         action_names: || vec!["updateImmediateValue", "updateValue"],
 
         on_action: |action_name, args, resolve_and_retrieve_state_var| {
             match action_name {
                 "updateImmediateValue" => {
-                    // Note: the key here is whatever the renderers call the new value
                     let new_val = args.get("text").expect("No text argument").first().unwrap();
 
                     vec![
                         (*SV_MAP.get("immediateValue").unwrap(), new_val.clone()),
-                        (*SV_MAP.get("syncImmediateValue").unwrap(), StateVarValue::Boolean(false)),
+                        (
+                            *SV_MAP.get("syncImmediateValue").unwrap(),
+                            StateVarValue::Boolean(false),
+                        ),
                     ]
-                },
-
-                "updateValue" => {
-
-                    let new_val = resolve_and_retrieve_state_var(1)
-                        .try_into().unwrap();
-                    let new_val = StateVarValue::String(new_val);
-
-                    vec![
-                        (*SV_MAP.get("value").unwrap(), new_val),
-                    ]
-
                 }
 
-                _ => panic!("Unknown action '{}' called on textInput", action_name)
+                "updateValue" => {
+                    let new_val = resolve_and_retrieve_state_var(1).try_into().unwrap();
+                    let new_val = StateVarValue::String(new_val);
+
+                    vec![(*SV_MAP.get("value").unwrap(), new_val)]
+                }
+
+                _ => panic!("Unknown action '{}' called on textInput", action_name),
             }
         },
 

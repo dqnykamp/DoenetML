@@ -13,7 +13,7 @@ pub mod number;
 pub mod text;
 pub mod text_input;
 // pub mod boolean;
-// pub mod p;
+pub mod p;
 pub mod number_input;
 // pub mod boolean_input;
 // pub mod sequence;
@@ -38,7 +38,7 @@ lazy_static! {
             &crate::text_input         ::MY_COMPONENT_DEFINITION,
             &crate::document           ::MY_COMPONENT_DEFINITION,
             // &crate::boolean            ::MY_COMPONENT_DEFINITION,
-            // &crate::p                  ::MY_COMPONENT_DEFINITION,
+            &crate::p                  ::MY_COMPONENT_DEFINITION,
             &crate::number_input       ::MY_COMPONENT_DEFINITION,
             // &crate::boolean_input      ::MY_COMPONENT_DEFINITION,
             // &crate::sequence           ::MY_COMPONENT_DEFINITION,

@@ -248,8 +248,18 @@ impl StateVarInterface<f64> for ImmediateValue {
         let mut updates = Vec::with_capacity(2);
         let bind_value_to_used_default = self.bind_value_to.get_used_default();
 
-        self.raw_renderer_value
-            .request_change_value_to(desired_value.to_string());
+        let mut update_raw_renderer_value = true;
+        if let Some(last_raw_renderer_value) = self.raw_renderer_value.try_get_last_value() {
+            let parsed_raw_value: f64 = last_raw_renderer_value.parse().unwrap_or(f64::NAN);
+            if parsed_raw_value == *desired_value || (desired_value.is_nan() && parsed_raw_value.is_nan()) {
+                update_raw_renderer_value = false;
+            }
+        }
+
+        if update_raw_renderer_value {
+            self.raw_renderer_value
+                .request_change_value_to(desired_value.to_string());
+        }
 
         updates.push(UpdatesRequested {
             instruction_ind: 0,
