@@ -10,7 +10,8 @@ use crate::dast::{
     Position as DastPosition,
 };
 use crate::state::{
-    StateVar, StateVarName, StateVarReadOnlyView, StateVarReadOnlyViewTyped, StateVarValue,
+    MathExpression, StateVar, StateVarName, StateVarReadOnlyView, StateVarReadOnlyViewTyped,
+    StateVarValue,
 };
 use crate::{ComponentIdx, ComponentPointerTextOrMacro, ExtendSource};
 
@@ -283,6 +284,7 @@ pub enum ComponentProfile {
     Number,
     Integer,
     Boolean,
+    Math,
 }
 
 /// When a component designates a component profile state variable,
@@ -302,6 +304,7 @@ pub enum ComponentProfileStateVariable {
     Number(StateVarReadOnlyViewTyped<f64>, StateVarName),
     Integer(StateVarReadOnlyViewTyped<i64>, StateVarName),
     Boolean(StateVarReadOnlyViewTyped<bool>, StateVarName),
+    Math(StateVarReadOnlyViewTyped<MathExpression>, StateVarName),
 }
 
 // TODO: derive these with macro?
@@ -315,6 +318,7 @@ impl ComponentProfileStateVariable {
             ComponentProfileStateVariable::Number(..) => ComponentProfile::Number,
             ComponentProfileStateVariable::Integer(..) => ComponentProfile::Integer,
             ComponentProfileStateVariable::Boolean(..) => ComponentProfile::Boolean,
+            ComponentProfileStateVariable::Math(..) => ComponentProfile::Math,
         }
     }
 
@@ -346,6 +350,10 @@ impl ComponentProfileStateVariable {
             ),
             ComponentProfileStateVariable::Boolean(sv, name) => (
                 StateVarReadOnlyView::Boolean(sv.create_new_read_only_view()),
+                name,
+            ),
+            ComponentProfileStateVariable::Math(sv, name) => (
+                StateVarReadOnlyView::Math(sv.create_new_read_only_view()),
                 name,
             ),
         }
