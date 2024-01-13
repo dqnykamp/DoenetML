@@ -37,7 +37,7 @@ impl ComponentNodeStateVariables for Math {
                 for_renderer: true,
                 name: "value",
                 dependency_instruction_hint: Some(DependencyInstruction::Child {
-                    match_profiles: vec![ComponentProfile::Text],
+                    match_profiles: vec![ComponentProfile::Math, ComponentProfile::String],
                     exclude_if_prefer_profiles: vec![],
                 }),
                 create_dependency_from_extend_source: true,

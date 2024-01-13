@@ -11,20 +11,20 @@ use crate::{
 use super::common::create_dependency_instruction_from_extend_source;
 
 #[derive(Debug)]
-enum MathOrTextValues {
+enum MathOrStringValues {
     Math(StateVarReadOnlyViewTyped<MathExpression>),
-    Text(StateVarReadOnlyViewTyped<String>),
+    String(StateVarReadOnlyViewTyped<String>),
 }
 
-impl Default for MathOrTextValues {
+impl Default for MathOrStringValues {
     fn default() -> Self {
-        MathOrTextValues::Text(StateVarReadOnlyViewTyped::default())
+        MathOrStringValues::String(StateVarReadOnlyViewTyped::default())
     }
 }
 
 #[derive(Debug, Default)]
 pub struct GeneralMathStateVarInterface {
-    math_text_dependency_values: Vec<MathOrTextValues>,
+    math_string_dependency_values: Vec<MathOrStringValues>,
 }
 
 impl StateVarInterface<MathExpression> for GeneralMathStateVarInterface {
@@ -56,7 +56,7 @@ impl StateVarInterface<MathExpression> for GeneralMathStateVarInterface {
     ) -> () {
         let num_dependencies = dependencies.iter().fold(0, |a, c| a + c.len());
 
-        let mut math_or_text_vals = Vec::with_capacity(num_dependencies);
+        let mut math_or_string_vals = Vec::with_capacity(num_dependencies);
 
         for instruction in dependencies.iter() {
             for Dependency {
@@ -64,22 +64,22 @@ impl StateVarInterface<MathExpression> for GeneralMathStateVarInterface {
             } in instruction.iter()
             {
                 match dep_value {
-                    StateVarReadOnlyView::Math(dep_math_value) => math_or_text_vals.push(
-                        MathOrTextValues::Math(dep_math_value.create_new_read_only_view()),
+                    StateVarReadOnlyView::Math(dep_math_value) => math_or_string_vals.push(
+                        MathOrStringValues::Math(dep_math_value.create_new_read_only_view()),
                     ),
-                    StateVarReadOnlyView::String(dep_string_value) => math_or_text_vals.push(
-                        MathOrTextValues::Text(dep_string_value.create_new_read_only_view()),
+                    StateVarReadOnlyView::String(dep_string_value) => math_or_string_vals.push(
+                        MathOrStringValues::String(dep_string_value.create_new_read_only_view()),
                     ),
                     _ => {
                         panic!(
-                            "Got a non-math or text value for a dependency for a GeneralMathStateVarInterface"
+                            "Got a non-math or string value for a dependency for a GeneralMathStateVarInterface"
                         );
                     }
                 }
             }
         }
 
-        self.math_text_dependency_values = math_or_text_vals;
+        self.math_string_dependency_values = math_or_string_vals;
     }
 
     fn calculate_state_var_from_dependencies_and_mark_fresh(
