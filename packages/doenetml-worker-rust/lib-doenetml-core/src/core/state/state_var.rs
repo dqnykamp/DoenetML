@@ -759,6 +759,11 @@ impl<T: Default + Clone> StateVarTyped<T> {
 // Particularly useful for having vectors of mixed type
 ///////////////////////////////////////////////////////////////////////
 
+/// Place holder for a Math type.
+/// TODO: determine how this should work
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct MathExpression(pub f64);
+
 /// The base structure for a state variable.
 ///
 /// Provides access to the `StateVarInterface` methods
@@ -769,6 +774,7 @@ pub enum StateVar {
     Integer(StateVarTyped<i64>),
     String(StateVarTyped<String>),
     Boolean(StateVarTyped<bool>),
+    Math(StateVarTyped<MathExpression>),
 }
 
 /// An untyped, mutable view of the value of the state variable.
@@ -779,6 +785,7 @@ pub enum StateVarMutableView {
     Integer(StateVarMutableViewTyped<i64>),
     String(StateVarMutableViewTyped<String>),
     Boolean(StateVarMutableViewTyped<bool>),
+    Math(StateVarMutableViewTyped<MathExpression>),
 }
 
 /// An untyped, read-only view of the value of the state variable.
@@ -789,6 +796,7 @@ pub enum StateVarReadOnlyView {
     Integer(StateVarReadOnlyViewTyped<i64>),
     String(StateVarReadOnlyViewTyped<String>),
     Boolean(StateVarReadOnlyViewTyped<bool>),
+    Math(StateVarReadOnlyViewTyped<MathExpression>),
 }
 
 /// This can contain the value of a state variable of any type,
@@ -800,6 +808,7 @@ pub enum StateVarValue {
     Number(f64),
     Integer(i64),
     Boolean(bool),
+    Math(MathExpression),
 }
 
 impl StateVar {
@@ -813,6 +822,7 @@ impl StateVar {
             StateVar::Integer(_) => "number",
             StateVar::String(_) => "text",
             StateVar::Boolean(_) => "boolean",
+            StateVar::Math(_) => "math",
         }
     }
 }
