@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{state::StateVarValue, Action};
+use crate::{
+    components::{doenet::text_input::TextInputAction, ComponentAction},
+    state::StateVarValue,
+    Action,
+};
 
 /// The structure of the json argument in a call to dispatch_action.
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,21 +31,28 @@ enum ArgValue {
 
 /// Parse the action json, converting all fields of args into a vector of StateVarVal.
 pub fn parse_action_from_json(action: &str) -> Result<Action, String> {
-    let action_structure: ActionStructure =
-        serde_json::from_str(action).map_err(|e| e.to_string())?;
+    // let action_structure: ActionStructure =
+    //     serde_json::from_str(action).map_err(|e| e.to_string())?;
 
-    let component_idx = action_structure.component_idx;
-    let action_name = action_structure.action_name.clone();
-    let args: HashMap<String, Vec<StateVarValue>> = action_structure
-        .args
-        .into_iter()
-        .map(|(k, v)| (k, v.into()))
-        .collect();
+    // let component_idx = action_structure.component_idx;
+    // let action_name = action_structure.action_name.clone();
+    // let args: HashMap<String, Vec<StateVarValue>> = action_structure
+    //     .args
+    //     .into_iter()
+    //     .map(|(k, v)| (k, v.into()))
+    //     .collect();
+
+    // Ok(Action {
+    //     component_idx,
+    //     action_name,
+    //     args,
+    // })
 
     Ok(Action {
-        component_idx,
-        action_name,
-        args,
+        component_idx: 2,
+        component_action: ComponentAction::TextInput(TextInputAction::UpdateImmediateValue(
+            StateVarValue::String("hello".to_string()),
+        )),
     })
 }
 

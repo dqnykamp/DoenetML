@@ -18,6 +18,7 @@ use super::state::state_var_calculations::{
 use super::state::state_var_updates::process_state_variable_update_request;
 use super::state::{Freshness, StateVarName, StateVarValue};
 
+use crate::components::ComponentAction;
 use crate::utils::parse_json;
 #[allow(unused)]
 use crate::utils::{log, log_debug, log_json};
@@ -241,11 +242,7 @@ pub struct StateVariableShadowingMatch {
 #[derive(Debug)]
 pub struct Action {
     pub component_idx: ComponentIdx,
-    pub action_name: String,
-
-    /// The keys are not state variable names.
-    /// They are whatever name the renderer calls the new value.
-    pub args: HashMap<String, Vec<StateVarValue>>,
+    pub component_action: ComponentAction,
 }
 
 impl DoenetMLCore {
@@ -354,9 +351,9 @@ impl DoenetMLCore {
         let action = parse_json::parse_action_from_json(action)
             .unwrap_or_else(|_| panic!("Error parsing json action: {}", action));
 
-        if action.action_name == "recordVisibilityChange" {
-            return HashMap::new();
-        }
+        // if action.action_name == "recordVisibilityChange" {
+        //     return HashMap::new();
+        // }
 
         let component_idx = action.component_idx;
 
@@ -382,11 +379,9 @@ impl DoenetMLCore {
         {
             // A call to on_action from a component processes the arguments and returns a vector
             // of component state variables with requested new values
-            let state_vars_to_update = self.components[component_idx].borrow().on_action(
-                &action.action_name,
-                action.args,
-                &mut state_var_resolver,
-            );
+            let state_vars_to_update = self.components[component_idx]
+                .borrow()
+                .on_action(action.component_action, &mut state_var_resolver);
 
             for (state_var_idx, requested_value) in state_vars_to_update {
                 let freshness;
