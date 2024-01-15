@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::components::prelude::*;
+use crate::components::{prelude::*, ComponentAction};
 
 #[derive(Debug, Default, ComponentNode)]
 pub struct TextInput {
@@ -18,6 +18,12 @@ pub struct TextInputRenderData {
     pub id: usize,
 
     pub immediate_value: String,
+}
+
+#[derive(Debug)]
+pub enum TextInputAction {
+    UpdateImmediateValue(StateVarValue),
+    UpdateValue,
 }
 
 impl RenderedComponentNode for TextInput {
@@ -77,35 +83,34 @@ impl RenderedComponentNode for TextInput {
 
     fn on_action(
         &self,
-        action_name: &str,
-        args: HashMap<String, Vec<StateVarValue>>,
+        action: ComponentAction,
         resolve_and_retrieve_state_var: &mut dyn FnMut(usize) -> StateVarValue,
     ) -> Vec<(usize, StateVarValue)> {
-        match action_name {
-            "updateImmediateValue" => {
-                let new_val = args.get("text").expect("No text argument").first().unwrap();
-
-                vec![
-                    (
+        match action {
+            ComponentAction::TextInput(text_input_action) => match text_input_action {
+                TextInputAction::UpdateImmediateValue(value) => {
+                    vec![
+                        (
+                            self.common.state_variable_name_to_index["immediateValue"],
+                            value,
+                        ),
+                        (
+                            self.common.state_variable_name_to_index["syncImmediateValue"],
+                            StateVarValue::Boolean(false),
+                        ),
+                    ]
+                }
+                TextInputAction::UpdateValue => {
+                    let new_val = resolve_and_retrieve_state_var(
                         self.common.state_variable_name_to_index["immediateValue"],
-                        new_val.clone(),
-                    ),
-                    (
-                        self.common.state_variable_name_to_index["syncImmediateValue"],
-                        StateVarValue::Boolean(false),
-                    ),
-                ]
+                    );
+
+                    vec![(self.common.state_variable_name_to_index["value"], new_val)]
+                }
+            },
+            _ => {
+                panic!("Invalid action called on {}", self.get_component_type());
             }
-
-            "updateValue" => {
-                let new_val = resolve_and_retrieve_state_var(
-                    self.common.state_variable_name_to_index["immediateValue"],
-                );
-
-                vec![(self.common.state_variable_name_to_index["value"], new_val)]
-            }
-
-            _ => panic!("Unknown action '{}' called on textInput", action_name),
         }
     }
 }

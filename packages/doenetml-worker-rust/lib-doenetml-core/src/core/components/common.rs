@@ -20,7 +20,7 @@ use super::doenet::document::Document;
 use super::doenet::p::P;
 use super::doenet::section::Section;
 use super::doenet::text::Text;
-use super::doenet::text_input::TextInput;
+use super::doenet::text_input::{TextInput, TextInputAction};
 
 /// camelCase
 pub type AttributeName = &'static str;
@@ -43,6 +43,11 @@ pub enum ComponentEnum {
     P(P),
     _Error(_Error),
     _External(_External),
+}
+
+#[derive(Debug)]
+pub enum ComponentAction {
+    TextInput(TextInputAction),
 }
 
 #[derive(Debug, Default)]
@@ -245,15 +250,10 @@ pub trait RenderedComponentNode: ComponentNode {
     #[allow(unused)]
     fn on_action(
         &self,
-        action_name: &str,
-        args: HashMap<String, Vec<StateVarValue>>,
+        action: ComponentAction,
         resolve_and_retrieve_state_var: &mut dyn FnMut(usize) -> StateVarValue,
     ) -> Vec<(usize, StateVarValue)> {
-        panic!(
-            "Unknown action '{}' called on {}",
-            action_name,
-            self.get_component_type()
-        );
+        panic!("Invalid action called on {}", self.get_component_type());
     }
 }
 
