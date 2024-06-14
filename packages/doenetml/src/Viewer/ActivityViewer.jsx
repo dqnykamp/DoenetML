@@ -61,6 +61,7 @@ export function ActivityViewer({
     addBottomPadding = true,
     scrollableContainer = window,
     darkMode,
+    showAnswerTitles,
 }) {
     const [errMsg, setErrMsg] = useState(null);
 
@@ -697,7 +698,7 @@ export function ActivityViewer({
 
     async function saveLoadedLocalStateToDatabase(localInfo) {
         if (!flags.allowSaveState || !apiURLs.saveActivityState) {
-            return;
+            return {};
         }
 
         let serverSaveId = await idb_get(
@@ -1501,6 +1502,7 @@ export function ActivityViewer({
                     errorsActivitySpecific={errorsActivitySpecific.current}
                     scrollableContainer={scrollableContainer}
                     darkMode={darkMode}
+                    showAnswerTitles={showAnswerTitles}
                 />
             );
 

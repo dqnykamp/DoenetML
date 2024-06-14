@@ -63,7 +63,7 @@ export type FullAddressMacro = {
     path: Path;
     attributes: PropAttrs;
 } & {
-    position?: {
+    position: {
         start: { offset: number; line: number; column: number };
         end: { offset: number; line: number; column: number };
     };
