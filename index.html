@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html> 
+     <script type="module" src="./standalone/doenet-standalone.js"> </script>
+    <link rel="stylesheet" href="./standalone/style.css">
+<body onload="onPageLoad()">
+ 
+<script>
+function onPageLoad() {
+  window.renderDoenetToContainer(document.querySelector(".doenetml-applet"));
+}
+</script>
+
+ <div class="doenetml-applet">
+     <script type="text/doenetml">
+        <section>
+          <title>Sticky groups</title>
+          <codeEditor showResults resultsLocation="left" height="600">
+
+              <graph>
+                <stickyGroup>
+
+
+                  <regularPolygon numSides="4" center="(-6, -6)" sideLength="2" filled />
+          
+                  <regularPolygon
+                    numSides="6"
+                    rigid
+                    center="(7, -6)"
+                    sideLength="2"
+                    filled
+                    styleNumber="4"
+                  />
+          
+                  <polygon
+                    vertices="(1,2) (3,4) (-5,6)"
+                    rigid
+                    name="a"
+                    layer="2"
+                    styleNumber="3"
+                    filled
+                  />
+          
+                  <polyline vertices="(-1,-2) (-3,-2) (2,-6)" rigid />
+          
+                  <polygon vertices="(7,6) (5,4) (9,1) (7,3)" styleNumber="2" filled />
+          
+                  <point styleNumber="5">(-6,2)</point>
+          
+          
+                </stickyGroup>
+              </graph>
+            </codeEditor>
+          </section>
+          <section>
+            <title>Tangrams!</title>
+          
+            <codeEditor showResults resultsLocation="top" height="800" viewerRatio="0.7">
+          
+              <graph>
+                <stickyGroup>
+                   <polygon
+                    vertices="(0,0) (4,0) (0,4)"
+                    rigid
+                    name="LT1"
+                    styleNumber="1"
+                    filled
+                  />
+          
+                  <polygon
+                    vertices="(0,0) (4,0) (0,-4)"
+                    rigid
+                    name="LT2"
+                    styleNumber="2"
+                    filled
+                  />
+          
+                  <polygon
+                    vertices="(0, 0) (0, 2) (-2, 2) (-2, 0)"
+                    rigid
+                    name="S"
+                    styleNumber="3"
+                    filled
+                  />
+          
+                  <polygon
+                    vertices="(-2, 0) (0, 0) (0, -2)"
+                    rigid
+                    name="ST1"
+                    styleNumber="4"
+                    filled
+                  />
+          
+                  <polygon
+                    vertices="(-2, 2) (-4, 0) (-2, -2)"
+                    rigid
+                    name="MT"
+                    styleNumber="1"
+                    filled
+                  />
+          
+                  <polygon
+                    vertices="(0, 4) (0, 2) (-2, 2)"
+                    rigid
+                    name="ST2"
+                    styleNumber="2"
+                    filled
+                  />
+          
+                  <polygon
+                    vertices="(-2, 0) (0, -2) (0,-4) (-2, -2)"
+                    rigid
+                    name="PG"
+                    styleNumber="3"
+                    filled
+                  />
+          
+          
+                </stickyGroup>
+              </graph>
+            </codeEditor>
+          </section>
+     </script>
+ </div>
+
+</body>

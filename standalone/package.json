@@ -1,0 +1,19 @@
+{
+    "name": "@doenet/standalone",
+    "type": "module",
+    "description": "Standalone renderer for DoenetML suitable for being included in a web page",
+    "version": "0.7.0-alpha7",
+    "license": "AGPL-3.0-or-later",
+    "homepage": "https://github.com/Doenet/DoenetML#readme",
+    "repository": "github:Doenet/DoenetML",
+    "files": [
+        "./"
+    ],
+    "exports": {
+        ".": {
+            "import": "./doenet-standalone.js"
+        }
+    },
+    "private": false,
+    "peerDependencies": {}
+}
