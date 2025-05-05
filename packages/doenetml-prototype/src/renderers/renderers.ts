@@ -21,6 +21,7 @@ import {
     Li,
     Ul,
     ChoiceInput,
+    Em,
 } from "./doenet";
 import * as PretextComponent from "./pretext-xml";
 import { PointInText } from "./doenet/text-point";
@@ -85,6 +86,7 @@ export const TEXT_MODE_COMPONENTS: RendererObject = {
     ol: { component: Ol, passthroughChildren: true },
     ul: { component: Ul, passthroughChildren: true },
     li: { component: Li, passthroughChildren: true },
+    em: { component: Em, passthroughChildren: true },
 
     // For PreTeXt compatibility
     pretext: { component: _Fragment, passthroughChildren: true },
@@ -135,6 +137,7 @@ export const PRETEXT_TEXT_MODE_COMPONENTS: RendererObject = {
     ol: { component: PretextComponent.Ol, passthroughChildren: true },
     ul: { component: PretextComponent.Ul, passthroughChildren: true },
     li: { component: PretextComponent.Li, passthroughChildren: true },
+    em: { component: Em, passthroughChildren: true },
 
     // For PreTeXt compatibility
     pretext: {

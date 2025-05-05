@@ -29,7 +29,7 @@ export default function TestViewer() {
     const [controlsVisible, setControlsVisible] = useState(false);
     const [testSettings, setTestSettings] = useState(defaultTestSettings);
     const [updateNumber, setUpdateNumber] = useState(0);
-    const [usePrototype, setUsePrototype] = useState(false);
+    const [usePrototype, setUsePrototype] = useState(true);
 
     let {
         requestedVariantIndex,
