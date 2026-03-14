@@ -1,7 +1,8 @@
 import * as Comlink from "comlink";
 import Worker from "./worker?worker&inline";
+import SharedWorkerFactory from "./shared-worker?sharedworker";
 import type { api } from "./worker";
-import { PREFIG_WHEEL_FILENAME } from "./worker/compiler";
+import { PREFIG_WHEEL_FILENAME } from "./worker/wheel-filename";
 
 declare const PREFIGURE_VERSION: string;
 
@@ -17,10 +18,28 @@ export type PrefigureCompileOptions = {
     indexURL?: string;
 };
 
+export type PrefigureKeepaliveHandle = {
+    disconnect(): void;
+};
+
+export type PrefigureRuntimeStatus = {
+    transport: "shared" | "dedicated";
+    connected: boolean;
+    initialized: boolean;
+};
+
 type WorkerApi = typeof api;
 type PrefigureWorkerApi = Comlink.Remote<WorkerApi>;
+type WorkerTransport = "shared" | "dedicated";
 
-let workerApiPromise: Promise<PrefigureWorkerApi> | null = null;
+type WorkerConnection = {
+    api: PrefigureWorkerApi;
+    transport: WorkerTransport;
+    port?: MessagePort;
+};
+
+let workerConnectionPromise: Promise<WorkerConnection> | null = null;
+let resolvedTransport: WorkerTransport | null = null;
 let initPromise: Promise<void> | null = null;
 let initializedIndexUrl: string | null = null;
 
@@ -31,29 +50,90 @@ const GLOBAL_SCOPE = globalThis as typeof globalThis & {
     initPrefigure?: typeof initPrefigure;
 };
 
-function ensureWorkerApi() {
-    if (!workerApiPromise) {
-        workerApiPromise = Promise.resolve(
-            Comlink.wrap<WorkerApi>(new Worker()) as PrefigureWorkerApi,
-        );
+async function createWorkerConnection(): Promise<WorkerConnection> {
+    const forceDedicated = !!(GLOBAL_SCOPE as any)
+        .__DOENET_PREFIGURE_FORCE_DEDICATED__;
+    if (!forceDedicated) {
+        try {
+            // Use a dedicated shared-worker entrypoint instead of self-loading this
+            // module to avoid nested worker creation in SharedWorker scope.
+            const sw = new SharedWorkerFactory();
+            const port = sw.port;
+            port.start();
+            const workerApi = Comlink.wrap<WorkerApi>(
+                port,
+            ) as PrefigureWorkerApi;
+            return { api: workerApi, transport: "shared", port };
+        } catch {
+            // SharedWorker creation can fail for cross-origin or browser policy reasons.
+            // Fall back to a dedicated worker.
+        }
     }
 
-    return workerApiPromise;
+    const workerApi = Comlink.wrap<WorkerApi>(
+        new Worker(),
+    ) as PrefigureWorkerApi;
+    return { api: workerApi, transport: "dedicated" };
+}
+
+function ensureWorkerConnection(): Promise<WorkerConnection> {
+    if (!workerConnectionPromise) {
+        workerConnectionPromise = createWorkerConnection().then((conn) => {
+            resolvedTransport = conn.transport;
+            return conn;
+        });
+    }
+    return workerConnectionPromise;
+}
+
+function ensureWorkerApi(): Promise<PrefigureWorkerApi> {
+    return ensureWorkerConnection().then((conn) => conn.api);
+}
+
+/**
+ * Connect to the prefigure runtime worker without initializing Pyodide.
+ */
+export async function connectPrefigureSharedWorker(): Promise<PrefigureKeepaliveHandle> {
+    const conn = await ensureWorkerConnection();
+    return {
+        disconnect() {
+            if (conn.port) {
+                conn.port.close();
+                workerConnectionPromise = null;
+            }
+        },
+    };
+}
+
+/**
+ * Return runtime transport/connection status without opening a new connection.
+ */
+export function getPrefigureRuntimeStatus(): PrefigureRuntimeStatus {
+    return {
+        transport: resolvedTransport ?? "dedicated",
+        connected: workerConnectionPromise !== null,
+        initialized: initializedIndexUrl !== null,
+    };
 }
 
 export function defaultPrefigureIndexUrl(): string {
     // Default to sibling assets relative to the module URL.
-    // Callers can pass an explicit indexURL when loading prefigure from a non-standard location.
     return new URL("./assets/", import.meta.url).toString();
 }
 
 /**
  * Initialize the prefigure worker runtime.
- *
- * Initialization is idempotent for the same `indexURL` and rejects if called
- * again with a different URL after a successful initialization.
  */
 export async function initPrefigure(indexURL?: string) {
+    // If initialization is already in progress or complete and no explicit URL
+    // was given, reuse the existing initialization without a URL conflict check.
+    // This prevents false conflicts when compilePrefigure() calls initPrefigure()
+    // with undefined and import.meta.url resolves differently from the URL that
+    // was passed during warmup (e.g., explicit PREFIGURE_INDEX_URL vs. CDN default).
+    if (initPromise && indexURL === undefined) {
+        return initPromise;
+    }
+
     const effectiveIndexUrl = indexURL ?? defaultPrefigureIndexUrl();
 
     const normalizedIndexUrl = effectiveIndexUrl.endsWith("/")
@@ -87,9 +167,6 @@ export async function initPrefigure(indexURL?: string) {
 
 /**
  * Compile PreFigure XML into SVG and annotations XML.
- *
- * This ensures the worker runtime is initialized before delegating to the
- * worker `compile` method.
  */
 export async function compilePrefigure(
     source: string,

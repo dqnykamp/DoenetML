@@ -14,6 +14,20 @@ declare module "*?worker&inline" {
     export default WorkerFactory;
 }
 
+declare module "*?sharedworker" {
+    const SharedWorkerFactory: {
+        new (): SharedWorker;
+    };
+    export default SharedWorkerFactory;
+}
+
+declare module "*?sharedworker&inline" {
+    const SharedWorkerFactory: {
+        new (): SharedWorker;
+    };
+    export default SharedWorkerFactory;
+}
+
 declare module "*?raw" {
     const content: string;
     export default content;

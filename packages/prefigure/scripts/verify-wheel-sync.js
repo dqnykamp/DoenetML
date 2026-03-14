@@ -23,13 +23,32 @@ export function verifyWheelSync({ compilerPath, pyodidePackagesDir }) {
         /export const PREFIG_WHEEL_FILENAME = "([^"]+)";/,
     );
 
-    if (!constantMatch) {
-        throw new Error(
-            "Could not parse PREFIG_WHEEL_FILENAME from compiler.ts",
-        );
-    }
+    let configuredWheel = constantMatch?.[1];
 
-    const configuredWheel = constantMatch[1];
+    if (!configuredWheel) {
+        const wheelFilenamePath = path.join(
+            path.dirname(compilerPath),
+            "wheel-filename.ts",
+        );
+        if (!fs.existsSync(wheelFilenamePath)) {
+            throw new Error(
+                "Could not parse PREFIG_WHEEL_FILENAME from compiler.ts and wheel-filename.ts was not found",
+            );
+        }
+
+        const wheelContent = fs.readFileSync(wheelFilenamePath, "utf8");
+        const wheelMatch = wheelContent.match(
+            /export const PREFIG_WHEEL_FILENAME = "([^"]+)";/,
+        );
+
+        if (!wheelMatch) {
+            throw new Error(
+                "Could not parse PREFIG_WHEEL_FILENAME from wheel-filename.ts",
+            );
+        }
+
+        configuredWheel = wheelMatch[1];
+    }
     if (
         !(
             configuredWheel.startsWith("prefig-") &&

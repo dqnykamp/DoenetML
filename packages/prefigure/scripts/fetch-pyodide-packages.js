@@ -108,12 +108,34 @@ function readPrefigWheelFilename() {
     const match = content.match(
         /export const PREFIG_WHEEL_FILENAME = "([^"]+)";/,
     );
-    if (!match) {
+    if (match) {
+        return match[1];
+    }
+
+    const wheelFilenamePath = path.join(
+        PACKAGE_ROOT,
+        "src",
+        "worker",
+        "wheel-filename.ts",
+    );
+    if (!fs.existsSync(wheelFilenamePath)) {
         throw new Error(
-            "Could not find PREFIG_WHEEL_FILENAME constant in src/worker/compiler.ts",
+            "Could not find PREFIG_WHEEL_FILENAME in src/worker/compiler.ts and src/worker/wheel-filename.ts was not found",
         );
     }
-    return match[1];
+
+    const wheelContent = fs.readFileSync(wheelFilenamePath, "utf8");
+    const wheelMatch = wheelContent.match(
+        /export const PREFIG_WHEEL_FILENAME = "([^"]+)";/,
+    );
+
+    if (!wheelMatch) {
+        throw new Error(
+            "Could not parse PREFIG_WHEEL_FILENAME in src/worker/wheel-filename.ts",
+        );
+    }
+
+    return wheelMatch[1];
 }
 
 // ---------------------------------------------------------------------------

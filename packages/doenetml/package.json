@@ -18,6 +18,10 @@
             "import": "./dist/index.js",
             "require": "./dist/index.js"
         },
+        "./prefigure-keepalive": {
+            "import": "./dist/prefigure-keepalive.js",
+            "require": "./dist/prefigure-keepalive.js"
+        },
         "./*": {
             "import": "./dist/*",
             "require": "./dist/*"

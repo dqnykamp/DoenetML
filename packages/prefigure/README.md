@@ -84,9 +84,53 @@ Current coverage includes API-level behavior tests for:
 - default index URL resolution
 - `initPrefigure()` idempotency and conflicting-URL guard
 - `compilePrefigure()` delegation/result mapping
+- `connectPrefigureSharedWorker()` connect-only semantics
+- transport status reporting via `getPrefigureRuntimeStatus()`
 
 The browser smoke harness remains useful as a manual runtime check for real
 Pyodide+WASM execution.
+
+## Shared Worker Keepalive
+
+When `SharedWorker` is available the package uses a shared worker so that all
+same-origin pages share one Pyodide runtime.  Pages that do **not** render
+diagrams can still keep the worker alive by calling `connectPrefigureSharedWorker()`:
+
+```js
+import { connectPrefigureSharedWorker } from "@doenet/prefigure";
+
+// Connect to the shared worker without initializing Pyodide.
+const keepAlive = await connectPrefigureSharedWorker();
+
+// Later, when this page no longer needs to hold the worker open:
+keepAlive.disconnect();
+```
+
+**Origin constraint**: SharedWorker is shared only across pages on the
+*same origin*.  Loading this module from a CDN URL means the shared worker
+identity is bound to that CDN origin, so inline-bundled workers (the default
+Vite build) are used to avoid cross-origin restrictions.
+
+**Fallback**: if `SharedWorker` is not available (e.g. older browsers, private
+browsing mode, Node.js test environments) the package falls back transparently
+to a dedicated `Worker`.  All API shapes remain identical.
+
+**Browser eviction**: browsers may still evict the shared worker when all
+connected pages close their ports or when the browser decides to reclaim
+resources.  The keepalive mechanism is best-effort.
+
+### Runtime status
+
+```js
+import { getPrefigureRuntimeStatus } from "@doenet/prefigure";
+
+const { transport, connected, initialized } = getPrefigureRuntimeStatus();
+// transport: "shared" | "dedicated"
+// connected: whether a worker connection has been established
+// initialized: whether Pyodide has been initialized
+```
+
+
 
 ## Wheel Requirement
 

@@ -12,6 +12,17 @@ import doenetMLstring from "./testCode.doenet?raw";
 // `false`: use runtime defaults (CDN module URL from prefigureConfig).
 const USE_LOCAL_PREFIGURE = true;
 
+// Toggle this to force a dedicated (non-shared) worker for comparison.
+// `true`: skip SharedWorker, always use a dedicated worker (old behavior).
+// `false`: prefer SharedWorker, fall back to dedicated (new behavior).
+const USE_DEDICATED_WORKER = false;
+
+if (USE_DEDICATED_WORKER) {
+    (globalThis as any).__DOENET_PREFIGURE_FORCE_DEDICATED__ = true;
+} else {
+    delete (globalThis as any).__DOENET_PREFIGURE_FORCE_DEDICATED__;
+}
+
 if (USE_LOCAL_PREFIGURE) {
     (globalThis as any).__DOENET_PREFIGURE_MODULE_URL__ = new URL(
         PREFIGURE_LOCAL_MODULE_URL,
