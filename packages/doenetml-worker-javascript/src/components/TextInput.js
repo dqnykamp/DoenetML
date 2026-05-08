@@ -37,6 +37,10 @@ export default class Textinput extends Input {
     }
     static componentType = "textInput";
 
+
+    static componentDocs = {
+        summary: "An interactive text input.",
+    };
     static variableForImplicitProp = "value";
 
     static processWhenJustUpdatedForNewComponent = true;
@@ -44,6 +48,7 @@ export default class Textinput extends Input {
     static createAttributesObject() {
         let attributes = super.createAttributesObject();
         attributes.prefill = {
+            description: "Initial text shown in the input before the user types.",
             createComponentOfType: "text",
             createStateVariable: "prefill",
             defaultValue: "",
@@ -53,6 +58,7 @@ export default class Textinput extends Input {
             createComponentOfType: "text",
         };
         attributes.expanded = {
+            description: "Whether the input renders as a multi-line text area.",
             createComponentOfType: "boolean",
             createStateVariable: "expanded",
             defaultValue: false,
@@ -64,6 +70,7 @@ export default class Textinput extends Input {
             createComponentOfType: "componentSize",
         };
         attributes.height = {
+            description: "Display height of the input.",
             createComponentOfType: "componentSize",
             createStateVariable: "height",
             defaultValue: { size: 120, isAbsolute: true },
@@ -71,6 +78,7 @@ export default class Textinput extends Input {
             public: true,
         };
         attributes.draggable = {
+            description: "Whether the input can be dragged on a graph.",
             createComponentOfType: "boolean",
             createStateVariable: "draggable",
             defaultValue: true,
@@ -127,6 +135,7 @@ export default class Textinput extends Input {
         Object.assign(stateVariableDefinitions, anchorDefinition);
 
         stateVariableDefinitions.width = {
+            description: "Display width of the input.",
             forRenderer: true,
             hasEssential: true,
             public: true,
@@ -194,6 +203,7 @@ export default class Textinput extends Input {
         };
 
         stateVariableDefinitions.valueChanged = {
+            description: "Whether the saved text has been changed from its initial state.",
             public: true,
             hasEssential: true,
             defaultValue: false,
@@ -220,6 +230,7 @@ export default class Textinput extends Input {
         };
 
         stateVariableDefinitions.value = {
+            description: "The most recently saved text value.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -318,6 +329,7 @@ export default class Textinput extends Input {
         };
 
         stateVariableDefinitions.immediateValueChanged = {
+            description: "Whether the live text differs from its initial state.",
             public: true,
             hasEssential: true,
             defaultValue: false,
@@ -346,6 +358,7 @@ export default class Textinput extends Input {
         };
 
         stateVariableDefinitions.immediateValue = {
+            description: "The current text being entered (live, before saving).",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -430,6 +443,7 @@ export default class Textinput extends Input {
         };
 
         stateVariableDefinitions.text = {
+            description: "The current text as a plain text string.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",

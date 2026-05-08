@@ -12,6 +12,10 @@ import { returnUnorderedListStateVariableDefinitions } from "../utils/unorderedL
 export default class VectorListComponent extends CompositeComponent {
     static componentType = "vectorList";
 
+
+    static componentDocs = {
+        summary: "A list of vectors.",
+    };
     static stateVariableToEvaluateAfterReplacements =
         "readyToExpandWhenResolved";
 
@@ -41,6 +45,7 @@ export default class VectorListComponent extends CompositeComponent {
         };
 
         attributes.maxNumber = {
+            description: "Maximum number of vectors to retain in the list.",
             createComponentOfType: "number",
             createStateVariable: "maxNumber",
             defaultValue: Infinity,
@@ -131,6 +136,7 @@ export default class VectorListComponent extends CompositeComponent {
         };
 
         stateVariableDefinitions.numVectors = {
+            description: "The number of vectors in the list.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "number",

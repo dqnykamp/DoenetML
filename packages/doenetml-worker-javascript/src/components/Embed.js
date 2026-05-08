@@ -10,11 +10,16 @@ export default class Embed extends BlockComponent {
     }
     static componentType = "embed";
 
+
+    static componentDocs = {
+        summary: "Embeds external content (e.g. an iframe) into the document.",
+    };
     static excludeFromSchema = true;
 
     static createAttributesObject() {
         let attributes = super.createAttributesObject();
         attributes.width = {
+            description: "Display width of the embedded content.",
             createComponentOfType: "componentSize",
             createStateVariable: "width",
             defaultValue: { size: 500, isAbsolute: true },
@@ -22,6 +27,7 @@ export default class Embed extends BlockComponent {
             forRenderer: true,
         };
         attributes.height = {
+            description: "Display height of the embedded content.",
             createComponentOfType: "componentSize",
             createStateVariable: "height",
             defaultValue: { size: 500, isAbsolute: true },
@@ -29,6 +35,7 @@ export default class Embed extends BlockComponent {
             forRenderer: true,
         };
         attributes.geogebra = {
+            description: "Identifier of a GeoGebra activity to embed.",
             createComponentOfType: "text",
             createStateVariable: "geogebra",
             defaultValue: null,
@@ -36,6 +43,7 @@ export default class Embed extends BlockComponent {
             forRenderer: true,
         };
         attributes.encodedGeogebraContent = {
+            description: "Base64-encoded GeoGebra worksheet content.",
             createComponentOfType: "text",
             createStateVariable: "encodedGeogebraContent",
             defaultValue: null,
@@ -43,6 +51,7 @@ export default class Embed extends BlockComponent {
             forRenderer: true,
         };
         attributes.fromMathInsight = {
+            description: "Identifier of a MathInsight resource to embed.",
             createComponentOfType: "text",
             createStateVariable: "fromMathInsight",
             defaultValue: null,

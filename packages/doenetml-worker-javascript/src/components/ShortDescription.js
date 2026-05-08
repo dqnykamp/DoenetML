@@ -3,6 +3,10 @@ import { renameStateVariable } from "../utils/stateVariables";
 
 export default class ShortDescription extends TextComponent {
     static componentType = "shortDescription";
+
+    static componentDocs = {
+        summary: "A short accessibility description for an enclosing component.",
+    };
     static rendererType = "text";
 
     static inSchemaOnlyInheritAs = [];
@@ -34,6 +38,7 @@ export default class ShortDescription extends TextComponent {
         };
 
         stateVariableDefinitions.value = {
+            description: "The short description text.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: this.componentType,

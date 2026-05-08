@@ -13,6 +13,10 @@ export default class SamplePrimeNumbers extends CompositeComponent {
     }
     static componentType = "samplePrimeNumbers";
 
+
+    static componentDocs = {
+        summary: "Samples random prime numbers.",
+    };
     static takesIndex = true;
 
     static allowInSchemaAsComponent = ["integer"];
@@ -28,6 +32,7 @@ export default class SamplePrimeNumbers extends CompositeComponent {
         let attributes = super.createAttributesObject();
 
         attributes.numSamples = {
+            description: "Number of prime samples to draw.",
             createComponentOfType: "number",
             createStateVariable: "numSamples",
             defaultValue: 1,
@@ -35,12 +40,14 @@ export default class SamplePrimeNumbers extends CompositeComponent {
         };
 
         attributes.from = {
+            description: "Lower bound (inclusive) of the prime range to sample from.",
             createComponentOfType: "integer",
             createStateVariable: "from",
             defaultValue: 2,
             public: true,
         };
         attributes.to = {
+            description: "Upper bound (inclusive) of the prime range to sample from.",
             createComponentOfType: "integer",
             createStateVariable: "to",
             defaultValue: 100,
@@ -48,6 +55,7 @@ export default class SamplePrimeNumbers extends CompositeComponent {
         };
 
         attributes.exclude = {
+            description: "Primes to exclude from the sample.",
             createComponentOfType: "numberList",
             createStateVariable: "exclude",
             defaultValue: [],
@@ -55,6 +63,7 @@ export default class SamplePrimeNumbers extends CompositeComponent {
         };
 
         attributes.variantDeterminesSeed = {
+            description: "Whether the document's variant index determines the random seed.",
             createPrimitiveOfType: "boolean",
             createStateVariable: "variantDeterminesSeed",
             defaultPrimitiveValue: false,

@@ -15,6 +15,11 @@ import { copyStateFromUnlinkedSource, remapExtendIndices } from "./Repeat";
 export default class RepeatForSequence extends CompositeComponent {
     static componentType = "repeatForSequence";
 
+
+    static componentDocs = {
+        summary:
+            "Repeats template content for each value in an arithmetic sequence.",
+    };
     static takesIndex = true;
 
     static allowInSchemaAsComponent = ["_inline", "_block", "_graphical"];

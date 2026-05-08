@@ -12,6 +12,10 @@ export default class CodeEditor extends BlockComponent {
     }
     static componentType = "codeEditor";
 
+
+    static componentDocs = {
+        summary: "An interactive code editor.",
+    };
     static variableForImplicitProp = "value";
 
     static renderChildren = true;
@@ -29,6 +33,7 @@ export default class CodeEditor extends BlockComponent {
     static createAttributesObject() {
         let attributes = super.createAttributesObject();
         attributes.prefill = {
+            description: "Initial code shown in the editor before the user types.",
             createComponentOfType: "text",
             createStateVariable: "prefill",
             defaultValue: "",
@@ -39,6 +44,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         attributes.width = {
+            description: "Editor width (e.g. \"100%\" or \"600px\").",
             createComponentOfType: "componentSize",
             createStateVariable: "width",
             defaultValue: { size: `100`, isAbsolute: false },
@@ -46,6 +52,7 @@ export default class CodeEditor extends BlockComponent {
             public: true,
         };
         attributes.height = {
+            description: "Editor height (e.g. \"500px\").",
             createComponentOfType: "componentSize",
             createStateVariable: "height",
             defaultValue: { size: 400, isAbsolute: true },
@@ -59,6 +66,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         attributes.showResults = {
+            description: "Whether to render the results panel alongside the editor.",
             createComponentOfType: "boolean",
             createStateVariable: "showResults",
             defaultValue: false,
@@ -67,6 +75,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         attributes.showFormatter = {
+            description: "Whether to show a code formatter button.",
             createComponentOfType: "boolean",
             createStateVariable: "showFormatter",
             defaultValue: false,
@@ -75,6 +84,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         attributes.resultsLocation = {
+            description: "Position of the results panel relative to the editor.",
             createComponentOfType: "text",
             createStateVariable: "resultsLocation",
             defaultValue: "bottom",
@@ -85,6 +95,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         attributes.readOnly = {
+            description: "Whether the editor is read-only.",
             createComponentOfType: "boolean",
             createStateVariable: "readOnly",
             defaultValue: false,
@@ -146,6 +157,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         stateVariableDefinitions.valueChanged = {
+            description: "Whether the saved value has been changed from its initial state.",
             public: true,
             hasEssential: true,
             defaultValue: false,
@@ -172,6 +184,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         stateVariableDefinitions.value = {
+            description: "The most recently saved code value.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -260,6 +273,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         stateVariableDefinitions.immediateValueChanged = {
+            description: "Whether the live (immediate) value has been changed from its initial state.",
             public: true,
             hasEssential: true,
             defaultValue: false,
@@ -288,6 +302,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         stateVariableDefinitions.immediateValue = {
+            description: "The current code in the editor (live, before saving).",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -373,6 +388,7 @@ export default class CodeEditor extends BlockComponent {
         };
 
         stateVariableDefinitions.text = {
+            description: "The current code as a plain text string.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",

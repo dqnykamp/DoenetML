@@ -2,12 +2,17 @@ import GraphicalComponent from "./abstract/GraphicalComponent";
 
 export default class RegionHalfPlane extends GraphicalComponent {
     static componentType = "regionHalfPlane";
+
+    static componentDocs = {
+        summary: "A half-plane region bounded by a line.",
+    };
     static rendererType = undefined;
 
     static createAttributesObject() {
         let attributes = super.createAttributesObject();
 
         attributes.horizontal = {
+            description: "Whether the half-plane is bounded by a horizontal line.",
             createComponentOfType: "boolean",
             createStateVariable: "horizontal",
             defaultValue: true,
@@ -15,6 +20,7 @@ export default class RegionHalfPlane extends GraphicalComponent {
         };
 
         attributes.boundaryValue = {
+            description: "Value of the bounding line (e.g. y = boundaryValue).",
             createComponentOfType: "number",
             createStateVariable: "boundaryValue",
             defaultValue: 0,
@@ -22,6 +28,7 @@ export default class RegionHalfPlane extends GraphicalComponent {
         };
 
         attributes.greaterThan = {
+            description: "Whether the region is the side where the inequality is greater than the boundary.",
             createComponentOfType: "boolean",
             createStateVariable: "greaterThan",
             defaultValue: true,

@@ -3,6 +3,10 @@ import InlineComponent from "./abstract/InlineComponent";
 export default class TextList extends InlineComponent {
     static componentType = "randomizedTextList";
 
+
+    static componentDocs = {
+        summary: "A list of texts in randomized order.",
+    };
     static excludeFromSchema = true;
 
     // when another component has a attribute that is a textList,
@@ -84,6 +88,7 @@ export default class TextList extends InlineComponent {
         let stateVariableDefinitions = super.returnStateVariableDefinitions();
 
         stateVariableDefinitions.texts = {
+            description: "The list of texts in randomized order.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -127,6 +132,7 @@ export default class TextList extends InlineComponent {
         };
 
         stateVariableDefinitions.text = {
+            description: "The randomized texts joined as a single text string.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -143,6 +149,7 @@ export default class TextList extends InlineComponent {
         };
 
         stateVariableDefinitions.numComponents = {
+            description: "The number of texts in the list.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "number",

@@ -11,6 +11,10 @@ export class SideBySide extends BlockComponent {
         });
     }
     static componentType = "sideBySide";
+
+    static componentDocs = {
+        summary: "Lays children out side-by-side.",
+    };
     static renderChildren = true;
     static canDisplayChildErrors = true;
 
@@ -470,6 +474,7 @@ export class SideBySide extends BlockComponent {
         };
 
         stateVariableDefinitions.absoluteMeasurements = {
+            description: "Whether children's widths are interpreted in absolute units.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "boolean",
@@ -497,6 +502,7 @@ export class SideBySide extends BlockComponent {
         };
 
         stateVariableDefinitions.allWidths = {
+            description: "All children's widths combined.",
             additionalStateVariablesDefined: [
                 "allMargins",
                 {
@@ -659,6 +665,7 @@ export class SideBySide extends BlockComponent {
         };
 
         stateVariableDefinitions.widths = {
+            description: "The list of child widths.",
             public: true,
             isArray: true,
             shadowingInstructions: {
@@ -799,6 +806,7 @@ export class SideBySide extends BlockComponent {
         };
 
         stateVariableDefinitions.margins = {
+            description: "Margins between adjacent children.",
             public: true,
             isArray: true,
             shadowingInstructions: {
@@ -1012,6 +1020,7 @@ export class SideBySide extends BlockComponent {
         };
 
         stateVariableDefinitions.valigns = {
+            description: "Vertical alignment of each child.",
             public: true,
             isArray: true,
             shadowingInstructions: {
@@ -1239,6 +1248,11 @@ export class SbsGroup extends BlockComponent {
     static rendererType = "containerBlock";
     static renderChildren = true;
     static canDisplayChildErrors = true;
+
+    static componentDocs = {
+        summary:
+            "A group of <sideBySide> components that share alignment and spacing.",
+    };
 
     static createAttributesObject() {
         let attributes = super.createAttributesObject();
@@ -1798,6 +1812,7 @@ export class SbsGroup extends BlockComponent {
 
         stateVariableDefinitions.absoluteMeasurements = {
             public: true,
+            description: "Whether children's widths are interpreted in absolute units.",
             shadowingInstructions: {
                 createComponentOfType: "boolean",
             },
@@ -1829,6 +1844,7 @@ export class SbsGroup extends BlockComponent {
                 {
                     variableName: "gapWidth",
                     public: true,
+            description: "All children's widths combined.",
                     shadowingInstructions: {
                         createComponentOfType: "number",
                     },
@@ -1991,6 +2007,7 @@ export class SbsGroup extends BlockComponent {
 
         stateVariableDefinitions.widths = {
             public: true,
+            description: "The list of child widths.",
             isArray: true,
             shadowingInstructions: {
                 createComponentOfType: "number",
@@ -2062,6 +2079,7 @@ export class SbsGroup extends BlockComponent {
 
         stateVariableDefinitions.margins = {
             public: true,
+            description: "Margins between adjacent children.",
             isArray: true,
             shadowingInstructions: {
                 createComponentOfType: "number",
@@ -2128,6 +2146,7 @@ export class SbsGroup extends BlockComponent {
 
         stateVariableDefinitions.valigns = {
             public: true,
+            description: "Vertical alignment of each child.",
             isArray: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -2326,6 +2345,10 @@ export class Stack extends BlockComponent {
     static rendererType = "containerBlock";
     static renderChildren = true;
     static canDisplayChildErrors = true;
+
+    static componentDocs = {
+        summary: "A vertical stack layout for arranging children.",
+    };
 
     static includeBlankStringChildren = true;
 

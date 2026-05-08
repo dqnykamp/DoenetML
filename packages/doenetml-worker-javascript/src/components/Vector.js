@@ -32,6 +32,10 @@ export default class Vector extends GraphicalComponent {
     }
     static componentType = "vector";
 
+
+    static componentDocs = {
+        summary: "A geometric vector with tail and head.",
+    };
     static canBeInList = true;
 
     static primaryStateVariableForDefinition = "displacementShadow";
@@ -41,6 +45,7 @@ export default class Vector extends GraphicalComponent {
         let attributes = super.createAttributesObject();
 
         attributes.draggable = {
+            description: "Whether the vector can be dragged on a graph.",
             createComponentOfType: "boolean",
             createStateVariable: "draggable",
             defaultValue: true,
@@ -77,6 +82,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         attributes.addControls = {
+            description: "Whether to render interactive control handles.",
             createComponentOfType: "text",
             createStateVariable: "addControls",
             defaultValue: "displacement",
@@ -99,6 +105,7 @@ export default class Vector extends GraphicalComponent {
         Object.assign(attributes, returnNumberDisplayAttributes());
 
         attributes.displayWithAngleBrackets = {
+            description: "Whether to display the vector with angle brackets (e.g. ⟨1,2⟩).",
             createComponentOfType: "boolean",
             createStateVariable: "displayWithAngleBrackets",
             defaultValue: false,
@@ -106,6 +113,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         attributes.showCoordsWhenDragging = {
+            description: "Whether to show coordinate labels while dragging.",
             createComponentOfType: "boolean",
             createStateVariable: "showCoordsWhenDragging",
             defaultValue: true,
@@ -311,6 +319,7 @@ export default class Vector extends GraphicalComponent {
         Object.assign(stateVariableDefinitions, styleDescriptionDefinitions);
 
         stateVariableDefinitions.styleDescription = {
+            description: "A textual description of the vector's style.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -357,6 +366,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         stateVariableDefinitions.styleDescriptionWithNoun = {
+            description: "Style description including the word \"vector\".",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "text",
@@ -406,6 +416,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         stateVariableDefinitions.tailDraggable = {
+            description: "Whether the vector's tail can be dragged independently.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "boolean",
@@ -445,6 +456,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         stateVariableDefinitions.headDraggable = {
+            description: "Whether the vector's head can be dragged independently.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "boolean",
@@ -1092,6 +1104,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         stateVariableDefinitions.numDimensions = {
+            description: "Number of dimensions of the vector.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "number",
@@ -1201,6 +1214,7 @@ export default class Vector extends GraphicalComponent {
 
         stateVariableDefinitions.displacement = {
             public: true,
+            description: "The displacement (head − tail) of the vector.",
             isLocation: true,
             shadowingInstructions: {
                 createComponentOfType: "math",
@@ -1651,6 +1665,7 @@ export default class Vector extends GraphicalComponent {
 
         stateVariableDefinitions.head = {
             public: true,
+            description: "Coordinates of the vector's head.",
             isLocation: true,
             shadowingInstructions: {
                 createComponentOfType: "math",
@@ -1858,6 +1873,7 @@ export default class Vector extends GraphicalComponent {
 
         stateVariableDefinitions.tail = {
             public: true,
+            description: "Coordinates of the vector's tail.",
             isLocation: true,
             shadowingInstructions: {
                 createComponentOfType: "math",
@@ -2113,6 +2129,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         stateVariableDefinitions.magnitude = {
+            description: "The magnitude (length) of the vector.",
             public: true,
             isLocation: true,
             shadowingInstructions: {
@@ -2339,6 +2356,7 @@ export default class Vector extends GraphicalComponent {
         };
 
         stateVariableDefinitions.latex = {
+            description: "The vector rendered as a LaTeX string.",
             forRenderer: true,
             public: true,
             shadowingInstructions: {

@@ -14,6 +14,10 @@ import me from "math-expressions";
 
 export default class StickyGroup extends GraphicalComponent {
     static componentType = "stickyGroup";
+
+    static componentDocs = {
+        summary: "Constrains group members to attract to each other when nearby.",
+    };
     static rendererType = "containerInline";
     static renderChildren = true;
 
@@ -21,6 +25,7 @@ export default class StickyGroup extends GraphicalComponent {
         let attributes = super.createAttributesObject();
 
         attributes.relativeToGraphScales = {
+            description: "Whether the snapping threshold is interpreted relative to graph scales.",
             createComponentOfType: "boolean",
             createStateVariable: "relativeToGraphScales",
             defaultValue: false,
@@ -32,6 +37,7 @@ export default class StickyGroup extends GraphicalComponent {
         };
 
         attributes.angleThreshold = {
+            description: "Angular distance within which group members snap together.",
             createComponentOfType: "number",
             createStateVariable: "angleThreshold",
             defaultValue: Math.PI * 0.03,
@@ -234,6 +240,7 @@ export default class StickyGroup extends GraphicalComponent {
         };
 
         stateVariableDefinitions.threshold = {
+            description: "Distance within which group members attract each other.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "number",
