@@ -246,11 +246,15 @@ function helpForPropertyReference(
         ctx.pathPartHasIndex,
     );
 
-    // Fallback to pure-JS resolution for simple `$name.property` when
-    // no Rust resolver adapter is configured (browser-only setups).
+    // Fallback to pure-JS resolution for simple `$name.property` when the
+    // Rust resolver adapter isn't configured *yet* (it loads asynchronously
+    // on mount in EditorViewer) or in tests that don't wire one up.
+    // pathParts is `[referentName, currentlyEditedMember]` for `$a.b`, so
+    // we only fall back when there are exactly two parts. Deeper chains
+    // (`$a.b.c`) need the resolver and return NONE here until it's ready.
     const containerNode =
         resolved.node ??
-        (ctx.pathParts.length >= 1
+        (ctx.pathParts.length === 2
             ? completer.sourceObj.getReferentAtOffset(offset, ctx.pathParts[0])
             : null);
     if (!containerNode) return NONE;

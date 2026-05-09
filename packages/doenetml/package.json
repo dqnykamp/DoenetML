@@ -51,6 +51,7 @@
             ],
             "dependencies": [
                 "../doenetml-worker:build",
+                "../doenetml-worker-rust:build",
                 "../codemirror:build",
                 "../ui-components:build",
                 "../utils:build",
@@ -66,6 +67,7 @@
         "react-dom": "^19.2.3"
     },
     "dependencies": {
+        "@doenet/doenetml-worker-rust": "*",
         "@doenet/lsp-tools": "*",
         "@doenet/static-assets": "*",
         "dompurify": "^3.3.0"

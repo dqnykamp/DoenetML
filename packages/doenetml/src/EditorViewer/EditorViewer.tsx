@@ -29,7 +29,11 @@ import {
     mergeDiagnosticsByType,
     toAdditionalDiagnosticsForLsp,
 } from "./diagnostics";
-import { AutoCompleter } from "@doenet/lsp-tools";
+import {
+    AutoCompleter,
+    RustResolverAdapter,
+    type RustResolverCore,
+} from "@doenet/lsp-tools";
 import { doenetSchema } from "@doenet/static-assets/schema";
 import {
     buildSchemaElementsByName,
@@ -43,6 +47,12 @@ const SCHEMA_MAP = buildSchemaElementsByName(
     doenetSchema.aliasedElements,
 );
 const HELP_NONE: HelpContent = { kind: "none" };
+
+const TAKES_INDEX_COMPONENT_TYPES: ReadonlySet<string> = new Set(
+    doenetSchema.elements
+        .filter((schemaElement) => schemaElement?.takesIndex)
+        .map((schemaElement) => schemaElement.name),
+);
 
 // Module-level constant so the default for `initialDiagnostics` is referentially
 // stable across renders. A parameter default `= []` would create a fresh array
@@ -164,9 +174,46 @@ export function EditorViewer({
     const [showInfoAnnotations, setShowInfoAnnotations] = useState(false);
 
     const completerRef = useRef(new AutoCompleter(initialDoenetML));
+    const adapterRef = useRef<RustResolverAdapter | null>(null);
     const [helpContent, setHelpContent] = useState<HelpContent>(HELP_NONE);
     const cursorDebounceTimer = useRef<number | undefined>(undefined);
     const isMountedRef = useRef(true);
+
+    // Track whether the resolver init has been kicked off. The Rust WASM
+    // module is sizeable (~1.6 MB gzip) so we defer load until the user
+    // first selects the help tab — readers who never open it pay nothing.
+    const resolverInitStartedRef = useRef(false);
+
+    /**
+     * Kick off async init of the Rust path resolver. Idempotent. Once
+     * resolved, multi-part property refs (e.g. `$a.b.c`) resolve through the
+     * actual reference graph instead of the first-segment-only JS fallback.
+     */
+    const ensureResolver = useCallback(async () => {
+        if (resolverInitStartedRef.current) return;
+        resolverInitStartedRef.current = true;
+        try {
+            const { getRustCoreForEditor } =
+                await import("./contextHelp/rust-core");
+            const core = await getRustCoreForEditor();
+            if (!isMountedRef.current) return;
+            const sourceObj = completerRef.current.sourceObj;
+            const adapter = new RustResolverAdapter(sourceObj, {
+                core: core as RustResolverCore,
+                takesIndexComponentTypes: TAKES_INDEX_COMPONENT_TYPES,
+            });
+            adapterRef.current = adapter;
+            completerRef.current = new AutoCompleter(undefined, undefined, {
+                sourceObj,
+                rustResolverAdapter: adapter,
+            });
+        } catch (error) {
+            console.warn(
+                "Editor context-help resolver unavailable; multi-part property refs will not resolve.",
+                error,
+            );
+        }
+    }, []);
 
     const tabStore = useTabStore({
         defaultSelectedId: showDiagnostics ? "errors" : "responses",
@@ -174,6 +221,15 @@ export function EditorViewer({
     const selectedTabId = tabStore.useState("selectedId");
     const isAccessibilityReportOpen =
         infoPanelIsOpen && selectedTabId === "accessibility";
+
+    // Kick off resolver init the first time the user opens the help tab.
+    // After this resolves, helpForPropertyReference can resolve multi-part
+    // refs through the Rust resolver instead of the JS fallback.
+    useEffect(() => {
+        if (infoPanelIsOpen && selectedTabId === "help") {
+            ensureResolver().catch(() => undefined);
+        }
+    }, [infoPanelIsOpen, selectedTabId, ensureResolver]);
 
     /** Opens accessibility diagnostics, or closes the panel if already focused there. */
     function toggleAccessibilityReport() {
@@ -324,6 +380,7 @@ export function EditorViewer({
         editorDoenetMLRef.current = initialDoenetML;
         setEditorDoenetML(initialDoenetML);
         completerRef.current.setSource(initialDoenetML);
+        adapterRef.current?.updateSource(completerRef.current.sourceObj);
         setHelpContent(HELP_NONE);
     }, [initialDoenetML]);
 
@@ -343,6 +400,9 @@ export function EditorViewer({
             if (editorDoenetMLRef.current !== value) {
                 editorDoenetMLRef.current = value;
                 completerRef.current.setSource(value);
+                adapterRef.current?.updateSource(
+                    completerRef.current.sourceObj,
+                );
 
                 if (!codeChangedRef.current) {
                     setCodeChanged(true);
