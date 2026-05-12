@@ -58,6 +58,7 @@ export function flatDastFromJS(
         data: {
             id: documentToRender.componentIdx,
             action_names: Object.keys(documentToRender.actions),
+            root_id: documentToRender.id,
         },
     };
 
@@ -103,6 +104,7 @@ export function flatDastFromJS(
                                     action_names: Object.keys(
                                         childInstruction.actions,
                                     ),
+                                    root_id: childInstruction.id,
                                 },
                             };
                         } else {
@@ -113,6 +115,7 @@ export function flatDastFromJS(
                                 child.data.action_names = Object.keys(
                                     childInstruction.actions,
                                 );
+                                child.data.root_id = childInstruction.id;
                             }
                         }
                     }
