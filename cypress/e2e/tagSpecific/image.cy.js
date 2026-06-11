@@ -793,12 +793,12 @@ describe("Image Tag Tests", function () {
 
     // Check that license link is displayed for i1
     cy.contains("a", "CC BY Attribution")
-    .should("have.attr", "href")
-    .and("include", "creativecommons.org/licenses/by/4.0");
+      .should("have.attr", "href")
+      .and("include", "creativecommons.org/licenses/by/4.0");
 
     // Check that license link is displayed for i2
     cy.contains("a", "CC0 No Rights Reserved")
-    .should("have.attr", "href")
-    .and("include", "creativecommons.org/publicdomain/zero/1.0");
+      .should("have.attr", "href")
+      .and("include", "creativecommons.org/publicdomain/zero/1.0");
   });
 });
