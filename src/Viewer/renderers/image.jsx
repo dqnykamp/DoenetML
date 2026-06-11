@@ -6,6 +6,42 @@ import { sizeToCSS } from "./utils/css";
 import VisibilitySensor from "react-visibility-sensor-v2";
 import me from "math-expressions";
 
+const licenseData = {
+  cc0: {
+    label: "CC0 No Rights Reserved",
+    url: "https://creativecommons.org/publicdomain/zero/1.0/",
+  },
+  "cc-by": {
+    label: "CC BY Attribution",
+    url: "https://creativecommons.org/licenses/by/4.0/",
+  },
+  "cc-by-sa": {
+    label: "CC BY-SA Attribution-ShareAlike",
+    url: "https://creativecommons.org/licenses/by-sa/4.0/",
+  },
+  "cc-by-nd": {
+    label: "CC BY-ND Attribution-NoDerivatives",
+    url: "https://creativecommons.org/licenses/by-nd/4.0/",
+  },
+  "cc-by-nc": {
+    label: "CC BY-NC Attribution-NonCommercial",
+    url: "https://creativecommons.org/licenses/by-nc/4.0/",
+  },
+  "cc-by-nc-sa": {
+    label: "CC BY-NC-SA Attribution-NonCommercial-ShareAlike",
+    url: "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  },
+  "cc-by-nc-nd": {
+    label: "CC BY-NC-ND Attribution-NonCommercial-NoDerivatives",
+    url: "https://creativecommons.org/licenses/by-nc-nd/4.0/",
+  },
+};
+
+function getLicenseInfo(license) {
+  if (!license) return null;
+  return licenseData[license] || null;
+}
+
 export default React.memo(function Image(props) {
   let { name, id, SVs, actions, callAction } = useDoenetRenderer(props, false);
   let [url, setUrl] = useState(null);
@@ -541,7 +577,8 @@ export default React.memo(function Image(props) {
   } else {
     outerStyle = {
       display: "flex",
-      justifyContent: SVs.horizontalAlign,
+      flexDirection: "column",
+      alignItems: SVs.horizontalAlign,
       margin: "12px 0",
     };
   }
@@ -559,6 +596,8 @@ export default React.memo(function Image(props) {
     imageStyle.border = "var(--mainBorder)";
   }
 
+  const licenseInfo = getLicenseInfo(SVs.license);
+
   return (
     <VisibilitySensor partialVisibility={true} onChange={onChangeVisibility}>
       <div style={outerStyle}>
@@ -573,6 +612,29 @@ export default React.memo(function Image(props) {
         ) : (
           <div id={id} style={imageStyle}>
             {SVs.description}
+          </div>
+        )}
+        {licenseInfo && (
+          <div
+            style={{
+              fontSize: "0.75em",
+              color: "var(--canvastext)",
+              marginTop: "4px",
+              maxWidth: sizeToCSS(SVs.width),
+            }}
+          >
+            {licenseInfo.url ? (
+              <a
+                href={licenseInfo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "inherit" }}
+              >
+                {licenseInfo.label}
+              </a>
+            ) : (
+              licenseInfo.label
+            )}
           </div>
         )}
       </div>

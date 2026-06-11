@@ -93,6 +93,23 @@ export default class Image extends BlockComponent {
       public: true,
       forRenderer: true,
     };
+    attributes.license = {
+      createComponentOfType: "text",
+      createStateVariable: "license",
+      defaultValue: null,
+      public: true,
+      forRenderer: true,
+      toLowerCase: true,
+      validValues: [
+        "cc0",
+        "cc-by",
+        "cc-by-sa",
+        "cc-by-nd",
+        "cc-by-nc",
+        "cc-by-nc-sa",
+        "cc-by-nc-nd",
+      ],
+    };
 
     attributes.draggable = {
       createComponentOfType: "boolean",

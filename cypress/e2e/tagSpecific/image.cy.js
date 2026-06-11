@@ -767,4 +767,38 @@ describe("Image Tag Tests", function () {
       .eq(0)
       .should("have.text", "q");
   });
+
+  it("image with license codes", () => {
+    cy.window().then(async (win) => {
+    win.postMessage(
+      {
+        doenetML: `
+  <text>a</text>
+  <image name="i1" source="http://mathinsight.org/media/image/image/giant_anteater.jpg" description="A giant anteater" license="cc-by" />
+  <image name="i2" source="http://mathinsight.org/media/image/image/giant_anteater.jpg" description="Another anteater" license="cc0" />
+  <image name="i3" source="http://mathinsight.org/media/image/image/giant_anteater.jpg" description="No license" />
+  <p name="p1">License 1: <text name="t1">$i1.license</text></p>
+  <p name="p2">License 2: <text name="t2">$i2.license</text></p>
+  <p name="p3">License 3: <text name="t3">$i3.license</text></p>
+  `,
+      },
+      "*",
+    );
+    });
+    cy.get(cesc("#\\/_text1")).should("have.text", "a"); // to wait for page to load
+
+    cy.get(cesc("#\\/t1")).should("have.text", "cc-by");
+    cy.get(cesc("#\\/t2")).should("have.text", "cc0");
+    cy.get(cesc("#\\/t3")).should("have.text", "");
+
+    // Check that license link is displayed for i1
+    cy.contains("a", "CC BY Attribution")
+    .should("have.attr", "href")
+    .and("include", "creativecommons.org/licenses/by/4.0");
+
+    // Check that license link is displayed for i2
+    cy.contains("a", "CC0 No Rights Reserved")
+    .should("have.attr", "href")
+    .and("include", "creativecommons.org/publicdomain/zero/1.0");
+  });
 });
