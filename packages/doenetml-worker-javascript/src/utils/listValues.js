@@ -3,8 +3,9 @@ import { returnGroupIntoComponentTypeSeparatedBySpacesOutsideParens } from "../c
 
 /**
  * Shared machinery for components that treat their children as a list of
- * comparable values: `<sort>`, `<sortIndices>`, and the index-returning
- * operators (`<argMin>`, `<argMax>`, `<indexOf>`, `<searchSorted>`).
+ * comparable values: `<sort>`, `<sortIndices>`, the index-returning operators
+ * (`<argMin>`, `<argMax>`, `<indexOf>`, `<searchSorted>`) and the counting
+ * operators (`<tally>`, `<binCounts>`).
  *
  * Every one of these has to answer the same question — "given this child,
  * what value do I compare it by?" — and they must all answer it the same way,
@@ -199,8 +200,9 @@ export function compareExtractedValues(a, b, numeric) {
  * `supportProps` controls whether the `sortByProp`, `sortByComponent` and
  * `sortVectorsBy` attributes are consulted, and so whether a `propName` state
  * variable is defined at all. `<sort>` and `<sortIndices>` pass `true`; the
- * index-returning operators, which declare none of those attributes, pass
- * `false` and read points and vectors by their first displacement coordinate.
+ * index-returning and counting operators, which declare none of those
+ * attributes, pass `false` and read points and vectors by their first
+ * displacement coordinate.
  */
 export function returnListValueStateVariableDefinitions({
     componentName,
@@ -366,9 +368,9 @@ export function returnListValueStateVariableDefinitions({
 /**
  * The comparable form of a value that did not come from a child component —
  * in practice, one value of the `target` attribute of `<indexOf>` /
- * `<searchSorted>`, which is a `_componentListWithSelectableType` and so
- * yields a list whose entries can each be a number, a string, a
- * math-expression or a boolean.
+ * `<searchSorted>` or of `<tally>`'s `categories`. Each is a
+ * `_componentListWithSelectableType` and so yields a list whose entries can
+ * each be a number, a string, a math-expression or a boolean.
  */
 export function comparableValueFromRaw(value) {
     if (value === null || value === undefined) {
@@ -404,9 +406,9 @@ export function comparableValueFromRaw(value) {
 
 /**
  * Sugar shared by the components that read their children as a list of typed
- * values — `<sort>`, `<sortIndices>`, `<shuffle>` and the index-returning
- * operators: bare strings are split on whitespace and wrapped in the component
- * type named by the `type` attribute.
+ * values — `<sort>`, `<sortIndices>`, `<shuffle>` and the index-returning and
+ * counting operators: bare strings are split on whitespace and wrapped in the
+ * component type named by the `type` attribute.
  *
  * Unlike the math-only operators, these components accept text as readily as
  * numbers, so there is no sensible default: without an explicit `type` the
