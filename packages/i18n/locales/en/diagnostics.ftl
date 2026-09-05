@@ -1087,3 +1087,10 @@ bin-counts-values-not-numeric =
 # is about a decrease, not about strict increase.
 bin-counts-cut-points-decreasing =
     `bins` cut points must be numbers in increasing order, but one is not a number or is smaller than the cut point before it, so no counts were produced.
+
+## Charts
+
+# Raised by `<barChart>` when `barWidth` is outside the (0, 1] range a fraction
+# of a bar's slot can take. $barWidth is what the author wrote.
+bar-chart-bar-width-invalid =
+    `barWidth` must be greater than 0 and at most 1, but { $barWidth } was given. Using 0.8 instead.

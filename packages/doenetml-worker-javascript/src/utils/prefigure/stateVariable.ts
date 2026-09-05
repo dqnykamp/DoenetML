@@ -616,7 +616,7 @@ function returnGraphPrefigureXMLStateVariableDefinition() {
     };
 }
 
-function returnGraphHasAuthorAnnotationsStateVariableDefinition() {
+export function returnGraphHasAuthorAnnotationsStateVariableDefinition() {
     return {
         description:
             "Whether the graph contains any author-provided `<annotations>` child.",
