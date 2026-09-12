@@ -16,6 +16,6 @@ export const applyAssignNameRenames: Plugin<
     DastRoot
 > = (context) => {
     return (tree, file) => {
-        applyRefRenames(tree, context.registry, file);
+        applyRefRenames(tree, context.registry, file, context);
     };
 };

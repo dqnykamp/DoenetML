@@ -86,7 +86,7 @@ export const upgradeCollectElement: Plugin<
                 node,
                 assignNamesValue,
                 fallbackBase: "collect",
-                ancestorNames: ancestorNamesOf(info.parents),
+                ancestorNames: ancestorNamesOf(info.parents, context),
                 context,
                 file,
             });

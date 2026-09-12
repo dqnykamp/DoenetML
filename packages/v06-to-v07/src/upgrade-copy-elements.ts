@@ -65,7 +65,7 @@ export const upgradeCopyElements: Plugin<
             // references have been rewritten, too late to register anything.
             convertAssignNames(
                 node,
-                ancestorNamesOf(info.parents),
+                ancestorNamesOf(info.parents, context),
                 context,
                 file,
             );
@@ -115,22 +115,33 @@ export const upgradeCopyElements: Plugin<
  * Attributes that belong to the `<copy>` itself rather than to whatever it copies. Only
  * the others say anything about what the external document is, so only they count as
  * evidence that its target takes parameters.
+ *
+ * Taken from v0.6's `Copy.js` `createAttributesObject`, plus the ways of naming the
+ * target and the copy. (v0.7's `<copy>` has a different set — `asList`, `copyInChildren`
+ * and so on — but none of those can appear in the v0.6 documents this reads.)
  */
 const COPY_OWN_ATTRIBUTES = new Set([
-    "uri",
     "assignnames",
-    "name",
-    "link",
-    "prop",
-    "source",
-    "target",
-    "tname",
-    "newnamespace",
+    "assignnamesskip",
     "assignnewnamespaces",
     "componentindex",
-    "propindex",
-    "sourceindex",
     "createcomponentoftype",
+    "link",
+    "name",
+    "newnamespace",
+    "numcomponents",
+    "obtainpropfromcomposite",
+    "prop",
+    "propindex",
+    "removeemptyarrayentries",
+    "source",
+    "sourceattributestoignore",
+    "sourceindex",
+    "sourcesubnames",
+    "sourcesubnamescomponentindex",
+    "target",
+    "tname",
+    "uri",
 ]);
 
 /**

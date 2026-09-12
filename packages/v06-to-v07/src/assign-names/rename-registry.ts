@@ -151,7 +151,10 @@ export class RenameRegistry {
                 bestScore = scope.length;
             }
         }
-        return best ?? targets[0];
+        // Nothing matched, so the reference is not reaching into any of the namespaces
+        // that assigned this name. Only a registration that was never scoped can speak
+        // for it; guessing at one of the scoped ones would point it somewhere arbitrary.
+        return best;
     }
 
     /** Whether `name` is registered *and* some registration rewrites references to it. */

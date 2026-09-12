@@ -66,7 +66,7 @@ export const upgradeMapElement: Plugin<
                         node,
                         assignNamesValue,
                         fallbackBase: "repeat",
-                        ancestorNames: ancestorNamesOf(info.parents),
+                        ancestorNames: ancestorNamesOf(info.parents, context),
                         context,
                         file,
                     }) ?? name;

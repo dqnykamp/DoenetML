@@ -118,7 +118,7 @@ export const upgradeAssignNames: Plugin<
                     {
                         elementName: node.name,
                         position: node.position,
-                        ancestorNames: ancestorNamesOf(parents),
+                        ancestorNames: ancestorNamesOf(parents, context),
                     },
                     file,
                 );
@@ -131,7 +131,7 @@ export const upgradeAssignNames: Plugin<
                 node,
                 assignNamesValue,
                 fallbackBase: spec.name,
-                ancestorNames: ancestorNamesOf(parents),
+                ancestorNames: ancestorNamesOf(parents, context),
                 context,
                 file,
                 positionMap: makePositionMap(node, spec, file),

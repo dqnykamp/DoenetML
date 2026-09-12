@@ -1068,3 +1068,41 @@ describe("regressions found by the fifth review", () => {
         ).toEqual(correctSource);
     });
 });
+
+describe("regressions found by the sixth review", () => {
+    let source: string;
+    let correctSource: string;
+
+    it("only treats a namespace as a namespace boundary", async () => {
+        // `<p name="wrapper">` is named but was never a namespace, so the v0.6 reference
+        // is `$(g/a)` and the scope recorded for the composite has to say the same.
+        source = `<graph name="g" newNamespace><p name="wrapper"><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /></p></graph><p>$(g/a)</p>`;
+        correctSource = `<graph name="g"><p name="wrapper"><selectFromSequence name="a" numToSelect="2" from="1" to="5" /></p></graph><p>$g.a[1]</p>`;
+        expect(
+            await updateSyntax(source, { doNotUpgradeCopyTags: true }),
+        ).toEqual(correctSource);
+    });
+
+    it("resolves a reference within its own namespace", async () => {
+        // Neither `$a` names a namespace, so only where each is written says which
+        // composite it meant.
+        source = `<graph name="g1" newNamespace><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /><p>$a</p></graph><graph name="g2" newNamespace><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /><p>$a</p></graph>`;
+        const xml = await updateSyntax(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        expect(xml).toContain(`<p>$a[1]</p></graph>`);
+        expect(xml).toContain(`<p>$selectFromSequence[1]</p></graph>`);
+    });
+
+    it("does not read a copy's own attributes as module parameters", async () => {
+        // `numComponents` belongs to v0.6's `<copy>`, so it says nothing about the target.
+        source = `<copy uri="doenet:cid=abc" numComponents="2" />`;
+        const res = await updateSyntaxFromV06toV07(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        expect(toXml(res.dast)).toEqual(source);
+        expect(res.vfile.messages.map((m) => m.ruleId)).toContain(
+            "external-copy/unknown-component-type",
+        );
+    });
+});

@@ -1,4 +1,11 @@
-import { DastElement, DastRoot, DastRootV6, toXml } from "@doenet/parser";
+import {
+    DastElement,
+    DastRoot,
+    DastRootV6,
+    isDastElement,
+    toXml,
+    visit,
+} from "@doenet/parser";
 import { NamePieces, firstLeafName } from "./break-into-pieces";
 import { RenameRegistry, isValidReferenceableName } from "./rename-registry";
 import {
@@ -24,17 +31,38 @@ export type AssignNamesContext = {
      * duplicate `name` that would result.
      */
     claimedNames: Set<string>;
+    /**
+     * The elements that carried `newNamespace`, recorded before that attribute is
+     * removed. Only these were addressable as a namespace in v0.6, so only these are
+     * boundaries when working out which of two same-named assignments a reference meant.
+     */
+    namespaceElements: WeakSet<DastElement>;
 };
 
 export function createAssignNamesContext(
     tree: DastRoot | DastRootV6,
 ): AssignNamesContext {
     const existingNames = collectExistingNames(tree);
+    // This runs before `removeNewNamespaceAttribute`, which is the only chance to see
+    // which elements were namespaces.
+    const namespaceElements = new WeakSet<DastElement>();
+    visit(tree, (node) => {
+        if (!isDastElement(node)) {
+            return;
+        }
+        const hasNewNamespace = Object.keys(node.attributes).some(
+            (key) => key.toLowerCase() === "newnamespace",
+        );
+        if (hasNewNamespace) {
+            namespaceElements.add(node);
+        }
+    });
     return {
         registry: new RenameRegistry(existingNames),
         uniqueName: createUniqueNameFactory(tree),
         existingNames,
         claimedNames: new Set(),
+        namespaceElements,
     };
 }
 
@@ -147,9 +175,18 @@ function assignNamesKey(node: DastElement): string | undefined {
  * a reference path reads, so the chain is reversed here. Elements without a name are
  * skipped: they were never addressable, so a reference could not have mentioned them.
  */
-export function ancestorNamesOf(parents: DastElement[]): string[] {
+export function ancestorNamesOf(
+    parents: DastElement[],
+    context: AssignNamesContext,
+): string[] {
     const names: string[] = [];
     for (const parent of parents) {
+        // A named element that was not a namespace could not appear in a reference path,
+        // so it is not a boundary — `<graph name="g" newNamespace><p name="wrapper">` is
+        // reached as `$(g/...)`, never `$(g/wrapper/...)`.
+        if (!context.namespaceElements.has(parent)) {
+            continue;
+        }
         const nameAttr = findAttribute(parent, "name");
         const name = nameAttr ? toXml(nameAttr.children).trim() : "";
         if (name) {

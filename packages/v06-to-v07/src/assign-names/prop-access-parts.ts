@@ -8,10 +8,10 @@ import { DastMacroPathPart } from "@doenet/parser";
  * `accessedProp` macros. `upgradePathSlashesToDots` flattens both into one v0.7 path, and
  * after that nothing in the tree distinguishes them — but the distinction matters here. A
  * namespace segment can name a component that `assignNames` created, so rewriting it is
- * right; a prop access never can, so rewriting one changes which prop a reference reads
- * (`$p.y` becoming `$p.x[2]` when `x` and `y` are also assigned names somewhere else in
- * the document). `applyRefRenames` rewrites both, since the rewrite is what the converter
- * has always done, but warns about the second so it is not lost silently.
+ * right; a prop access never can, because v0.6 dot notation reached public state
+ * variables and nothing else. `applyRefRenames` therefore leaves a prop access alone —
+ * rewriting one would turn `$p.y`, the point's y-coordinate, into `$p.x[2]` whenever `x`
+ * and `y` happened to be assigned somewhere else in the document.
  *
  * Held in a `WeakSet` keyed on the part itself, so there is nothing to clear between
  * documents and no converter-only field on a shared `@doenet/parser` type.

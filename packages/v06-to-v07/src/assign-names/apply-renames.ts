@@ -9,6 +9,7 @@ import {
 import { VFile } from "vfile";
 import { visitAll, visitAllMacros } from "./visit-all";
 import { RenameRegistry } from "./rename-registry";
+import { AssignNamesContext, ancestorNamesOf } from "./context";
 import { reparseAttribute } from "../reparse-attribute";
 import { isPropAccess } from "./prop-access-parts";
 
@@ -36,16 +37,23 @@ export function applyRefRenames(
     tree: DastRoot,
     registry: RenameRegistry,
     file: VFile,
+    context: AssignNamesContext,
 ) {
     if (registry.size === 0) {
         return;
     }
 
-    visitAllMacros(tree, (node) => {
-        node.path = renamePath(node.path, registry, file, node.position);
+    visitAllMacros(tree, (node, parents) => {
+        node.path = renamePath(
+            node.path,
+            registry,
+            file,
+            node.position,
+            ancestorNamesOf(parents, context),
+        );
     });
 
-    visitAll(tree, (node) => {
+    visitAll(tree, (node, parents) => {
         if (!isDastElement(node)) {
             return;
         }
@@ -53,8 +61,15 @@ export function applyRefRenames(
         if (!attrNames) {
             return;
         }
+        const enclosing = ancestorNamesOf(parents, context);
         for (const attrName of attrNames) {
-            renameRawReferenceAttribute(node, attrName, registry, file);
+            renameRawReferenceAttribute(
+                node,
+                attrName,
+                registry,
+                file,
+                enclosing,
+            );
         }
     });
 }
@@ -73,6 +88,7 @@ function renameRawReferenceAttribute(
     attrName: string,
     registry: RenameRegistry,
     file: VFile,
+    enclosingNames: string[],
 ) {
     const attr = Object.entries(node.attributes).find(
         ([name]) => name.toLowerCase() === attrName.toLowerCase(),
@@ -119,7 +135,13 @@ function renameRawReferenceAttribute(
     // top level.
     const asMacro: DastMacro = { type: "macro", path, attributes: {} };
     visitAllMacros(asMacro, (macro) => {
-        macro.path = renamePath(macro.path, registry, file, node.position);
+        macro.path = renamePath(
+            macro.path,
+            registry,
+            file,
+            node.position,
+            enclosingNames,
+        );
     });
     child.value = toXml(asMacro.path);
 }
@@ -142,6 +164,8 @@ function renamePath(
     registry: RenameRegistry,
     file: VFile,
     place?: DastElement["position"],
+    /** The namespaces the reference itself sits inside, outermost first. */
+    enclosingNames: string[] = [],
 ): DastMacroPathPart[] {
     if (!path.some((part) => registry.hasReplacement(part.name))) {
         return path;
@@ -149,10 +173,12 @@ function renamePath(
     return path.flatMap((part, partIndex): DastMacroPathPart[] => {
         // The parts before this one say which namespace the reference is reaching into,
         // which is how a name assigned in more than one of them is told apart.
-        const target = registry.get(
-            part.name,
-            path.slice(0, partIndex).map((p) => p.name),
-        );
+        // Where the reference is written, followed by the namespaces it names on its
+        // way in: a `$a` inside `g2` means g2's `a`, and so does `$(g2/a)` from outside.
+        const target = registry.get(part.name, [
+            ...enclosingNames,
+            ...path.slice(0, partIndex).map((p) => p.name),
+        ]);
         if (!target?.replacement) {
             return [part];
         }
