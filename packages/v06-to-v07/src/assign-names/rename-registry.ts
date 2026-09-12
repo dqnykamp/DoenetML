@@ -19,6 +19,15 @@ export type RenameOrigin = {
     /** The element that carried the `assignNames` attribute; used in messages. */
     elementName: string;
     position?: DastElement["position"];
+    /**
+     * The `name`s of the elements enclosing the composite, outermost first.
+     *
+     * v0.6 namespaces meant the same assigned name could appear more than once in a
+     * document, and a reference said which it meant by writing the namespace in front of
+     * it (`$(g2/a)`). Flattening the namespaces away loses that, so it is recorded here
+     * and matched against the front of the reference path.
+     */
+    ancestorNames?: string[];
 };
 
 export type RenameTarget = {
@@ -59,7 +68,7 @@ export function makeIndexedPathPart(
  * so that a reference is rewritten exactly once, no matter which plugin claimed the name.
  */
 export class RenameRegistry {
-    _renames = new Map<string, RenameTarget>();
+    _renames = new Map<string, RenameTarget[]>();
     _matched = new Set<string>();
     /** Names carried by a `name=` attribute somewhere in the document. */
     _existingNames: ReadonlySet<string>;
@@ -86,10 +95,14 @@ export class RenameRegistry {
         if (!oldName) {
             return;
         }
-        const existing = this._renames.get(oldName);
-        if (existing) {
+        const existing = this._renames.get(oldName) ?? [];
+        const scope = origin.ancestorNames ?? [];
+        const sameScope = existing.find((target) =>
+            sameScopeAs(target.origin.ancestorNames ?? [], scope),
+        );
+        if (sameScope) {
             file.message(
-                `The name "${oldName}" is assigned by both <${existing.origin.elementName}> and <${origin.elementName}>; references to it were converted as if they referred to the first.`,
+                `The name "${oldName}" is assigned by both <${sameScope.origin.elementName}> and <${origin.elementName}> in the same place; references to it were converted as if they referred to the first.`,
                 {
                     place: origin.position,
                     ruleId: "assign-names/duplicate-name",
@@ -98,7 +111,7 @@ export class RenameRegistry {
             );
             return;
         }
-        if (this._existingNames.has(oldName)) {
+        if (existing.length === 0 && this._existingNames.has(oldName)) {
             file.message(
                 `The name "${oldName}" assigned by <${origin.elementName}> is also used as the "name" of another component; all references to "${oldName}" were converted to point at the <${origin.elementName}> replacement.`,
                 {
@@ -108,20 +121,44 @@ export class RenameRegistry {
                 },
             );
         }
-        this._renames.set(oldName, { replacement, origin });
+        existing.push({ replacement, origin });
+        this._renames.set(oldName, existing);
     }
 
-    get(name: string): RenameTarget | undefined {
-        const target = this._renames.get(name);
-        if (target) {
-            this._matched.add(name);
+    /**
+     * The rename for `name`, chosen by which of them the reference is reaching into.
+     *
+     * `precedingNames` are the path parts written before it, so `$g2.a` looks up `a` with
+     * `["g2"]`. The registration whose enclosing names are the longest match at the end of
+     * that wins; one recorded with no enclosing names matches anything, which is what
+     * keeps an unscoped document behaving exactly as before.
+     */
+    get(name: string, precedingNames: string[] = []): RenameTarget | undefined {
+        const targets = this._renames.get(name);
+        if (!targets || targets.length === 0) {
+            return undefined;
         }
-        return target;
+        this._matched.add(name);
+        let best: RenameTarget | undefined;
+        let bestScore = -1;
+        for (const target of targets) {
+            const scope = target.origin.ancestorNames ?? [];
+            if (!isSuffixOf(scope, precedingNames)) {
+                continue;
+            }
+            if (scope.length > bestScore) {
+                best = target;
+                bestScore = scope.length;
+            }
+        }
+        return best ?? targets[0];
     }
 
-    /** Whether `name` is registered *and* references to it need rewriting. */
+    /** Whether `name` is registered *and* some registration rewrites references to it. */
     hasReplacement(name: string): boolean {
-        return this._renames.get(name)?.replacement !== undefined;
+        return (this._renames.get(name) ?? []).some(
+            (target) => target.replacement !== undefined,
+        );
     }
 
     get size(): number {
@@ -132,4 +169,17 @@ export class RenameRegistry {
     unused(): string[] {
         return [...this._renames.keys()].filter((n) => !this._matched.has(n));
     }
+}
+
+function sameScopeAs(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((name, i) => name === b[i]);
+}
+
+/** Whether `scope` is the tail of `path` — `["g2"]` is the tail of `["doc", "g2"]`. */
+function isSuffixOf(scope: string[], path: string[]): boolean {
+    if (scope.length > path.length) {
+        return false;
+    }
+    const offset = path.length - scope.length;
+    return scope.every((name, i) => name === path[offset + i]);
 }

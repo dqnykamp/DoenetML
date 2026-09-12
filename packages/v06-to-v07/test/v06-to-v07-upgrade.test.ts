@@ -1005,3 +1005,66 @@ describe("regressions found by the fourth review", () => {
         ).toEqual(correctSource);
     });
 });
+
+describe("regressions found by the fifth review", () => {
+    let source: string;
+    let correctSource: string;
+
+    it("tells apart the same assigned name in two namespaces", async () => {
+        // v0.6 let both of these be called `a`, and a reference said which it meant by
+        // writing the namespace. Only one can keep the bare name once the namespaces are
+        // gone, so each reference has to follow the one it was reaching into.
+        source = `<graph name="g1" newNamespace><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /></graph><graph name="g2" newNamespace><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /></graph><p>$(g1/a) $(g2/a) $(g2/b)</p>`;
+        const res = await updateSyntaxFromV06toV07(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        const xml = toXml(res.dast);
+        expect(xml).toContain(
+            `<p>$g1.a[1] $g2.selectFromSequence[1] $g2.selectFromSequence[2]</p>`,
+        );
+        // Two namespaces using one name is not a clash, so nothing is reported.
+        expect(res.vfile.messages.map((m) => m.ruleId)).not.toContain(
+            "assign-names/duplicate-name",
+        );
+    });
+
+    it("still reports two composites assigning one name in the same place", async () => {
+        source = `<selectFromSequence assignNames="a b" numToSelect="2" /><selectFromSequence assignNames="a c" numToSelect="2" /> $a $b`;
+        const res = await updateSyntaxFromV06toV07(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        // The first keeps the name and the references; the second gets its own.
+        expect(toXml(res.dast)).toContain(`$a[1] $a[2]`);
+        expect(res.vfile.messages.map((m) => m.ruleId)).toContain(
+            "assign-names/duplicate-name",
+        );
+    });
+
+    it("does not read a copy's own attributes as module parameters", async () => {
+        // `link` belongs to the `<copy>`, so it says nothing about the external target.
+        source = `<copy uri="doenet:cid=abc" link="false" />`;
+        const res = await updateSyntaxFromV06toV07(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        expect(toXml(res.dast)).toEqual(source);
+        expect(res.vfile.messages.map((m) => m.ruleId)).toContain(
+            "external-copy/unknown-component-type",
+        );
+    });
+
+    it("normalizes a reference token that already has a dollar sign", async () => {
+        source = `<answer><award sourcesAreResponses="$g/a"><when>1=1</when></award></answer>`;
+        correctSource = `<answer><award referencesAreResponses="$g.a"><when>1=1</when></award></answer>`;
+        expect(
+            await updateSyntax(source, { doNotUpgradeCopyTags: true }),
+        ).toEqual(correctSource);
+    });
+
+    it("does not move a reference when a copy's own name is already taken", async () => {
+        source = `<point name="a">(1,2)</point><copy source="m" name="c" assignNames="a" /> $a`;
+        correctSource = `<point name="a">(1,2)</point><copy source="m" name="c" /> $a`;
+        expect(
+            await updateSyntax(source, { doNotUpgradeCopyTags: true }),
+        ).toEqual(correctSource);
+    });
+});

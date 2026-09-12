@@ -7,7 +7,11 @@ import {
     toXml,
 } from "@doenet/parser";
 import { reparseAttribute } from "./reparse-attribute";
-import { AssignNamesContext, readAssignNames } from "./assign-names/context";
+import {
+    AssignNamesContext,
+    ancestorNamesOf,
+    readAssignNames,
+} from "./assign-names/context";
 import { registerCompositeAssignNames } from "./assign-names/register-composite";
 
 /**
@@ -19,7 +23,7 @@ export const upgradeMapElement: Plugin<
     DastRoot
 > = (context) => {
     return (tree, file) => {
-        replaceNode(tree, (node) => {
+        replaceNode(tree, (node, info) => {
             if (!isDastElement(node)) {
                 return;
             }
@@ -62,6 +66,7 @@ export const upgradeMapElement: Plugin<
                         node,
                         assignNamesValue,
                         fallbackBase: "repeat",
+                        ancestorNames: ancestorNamesOf(info.parents),
                         context,
                         file,
                     }) ?? name;

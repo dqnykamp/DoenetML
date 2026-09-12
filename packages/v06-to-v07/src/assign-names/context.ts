@@ -139,3 +139,22 @@ function assignNamesKey(node: DastElement): string | undefined {
         (k) => k.toLowerCase() === "assignnames",
     );
 }
+
+/**
+ * The `name`s of the elements enclosing a composite, outermost first.
+ *
+ * `visit` and `visitAll` both report parents nearest-first, which is the opposite of how
+ * a reference path reads, so the chain is reversed here. Elements without a name are
+ * skipped: they were never addressable, so a reference could not have mentioned them.
+ */
+export function ancestorNamesOf(parents: DastElement[]): string[] {
+    const names: string[] = [];
+    for (const parent of parents) {
+        const nameAttr = findAttribute(parent, "name");
+        const name = nameAttr ? toXml(nameAttr.children).trim() : "";
+        if (name) {
+            names.push(name);
+        }
+    }
+    return names.reverse();
+}

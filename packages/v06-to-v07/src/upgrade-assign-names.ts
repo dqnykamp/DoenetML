@@ -10,6 +10,7 @@ import {
 } from "./assign-names/composite-info";
 import {
     AssignNamesContext,
+    ancestorNamesOf,
     deleteAssignNames,
     readAssignNames,
     setCompositeName,
@@ -49,7 +50,7 @@ export const upgradeAssignNames: Plugin<
     DastRoot
 > = (context) => {
     return (tree, file) => {
-        visitAll(tree, (node) => {
+        visitAll(tree, (node, parents) => {
             if (!isDastElement(node)) {
                 return;
             }
@@ -114,7 +115,11 @@ export const upgradeAssignNames: Plugin<
                 context.registry.register(
                     onlyPiece,
                     undefined,
-                    { elementName: node.name, position: node.position },
+                    {
+                        elementName: node.name,
+                        position: node.position,
+                        ancestorNames: ancestorNamesOf(parents),
+                    },
                     file,
                 );
                 warnIfSelfReferential(node, onlyPiece, file);
@@ -126,6 +131,7 @@ export const upgradeAssignNames: Plugin<
                 node,
                 assignNamesValue,
                 fallbackBase: spec.name,
+                ancestorNames: ancestorNamesOf(parents),
                 context,
                 file,
                 positionMap: makePositionMap(node, spec, file),

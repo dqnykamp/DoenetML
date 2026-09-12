@@ -230,7 +230,9 @@ describe("copy naming", () => {
         expect(result.xml).toEqual(
             `<module copy="doenet:cid=x" vmin="1" name="a" /><module copy="doenet:cid=y" vmin="2" name="copy" /> $a`,
         );
-        expect(result.ruleIds).toContain("copy/name-already-taken");
+        // Both are at the same level, so this is a genuine clash rather than two
+        // namespaces that happened to use the same name.
+        expect(result.ruleIds).toContain("assign-names/duplicate-name");
     });
 
     it("does not let a copy take a name another component already has", async () => {

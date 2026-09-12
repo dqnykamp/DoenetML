@@ -147,7 +147,12 @@ function renamePath(
         return path;
     }
     return path.flatMap((part, partIndex): DastMacroPathPart[] => {
-        const target = registry.get(part.name);
+        // The parts before this one say which namespace the reference is reaching into,
+        // which is how a name assigned in more than one of them is told apart.
+        const target = registry.get(
+            part.name,
+            path.slice(0, partIndex).map((p) => p.name),
+        );
         if (!target?.replacement) {
             return [part];
         }

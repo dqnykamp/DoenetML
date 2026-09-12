@@ -11,6 +11,7 @@ import { renameAttrInPlace } from "./rename-attr-in-place";
 import { breakStringInPiecesBySpacesOrParens } from "./assign-names/break-into-pieces";
 import {
     AssignNamesContext,
+    ancestorNamesOf,
     deleteAssignNames,
     readAssignNames,
     setCompositeName,
@@ -48,7 +49,7 @@ export const upgradeCopyElements: Plugin<
     DastRoot
 > = (context) => {
     return (tree, file) => {
-        visit(tree, (node) => {
+        visit(tree, (node, info) => {
             if (!isDastElement(node)) {
                 return;
             }
@@ -62,7 +63,12 @@ export const upgradeCopyElements: Plugin<
             // Every `<copy>` needs its assigned name turned into a `name`, and it has to
             // happen here rather than in `upgradeCopySyntax` — that runs after the
             // references have been rewritten, too late to register anything.
-            convertAssignNames(node, context, file);
+            convertAssignNames(
+                node,
+                ancestorNamesOf(info.parents),
+                context,
+                file,
+            );
 
             const uriKey = findKey(node, "uri");
             if (!uriKey) {
@@ -74,8 +80,7 @@ export const upgradeCopyElements: Plugin<
             }
 
             const passedAttributes = Object.keys(node.attributes).filter(
-                (key) =>
-                    !["uri", "assignnames", "name"].includes(key.toLowerCase()),
+                (key) => !COPY_OWN_ATTRIBUTES.has(key.toLowerCase()),
             );
 
             if (passedAttributes.length === 0) {
@@ -107,6 +112,28 @@ export const upgradeCopyElements: Plugin<
 };
 
 /**
+ * Attributes that belong to the `<copy>` itself rather than to whatever it copies. Only
+ * the others say anything about what the external document is, so only they count as
+ * evidence that its target takes parameters.
+ */
+const COPY_OWN_ATTRIBUTES = new Set([
+    "uri",
+    "assignnames",
+    "name",
+    "link",
+    "prop",
+    "source",
+    "target",
+    "tname",
+    "newnamespace",
+    "assignnewnamespaces",
+    "componentindex",
+    "propindex",
+    "sourceindex",
+    "createcomponentoftype",
+]);
+
+/**
  * Give a `<copy>` the name its references will be converted to.
  *
  * A single assigned name is the component's `name`. When the element already carries a
@@ -121,6 +148,7 @@ export const upgradeCopyElements: Plugin<
  */
 function convertAssignNames(
     node: DastElement,
+    ancestorNames: string[],
     context: AssignNamesContext,
     file: VFile,
 ) {
@@ -129,7 +157,11 @@ function convertAssignNames(
         deleteAssignNames(node);
         return;
     }
-    const origin = { elementName: node.name, position: node.position };
+    const origin = {
+        elementName: node.name,
+        position: node.position,
+        ancestorNames,
+    };
     const parsed = breakStringInPiecesBySpacesOrParens(assignNamesValue);
     const names =
         parsed.success && parsed.pieces.every((p) => typeof p === "string")
@@ -154,41 +186,53 @@ function convertAssignNames(
         node.attributes[findKey(node, "name") ?? ""]?.children ?? [],
     ).trim();
 
+    // A name already carried by a real component is not ours to take, and references to
+    // it were never about this copy. A name claimed by another `assignNames` is a
+    // different matter: v0.6 namespaces allowed that, so this copy takes a name of its
+    // own and the references reaching into *its* namespace are pointed at it.
+    const nameBelongsToAnother =
+        !isValidReferenceableName(assignedName) ||
+        context.existingNames.has(assignedName);
+    const nameIsTaken =
+        nameBelongsToAnother || context.claimedNames.has(assignedName);
+
     if (existingName) {
         // The element keeps the name it already had, so an assigned name that differs is
-        // simply another way of spelling it and references can be pointed at it.
-        if (existingName !== assignedName) {
+        // simply another way of spelling it and references can be pointed at it — unless
+        // something else is already called that, in which case pointing them here would
+        // move references that were never about this copy.
+        if (existingName !== assignedName && !nameBelongsToAnother) {
             context.registry.register(
                 assignedName,
                 [makeIndexedPathPart(existingName, [])],
                 origin,
                 file,
             );
+        } else if (existingName !== assignedName) {
+            reportNameAlreadyTaken(node, assignedName, file);
         }
         deleteAssignNames(node);
         setCompositeName(node, existingName);
         return;
     }
 
-    if (
-        !isValidReferenceableName(assignedName) ||
-        context.existingNames.has(assignedName) ||
-        context.claimedNames.has(assignedName)
-    ) {
-        // Something else is already called this. v0.6 namespaces let the same assigned
-        // name appear more than once, and flattening them brings the two together.
-        // References are deliberately left alone: `$x` most likely meant the component
-        // that already had the name, and redirecting them all here would be a guess.
-        file.message(
-            `<${node.name}> assigns the name "${assignedName}", but something else in the document is already called that. It was given a generated name instead, and references to "${assignedName}" were left pointing where they already pointed.`,
-            {
-                place: node.position,
-                ruleId: "copy/name-already-taken",
-                source: "v06-to-v07",
-            },
-        );
+    if (nameIsTaken) {
+        const generated = context.uniqueName("copy");
+        if (nameBelongsToAnother) {
+            // References to it were never about this copy, so they are left alone.
+            reportNameAlreadyTaken(node, assignedName, file);
+        } else {
+            // Another `assignNames` holds the bare name, but this copy is somewhere else,
+            // so references that reach into its namespace are pointed at it.
+            context.registry.register(
+                assignedName,
+                [makeIndexedPathPart(generated, [])],
+                origin,
+                file,
+            );
+        }
         deleteAssignNames(node);
-        setCompositeName(node, context.uniqueName("copy"));
+        setCompositeName(node, generated);
         return;
     }
 
@@ -218,6 +262,21 @@ function warnAboutExternalRef(node: DastElement, file: any) {
         {
             place: node.position,
             ruleId: "external-ref/needs-new-content-id",
+            source: "v06-to-v07",
+        },
+    );
+}
+
+function reportNameAlreadyTaken(
+    node: DastElement,
+    assignedName: string,
+    file: VFile,
+) {
+    file.message(
+        `<${node.name}> assigns the name "${assignedName}", but something else in the document is already called that. References to "${assignedName}" were left pointing where they already pointed.`,
+        {
+            place: node.position,
+            ruleId: "copy/name-already-taken",
             source: "v06-to-v07",
         },
     );

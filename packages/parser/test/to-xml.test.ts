@@ -61,6 +61,13 @@ describe("parser", () => {
 
         // The v0.6 serializer needs the same treatment, since `toXml` accepts a v0.6 tree.
         expect(toXml(lezerToDastV6(`$(x)_0`) as any)).toEqual(`$(x)_0`);
+        // ...including in a function macro's arguments, an index, and a macro attribute,
+        // which the v0.6 serializer renders itself rather than through `nodesToXml`.
+        expect(toXml(lezerToDastV6(`$$f($(x)_0)`) as any)).toEqual(
+            `$$f($(x)_0)`,
+        );
+        expect(toXml(lezerToDastV6(`$a[$(x)_0]`) as any)).toEqual(`$a[$(x)_0]`);
+
         // ...and drops them again when nothing would run on, as the v0.7 one does.
         expect(toXml(lezerToDastV6(`$(x) 0`) as any)).toEqual(`$x 0`);
 

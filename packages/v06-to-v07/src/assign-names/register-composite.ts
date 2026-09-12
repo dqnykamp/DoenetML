@@ -17,6 +17,7 @@ export function registerCompositeAssignNames({
     node,
     assignNamesValue,
     fallbackBase,
+    ancestorNames,
     context,
     file,
     positionMap,
@@ -25,11 +26,17 @@ export function registerCompositeAssignNames({
     assignNamesValue: string;
     /** Base name to generate from when the assigned names cannot be reused. */
     fallbackBase: string;
+    /** See `RenameOrigin.ancestorNames`. */
+    ancestorNames?: string[];
     context: AssignNamesContext;
     file: VFile;
     positionMap?: PositionMap;
 }): string | undefined {
-    const origin = { elementName: node.name, position: node.position };
+    const origin = {
+        elementName: node.name,
+        position: node.position,
+        ancestorNames,
+    };
     const parsed = breakStringInPiecesBySpacesOrParens(assignNamesValue);
     if (!parsed.success) {
         // Calling through anyway keeps the "unbalanced parentheses" message in one place.

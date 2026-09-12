@@ -25,7 +25,7 @@ export function macroToString(
     forceParens = false,
 ): string {
     if (Array.isArray(node)) {
-        return node.map((n) => macroToString(n)).join("");
+        return arrayToString(node);
     }
     switch (node.type) {
         case "macro": {
@@ -90,12 +90,40 @@ function macroPathPartToString(pathPart: ScopedPathPart): string {
     );
 }
 
+/**
+ * Render a run of siblings, giving a macro its `$(...)` form when the one after it would
+ * otherwise run on into its name. The same rule as in `dast-util-to-xml.ts`; comparing the
+ * rendered strings means escaping and siblings that print nothing take care of themselves.
+ */
+function arrayToString(nodes: readonly Node[]): string {
+    const parts = nodes.map((n) => macroToString(n));
+    let nextChar = "";
+    for (let i = parts.length - 1; i >= 0; i--) {
+        const child = nodes[i];
+        if (
+            (child.type === "macro" || child.type === "function") &&
+            isNameChar(nextChar) &&
+            isNameChar(parts[i].slice(-1))
+        ) {
+            parts[i] = macroToString(child, true);
+        }
+        if (parts[i]) {
+            nextChar = parts[i][0];
+        }
+    }
+    return parts.join("");
+}
+
+function isNameChar(char: string): boolean {
+    return /^[a-zA-Z0-9_]$/.test(char);
+}
+
 function attrToString(attr: Attr): string {
     const name = attr.name;
     if (attr.children.length === 0) {
         return name;
     }
-    const value = attr.children.map((c) => macroToString(c)).join("");
+    const value = arrayToString(attr.children);
     return `${name}=${quote(value)}`;
 }
 

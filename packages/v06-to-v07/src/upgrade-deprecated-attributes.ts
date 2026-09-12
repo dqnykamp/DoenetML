@@ -220,7 +220,7 @@ function applyRule(
             const dollared = value
                 .split(/\s+/)
                 .filter((t) => t)
-                .map((t) => (t.startsWith("$") ? t : referenceTo(t)))
+                .map(referenceTo)
                 .join(" ");
             elm.attributes[rule.to].children = reparseAttributeV6(dollared);
             return;
@@ -302,5 +302,10 @@ function findAttrKey(elm: DastElementV6, attrName: string): string | undefined {
  * parentheses again for names that do not need them.
  */
 function referenceTo(token: string): string {
-    return /^[a-zA-Z0-9_]+$/.test(token) ? `$${token}` : `$(${token})`;
+    if (token.startsWith("$(")) {
+        // Already in the form that can carry anything.
+        return token;
+    }
+    const name = token.startsWith("$") ? token.slice(1) : token;
+    return /^[a-zA-Z0-9_]+$/.test(name) ? `$${name}` : `$(${name})`;
 }

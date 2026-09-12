@@ -15,6 +15,7 @@ import { reparseAttribute } from "./reparse-attribute";
 import { determinePropType } from "./core-info/determine-prop-type";
 import {
     AssignNamesContext,
+    ancestorNamesOf,
     deleteAssignNames,
     readAssignNames,
     setCompositeName,
@@ -39,7 +40,7 @@ export const upgradeCollectElement: Plugin<
     DastRoot
 > = (context) => {
     return (tree, file) => {
-        visit(tree, (node) => {
+        visit(tree, (node, info) => {
             if (!isDastElement(node)) {
                 return;
             }
@@ -85,6 +86,7 @@ export const upgradeCollectElement: Plugin<
                 node,
                 assignNamesValue,
                 fallbackBase: "collect",
+                ancestorNames: ancestorNamesOf(info.parents),
                 context,
                 file,
             });

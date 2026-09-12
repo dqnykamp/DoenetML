@@ -27,6 +27,11 @@ became `source="...f"`, a function macro nested in another's arguments or indice
 an attribute was left in v0.6 syntax, and a `<copy>` of something the document could not
 build was renamed to `<_error>`, which is not an element anyone can write.
 
+The same assigned name can appear in more than one v0.6 namespace, and a reference said
+which it meant by writing the namespace in front of it. Only one of them can keep the bare
+name once the namespaces are gone, so each reference now follows the one it was reaching
+into rather than all of them following the first.
+
 A reference written with dot notation is left alone. v0.6 reached public state variables
 that way and nothing else, so `$p.y` was the point's y-coordinate and not a component that
 `assignNames` had named — only the slash form could name one of those.
