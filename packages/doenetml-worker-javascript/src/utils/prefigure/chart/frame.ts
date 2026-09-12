@@ -757,7 +757,6 @@ export function assembleChartDiagram({
     yTicks: AxisTicks;
     /** Null when the horizontal axis carries category names instead of numbers. */
     xTicks: AxisTicks | null;
-    /** Null when the horizontal axis is numeric. */
     /**
      * Null when the horizontal axis is numeric. `labelHasLatex` says the name
      * carries math to typeset rather than characters to print — true only of a
