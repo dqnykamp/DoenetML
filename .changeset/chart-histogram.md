@@ -36,4 +36,4 @@ Seven things are reported rather than passed over in silence:
 - `categories`, which a histogram has no positions for — its bars are named by the cut points they run between;
 - `barWidth`, which a histogram has no gap to widen into.
 
-The reference page now has a section per chart type, each saying what a series holds for it, and every attribute section says which types it affects. Closes #1881 and #1882, and completes #437.
+The reference page now has a section per chart type, each saying what a series holds for it, and every attribute section says which types it affects. Closes #1881, #1882 and #437 — the six chart types that issue set out are now all shipped.

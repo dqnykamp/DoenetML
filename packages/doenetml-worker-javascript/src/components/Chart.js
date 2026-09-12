@@ -186,7 +186,7 @@ export default class Chart extends BlockComponent {
             groupName: "marks",
             createComponentOfType: "numberList",
             description:
-                "How to divide a histogram's scale: a number of equal-width bins, or two or more cut points, each at least as large as the one before it. Omit it and the bins are chosen from the data. Only a histogram draws with it.",
+                "How to divide a histogram's scale: a whole number of equal-width bins, from 1 to 1000, or two or more finite cut points, each at least as large as the one before it. Omit it and the bins are chosen from the data. Only a histogram draws with it.",
             highlighted: true,
         };
 
@@ -365,7 +365,7 @@ export default class Chart extends BlockComponent {
         attributes.xMin = {
             groupName: "axes",
             description:
-                "Leftmost value shown on the horizontal axis, for a chart with a numeric one. Defaults to the first tick below the smallest `x`. If `xMin` and `xMax` do not describe a box — both finite, with `xMin` below `xMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
+                "Leftmost value shown on the horizontal axis, for a chart with a numeric one. Defaults to the first tick below the smallest `x`, or on a histogram to its first cut point, since its bars fill the axis. If `xMin` and `xMax` do not describe a box — both finite, with `xMin` below `xMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
             createComponentOfType: "number",
             createStateVariable: "xMinAttr",
             defaultValue: null,
@@ -374,7 +374,7 @@ export default class Chart extends BlockComponent {
         attributes.xMax = {
             groupName: "axes",
             description:
-                "Rightmost value shown on the horizontal axis, for a chart with a numeric one. Defaults to the first tick above the largest `x`. If `xMin` and `xMax` do not describe a box — both finite, with `xMin` below `xMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
+                "Rightmost value shown on the horizontal axis, for a chart with a numeric one. Defaults to the first tick above the largest `x`, or on a histogram to its last cut point, since its bars fill the axis. If `xMin` and `xMax` do not describe a box — both finite, with `xMin` below `xMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
             createComponentOfType: "number",
             createStateVariable: "xMaxAttr",
             defaultValue: null,
@@ -383,7 +383,7 @@ export default class Chart extends BlockComponent {
         attributes.yMin = {
             groupName: "axes",
             description:
-                "Lowest value shown on the vertical axis. Defaults to 0 for a bar chart, whose bars are measured from it, or to the first tick past the smallest value — which is what a bar chart with negative values gets, and what a line, scatter or box chart always gets. If `yMin` and `yMax` do not describe a box — both finite, with `yMin` below `yMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
+                "Lowest value shown on the vertical axis. Defaults to 0 for a bar chart, whose bars are measured from it, and for a histogram, whose bars are counts, or to the first tick past the smallest value — which is what a bar chart with negative values gets, and what a line, scatter or box chart always gets. If `yMin` and `yMax` do not describe a box — both finite, with `yMin` below `yMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
             createComponentOfType: "number",
             createStateVariable: "yMinAttr",
             defaultValue: null,
@@ -856,7 +856,7 @@ export default class Chart extends BlockComponent {
             groupName: "data",
             highlighted: true,
             description:
-                "How many series the chart holds: its `<series>` children that are not hidden, or one for a chart of bare values. Not necessarily how many are drawn — a pie draws the first of them and no more.",
+                "How many series the chart holds: its `<series>` children that are not hidden, or one for a chart of bare values. Not necessarily how many are drawn — a pie and a histogram each draw the first of them and no more.",
             public: true,
             shadowingInstructions: {
                 createComponentOfType: "integer",
