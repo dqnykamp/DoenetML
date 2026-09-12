@@ -1320,9 +1320,13 @@ describe("Chart prefigure renderer live validation @group4", () => {
                     ],
                 ],
                 [
+                    // Scores rather than the small sample used elsewhere: the
+                    // sweep below reads every label in the picture, and a cut
+                    // point that is also a count would be found on the vertical
+                    // axis whether or not the horizontal one drew it.
                     "cut points the chart chose",
-                    `<chart type="histogram" name="c">2 3 3 4 4 4 5 5 6 9</chart>`,
-                    [2, 4, 6, 8, 10],
+                    `<chart type="histogram" name="c">52 61 63 68 70 71 75 78 84 91 55 58 60 62 65 66 70 72 88 94</chart>`,
+                    [50, 60, 70, 80, 90, 100],
                 ],
             ] as [string, string, number[]][]) {
                 const prefigureXML = await getPrefigureXML(doenetML, "c");

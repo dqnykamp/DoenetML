@@ -762,8 +762,8 @@ export function assembleChartDiagram({
      * Null when the horizontal axis is numeric. `labelHasLatex` says the name
      * carries math to typeset rather than characters to print — true only of a
      * box chart, whose positions are named by a `<label>` that may hold an
-     * `<m>`, where every other type names them from `categories`, which is a
-     * `textList` and so is text and nothing else.
+     * `<m>`, where a chart of categories names them from `categories`, which is
+     * a `textList` and so is text and nothing else.
      */
     slots: { center: number; label: string; labelHasLatex?: boolean }[] | null;
     widthPx: number;

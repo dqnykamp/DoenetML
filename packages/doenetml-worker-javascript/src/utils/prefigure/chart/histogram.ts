@@ -353,7 +353,17 @@ function edgeTicks(
         return niceTicks();
     }
 
-    const width = snapNumber(edges[1] - edges[0]);
+    // Two forms of the same width, and they are not interchangeable. The step
+    // the axis is labeled by is snapped, because it is written into the XML;
+    // the width the other widths are *compared* to is the difference itself,
+    // because a snap is a rounding of ours and the differences it is held
+    // against carry none. Compared against the snapped one, an author's evenly
+    // spaced cut points whose width is not already round to twelve digits —
+    // sixths of an interval, sevenths, anything from a `<sequence>` — were
+    // called unevenly binned and numbered at ordinary ticks instead of at the
+    // cut points.
+    const exactWidth = edges[1] - edges[0];
+    const width = snapNumber(exactWidth);
     // Of one width, to within the precision the cut points are kept at rather
     // than to the last bit. A requested count divides the data's own range, and
     // the cut points that come of it are snapped to twelve significant digits
@@ -398,7 +408,7 @@ function edgeTicks(
     const uniform = edges.every(
         (edge, ind) =>
             ind === 0 ||
-            Math.abs(edge - edges[ind - 1] - width) <= slackPerWidth,
+            Math.abs(edge - edges[ind - 1] - exactWidth) <= slackPerWidth,
     );
     // A width of nothing is two cut points that repeat, which `<binCounts>`
     // accepts and this draws as a bar of no width: there is nothing to step by.

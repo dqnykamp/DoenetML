@@ -392,7 +392,7 @@ export default class Chart extends BlockComponent {
         attributes.yMax = {
             groupName: "axes",
             description:
-                "Highest value shown on the vertical axis. Defaults to the next tick above the largest value. If `yMin` and `yMax` do not describe a box — both finite, with `yMin` below `yMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
+                "Highest value shown on the vertical axis. Defaults to the next tick above the largest value, or on a histogram above the tallest count. If `yMin` and `yMax` do not describe a box — both finite, with `yMin` below `yMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
             createComponentOfType: "number",
             createStateVariable: "yMaxAttr",
             defaultValue: null,

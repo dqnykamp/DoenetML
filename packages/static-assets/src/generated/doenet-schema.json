@@ -36190,11 +36190,11 @@
                     "autocompleteValues": [
                         {
                             "value": "left",
-                            "description": "Bins are `[a, b)`, matching NumPy and the usual textbook class interval. The last bin also includes its upper cut point, so the largest value is not dropped."
+                            "description": "Bins are `[a, b)`, matching NumPy and the usual textbook class interval. The last bin also includes its upper cut point, so a value sitting exactly on it is counted."
                         },
                         {
                             "value": "right",
-                            "description": "Bins are `(a, b]`, matching R, pandas and Excel. The first bin also includes its lower cut point, so the smallest value is not dropped."
+                            "description": "Bins are `(a, b]`, matching R, pandas and Excel. The first bin also includes its lower cut point, so a value sitting exactly on it is counted."
                         }
                     ],
                     "type": "keyword"
@@ -36674,7 +36674,7 @@
                 },
                 {
                     "name": "yMax",
-                    "description": "Highest value shown on the vertical axis. Defaults to the next tick above the largest value. If `yMin` and `yMax` do not describe a box — both finite, with `yMin` below `yMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
+                    "description": "Highest value shown on the vertical axis. Defaults to the next tick above the largest value, or on a histogram above the tallest count. If `yMin` and `yMax` do not describe a box — both finite, with `yMin` below `yMax` — the axis is chosen from the data instead. A pie has no axes and reads neither.",
                     "groupName": "axes",
                     "defaultValue": null,
                     "type": "number"

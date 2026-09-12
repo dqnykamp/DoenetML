@@ -547,6 +547,25 @@ describe("chart histogram prefigure tests @group4", async () => {
             expect(even).toContain('hlabels="(1000000000,1,1000000002)"');
         });
 
+        it("labels an author's evenly spaced cut points whose width is not a round number", async () => {
+            const xml = await chartXML(`
+    <setup><numberList name="cuts"><sequence from="0" to="2" step="1/3" /></numberList></setup>
+    <chart type="histogram" name="c" bins="$cuts">
+      <shortDescription>x</shortDescription>
+      <series>0.1 0.4 0.5 0.8 1.1 1.2 1.5 1.9</series>
+    </chart>
+    `);
+
+            // Six bins a third of a unit wide. The step the axis is labeled by
+            // is snapped, because it is written into the XML; the width the
+            // other widths are compared to must not be, because the snap is a
+            // rounding of ours and the differences it is held against carry
+            // none. Held to the snapped one, these came out as unevenly binned
+            // and the axis was numbered 0, 0.5, 1, 1.5, 2 — not one of which
+            // but the ends is a cut point.
+            expect(xml).toContain('hlabels="(0,0.333333333333,2)"');
+        });
+
         it("numbers the axis the ordinary way for cut points of differing widths", async () => {
             const xml = await chartXML(`
     <chart type="histogram" name="c" bins="0 5 10 20">

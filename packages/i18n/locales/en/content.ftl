@@ -606,11 +606,11 @@ math-embedded-input-blank-ordinal = blank { $ordinal } of { $total }
 # The five-number summary a `<chart type="box">` gives a screen reader on each
 # box it draws.
 #
-# Words rather than five bare numbers, which is the one annotation in a chart
-# that cannot do without them: a bar is announced as its category and its
-# value, and a point as its coordinates, because in both the position says
-# which number it is. A box reports five numbers at one position, and nothing
-# but the naming tells them apart.
+# Words rather than five bare numbers. A bar is announced as its category and
+# its value, and a point as its coordinates, because in both the position says
+# which number it is; a box reports five numbers at one position, and nothing
+# but the naming tells them apart. A histogram's bar needs a word for the same
+# reason — see `chart-histogram-bin` below, which names its count.
 #
 # Each number arrives as text, already written the way the chart writes the
 # numbers on its own axis. Passed as a number instead, a translation would

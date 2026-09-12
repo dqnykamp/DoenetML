@@ -1,6 +1,6 @@
 /**
  * PreFigure assembly for `<chart>` — bars, points and the lines through them,
- * pies, and box plots.
+ * pies, box plots, and histograms.
  *
  * Kept apart from `graph.ts` because a chart is not a graph with data in it: it
  * owns its own bounding box, it sizes its own axes from the data, and it has no
@@ -88,8 +88,10 @@ export function chartLegendHasItems(geometry: ChartGeometry | null): boolean {
     }
 
     // A box chart names each series on the axis, under the box drawn from it,
-    // so it has nothing left for a legend to say. Every other type draws
-    // several series into the same space and needs a key to tell them apart.
+    // so it has nothing left for a legend to say. The types that draw several
+    // series into the same space need a key to tell them apart, and a
+    // histogram, which draws one, names that one the way a bar chart of one
+    // group does.
     if (geometry.kind === "box") {
         return false;
     }

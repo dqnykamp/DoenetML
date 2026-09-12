@@ -496,12 +496,12 @@ export class BinCounts extends CountingBaseListOperator {
                 {
                     value: "left",
                     description:
-                        "Bins are `[a, b)`, matching NumPy and the usual textbook class interval. The last bin also includes its upper cut point, so the largest value is not dropped.",
+                        "Bins are `[a, b)`, matching NumPy and the usual textbook class interval. The last bin also includes its upper cut point, so a value sitting exactly on it is counted.",
                 },
                 {
                     value: "right",
                     description:
-                        "Bins are `(a, b]`, matching R, pandas and Excel. The first bin also includes its lower cut point, so the smallest value is not dropped.",
+                        "Bins are `(a, b]`, matching R, pandas and Excel. The first bin also includes its lower cut point, so a value sitting exactly on it is counted.",
                 },
             ],
         };
