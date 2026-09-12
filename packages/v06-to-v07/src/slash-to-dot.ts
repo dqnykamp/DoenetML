@@ -53,6 +53,11 @@ export const upgradePathSlashesToDots: Plugin<
                         node.type === "macro"
                             ? v06MacroToV07Macro(node)
                             : v06FunctionMacroToV07FunctionMacro(node);
+                    // Anything the diagnostic needs has to be taken now: the node is
+                    // about to be emptied, and `v06macroToString` only understands the
+                    // v0.6 shape, which the converted macro no longer has.
+                    const originalText = v06macroToString(node as any);
+                    const originalPosition = node.position;
                     // We mutate in place. Clear the node of its old properties
                     // and splice in the new values.
                     Object.keys(node).forEach((key) => {
@@ -61,12 +66,10 @@ export const upgradePathSlashesToDots: Plugin<
                     });
                     macro.path = collapseParentPathParts(macro.path, () =>
                         file.message(
-                            `There is no equivalent to the $(../x) syntax; a best-guess was made when converting ${v06macroToString(
-                                macro as any,
-                            )}`,
+                            `There is no equivalent to the $(../x) syntax; a best-guess was made when converting ${originalText}`,
                             {
-                                start: node.position?.start,
-                                end: node.position?.end,
+                                start: originalPosition?.start,
+                                end: originalPosition?.end,
                             },
                         ),
                     );

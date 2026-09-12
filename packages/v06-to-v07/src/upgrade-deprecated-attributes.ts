@@ -220,7 +220,7 @@ function applyRule(
             const dollared = value
                 .split(/\s+/)
                 .filter((t) => t)
-                .map((t) => (t.startsWith("$") ? t : `$${t}`))
+                .map((t) => (t.startsWith("$") ? t : referenceTo(t)))
                 .join(" ");
             elm.attributes[rule.to].children = reparseAttributeV6(dollared);
             return;
@@ -291,4 +291,16 @@ function findAttrKey(elm: DastElementV6, attrName: string): string | undefined {
     return Object.keys(elm.attributes).find(
         (key) => key.toLowerCase() === attrName.toLowerCase(),
     );
+}
+
+/**
+ * Write `token` as a v0.6 reference.
+ *
+ * A bare `$` only carries a plain identifier: `$a-b` is a subtraction and `$g/a` is a
+ * reference to `g` followed by the text `/a`. Anything else has to go inside `$(...)`,
+ * which is also where a namespace path was always written. The serializer drops the
+ * parentheses again for names that do not need them.
+ */
+function referenceTo(token: string): string {
+    return /^[a-zA-Z0-9_]+$/.test(token) ? `$${token}` : `$(${token})`;
 }

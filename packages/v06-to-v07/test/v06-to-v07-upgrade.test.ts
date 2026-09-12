@@ -100,7 +100,7 @@ describe("v06 to v07 update", () => {
 
         expect(res.vfile.messages).toMatchInlineSnapshot(`
           [
-            [1:1-1:1: There is no equivalent to the $(../x) syntax; a best-guess was made when converting $(x/../bar)],
+            [1:8-1:19: There is no equivalent to the $(../x) syntax; a best-guess was made when converting $(x/../bar)],
           ]
         `);
 
@@ -116,7 +116,7 @@ describe("v06 to v07 update", () => {
 
         expect(res.vfile.messages).toMatchInlineSnapshot(`
           [
-            [1:1-1:1: There is no equivalent to the $(../x) syntax; a best-guess was made when converting $(x/../../bar)],
+            [1:8-1:22: There is no equivalent to the $(../x) syntax; a best-guess was made when converting $(x/../../bar)],
           ]
         `);
     });
@@ -957,6 +957,49 @@ describe("regressions found by the third review", () => {
     it("normalizes a padded name a copy already had", async () => {
         source = `<math name="m">5</math><copy source="m" name=" a " assignNames="b" /> $b`;
         correctSource = `<math name="m">5</math><copy source="m" name="a" /> $a`;
+        expect(
+            await updateSyntax(source, { doNotUpgradeCopyTags: true }),
+        ).toEqual(correctSource);
+    });
+});
+
+describe("regressions found by the fourth review", () => {
+    let source: string;
+    let correctSource: string;
+
+    it("converts a parent path inside a function macro", async () => {
+        // The diagnostic for `..` was built from the already-converted macro, which the
+        // v0.6 serializer cannot read — so this threw instead of converting.
+        source = `<p>$$(../f)(2)</p>`;
+        correctSource = `<p>$$f(2)</p>`;
+        const res = await updateSyntaxFromV06toV07(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        expect(toXml(res.dast)).toEqual(correctSource);
+        expect(res.vfile.messages).toHaveLength(1);
+    });
+
+    it("keeps a numbered list prop when the name needs parentheses", async () => {
+        // Dropping `prop` before the index was in place widened the copy from one item
+        // to the whole list.
+        source = `<mathList name="foo-bar">1 2 3</mathList><copy source="foo-bar" prop="math2" name="k" />`;
+        correctSource = `<mathList name="foo-bar">1 2 3</mathList><copy source="foo-bar[2]" name="k" />`;
+        expect(
+            await updateSyntax(source, { doNotUpgradeCopyTags: true }),
+        ).toEqual(correctSource);
+    });
+
+    it("writes a reference list token in the form that can express it", async () => {
+        // `$a-b` is a subtraction and `$g/a` is `$g` followed by text, so neither is the
+        // reference the attribute needs.
+        source = `<answer><award sourcesAreResponses="a-b"><when>1=1</when></award></answer>`;
+        correctSource = `<answer><award referencesAreResponses="$(a-b)"><when>1=1</when></award></answer>`;
+        expect(
+            await updateSyntax(source, { doNotUpgradeCopyTags: true }),
+        ).toEqual(correctSource);
+
+        source = `<answer><award sourcesAreResponses="g/a"><when>1=1</when></award></answer>`;
+        correctSource = `<answer><award referencesAreResponses="$g.a"><when>1=1</when></award></answer>`;
         expect(
             await updateSyntax(source, { doNotUpgradeCopyTags: true }),
         ).toEqual(correctSource);

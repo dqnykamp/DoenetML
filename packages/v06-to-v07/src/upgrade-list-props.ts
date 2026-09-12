@@ -7,7 +7,7 @@ import {
     toXml,
 } from "@doenet/parser";
 import { visitAll, visitAllMacros } from "./assign-names/visit-all";
-import { reparseAttribute } from "./reparse-attribute";
+import { parseReferencePath } from "./assign-names/apply-renames";
 import {
     isPropAccess,
     markAsPropAccess,
@@ -102,10 +102,15 @@ function rewritePropAttribute(node: DastElement) {
     if (!ALL_ITEMS_PROPS.has(prop) && !numbered) {
         return;
     }
-    delete node.attributes[propKey];
     if (!numbered) {
+        // An "all items" prop is the list itself, so there is nothing to move.
+        delete node.attributes[propKey];
         return;
     }
+
+    // A numbered prop becomes an index on the source, so the prop may only be dropped
+    // once that has actually happened — otherwise the copy silently widens from one item
+    // to the whole list.
     const sourceKey = findKey(node, "source");
     if (!sourceKey) {
         return;
@@ -116,20 +121,23 @@ function rewritePropAttribute(node: DastElement) {
         return;
     }
     const hadDollar = source.startsWith("$");
-    const reparsed = reparseAttribute(hadDollar ? source : `$${source}`);
-    if (reparsed.length !== 1 || reparsed[0].type !== "macro") {
+    let path: DastMacroPathPart[];
+    try {
+        path = parseReferencePath(hadDollar ? source.slice(1) : source);
+    } catch (e) {
         return;
     }
-    const path = reparsed[0].path;
     const last = path[path.length - 1];
     last.index = [
         ...last.index,
         { type: "index", value: [{ type: "text", value: numbered[2] }] },
     ];
-    const printed = toXml(path);
-    sourceAttr.children = [
-        { type: "text", value: hadDollar ? `$${printed}` : printed },
-    ];
+    // When the value carried a `$` it is a reference, so print it as one and let the
+    // serializer add whatever parentheses the name needs.
+    sourceAttr.children = hadDollar
+        ? [{ type: "macro", path, attributes: {} }]
+        : [{ type: "text", value: toXml(path) }];
+    delete node.attributes[propKey];
 }
 
 function findKey(node: DastElement, attrName: string): string | undefined {

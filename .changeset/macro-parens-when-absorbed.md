@@ -1,4 +1,5 @@
 ---
+"@doenet/v06-to-v07": patch
 "@doenet/doenetml": patch
 "@doenet/standalone": patch
 "@doenet/doenetml-iframe": patch
