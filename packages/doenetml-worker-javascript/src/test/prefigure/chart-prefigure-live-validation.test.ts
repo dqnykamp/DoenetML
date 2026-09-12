@@ -1280,4 +1280,76 @@ describe("Chart prefigure renderer live validation @group4", () => {
             }
         },
     );
+
+    it.skipIf(!RUN_LIVE_PREFIGURE_VALIDATION)(
+        "optional: every cut point the axis promises carries a drawn number",
+        async () => {
+            // The gap this closes: nothing else in the repository can see a
+            // label that was *not* drawn. The vitest suites assert on the XML
+            // string, and the cases above ask the build service only for an
+            // SVG — so an axis asked to number a place outside its own bounding
+            // box passes both, because PreFigure drops such a label in silence.
+            // Two defects reached review that way, both in the numbers under a
+            // histogram's outermost bars, and both invisible until the rendered
+            // SVG was read.
+            //
+            // A label reaches the SVG as MathJax, carrying its value in
+            // `data-semantic-speech` — grouped, so 1013.15 arrives as
+            // "1 comma 013.15" — and rounded to about six digits, which is why
+            // the comparison below is a tolerance rather than a string match.
+            //
+            // Every fixture here is labeled at every cut point (a stride of
+            // one), and none of them has a cut point at zero: PreFigure draws
+            // no label where the two axes cross, which is a rule of its own
+            // rather than anything this chart decides.
+            for (const [what, doenetML, expected] of [
+                [
+                    "a requested count over data carrying more than twelve digits",
+                    `<chart type="histogram" name="c" bins="5">1.234567890123456 3 5 7 9.876543210987654</chart>`,
+                    [
+                        1.234567890123456, 2.962962954, 4.691358018,
+                        6.419753082, 8.148148146, 9.876543210987654,
+                    ],
+                ],
+                [
+                    "bins narrow beside their own magnitude",
+                    `<chart type="histogram" name="c" bins="6">1013.21 1013.26 1013.29 1013.15 1013.33 1013.16 1013.29 1013.16 1013.17 1013.34 1013.32</chart>`,
+                    [
+                        1013.15, 1013.18167, 1013.21333, 1013.245, 1013.27667,
+                        1013.30833, 1013.34,
+                    ],
+                ],
+                [
+                    "cut points the chart chose",
+                    `<chart type="histogram" name="c">2 3 3 4 4 4 5 5 6 9</chart>`,
+                    [2, 4, 6, 8, 10],
+                ],
+            ] as [string, string, number[]][]) {
+                const prefigureXML = await getPrefigureXML(doenetML, "c");
+                const result =
+                    await validatePrefigureXMLAgainstBuildService(prefigureXML);
+                expect(result.ok, `${what}: build failed`).toBe(true);
+
+                const svg: string = result.body?.svg ?? "";
+                const drawn = [
+                    ...svg.matchAll(/data-semantic-speech="([^"]*)"/g),
+                ].map((label) =>
+                    Number(
+                        label[1].replace(/ comma /g, "").replace(/\s+/g, ""),
+                    ),
+                );
+
+                for (const cutPoint of expected) {
+                    expect(
+                        drawn.some(
+                            (value) =>
+                                Math.abs(value - cutPoint) <=
+                                Math.abs(cutPoint) * 1e-5,
+                        ),
+                        `${what}: no number drawn at the cut point ${cutPoint}`,
+                    ).toBe(true);
+                }
+            }
+        },
+    );
 });
