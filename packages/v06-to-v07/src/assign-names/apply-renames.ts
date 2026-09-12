@@ -132,10 +132,10 @@ function renameRawReferenceAttribute(
  * Every matching part is rewritten, not just the leading one, because a v0.6 namespace
  * segment names a component and so can be an assigned name: `$(g/a)` arrives here as the
  * path `g.a`, and the `a` is the one that has to become `a[1]`. A part the author wrote
- * after a `.` is a *prop* access and can never name an assigned component, so rewriting
- * one is a guess — it is still made, but it warns, since silently turning `$p.y` into
- * `$p.x[2]` (when `x` and `y` are assigned elsewhere) would be indistinguishable from
- * authored markup.
+ * after a `.` was a *prop* access in v0.6 — dot notation reached public state variables
+ * and nothing else — so it can never name a component that `assignNames` created, and it
+ * is left alone. Rewriting one would turn `$p.y`, the point's y-coordinate, into
+ * `$p.x[2]` whenever `x` and `y` happened to be assigned somewhere else in the document.
  */
 function renamePath(
     path: DastMacroPathPart[],
@@ -152,14 +152,9 @@ function renamePath(
             return [part];
         }
         if (partIndex > 0 && isPropAccess(part)) {
-            file.message(
-                `"${part.name}" in the reference $${toXml(path)} was written as a prop of "${path[partIndex - 1].name}", but it is also a name assigned by <${target.origin.elementName}>, so it was converted to that composite's replacement. If it really was meant as a prop, change it back.`,
-                {
-                    place,
-                    ruleId: "assign-names/prop-like-reference",
-                    source: "v06-to-v07",
-                },
-            );
+            // Written after a `.`, so v0.6 read it as a prop of the part before it,
+            // whatever else happens to carry the name.
+            return [part];
         }
         const replacement = structuredClone(
             target.replacement,

@@ -213,9 +213,11 @@ describe("v06 to v07 update", () => {
         correctSource = `<collect componentType="point" name="points" from="$panel" /> $points[1] $points[4]`;
         expect(await updateSyntax(source)).toEqual(correctSource);
 
-        // References to the old `assignNames` get updated
-        source = `<p name="p"><collect componentTypes="point" name="points" source="panel" assignNames="q1 q2 q3 q4 q5" /></p> $p.q1 $q4`;
-        correctSource = `<p name="p"><collect componentType="point" name="points" from="$panel" /></p> $p.points[1] $points[4]`;
+        // A reference from outside the namespace gets updated at the part that names the
+        // assigned component. v0.6 addressed that with a slash — dot notation there would
+        // have been a prop of `p`, which is a different thing entirely.
+        source = `<p name="p" newNamespace><collect componentTypes="point" name="points" source="panel" assignNames="q1 q2 q3 q4 q5" /></p> $(p/q1) $(p/q4)`;
+        correctSource = `<p name="p"><collect componentType="point" name="points" from="$panel" /></p> $p.points[1] $p.points[4]`;
         expect(await updateSyntax(source)).toEqual(correctSource);
     });
 
@@ -272,34 +274,33 @@ describe("v06 to v07 update", () => {
         expect(await updateSyntax(source)).toEqual(correctSource);
     });
 
-    it("warns when an assigned name is rewritten inside a prop access", async () => {
-        // `x` and `y` are assigned names *and* the props of a point, so `$p.y` is
-        // rewritten to a different prop of `p` entirely. The rewrite is still made,
-        // because a v0.6 namespace path arrives here looking exactly the same, but this
-        // is the shape that cannot be right, so it has to be reported.
+    it("leaves a prop access alone", async () => {
+        // In v0.6, dot notation reached public state variables and nothing else, so a
+        // part written after a `.` never named a component `assignNames` created. Here
+        // `x` and `y` are assigned names *and* the props of a point: `$p.y` was the
+        // point's y-coordinate, and rewriting it would read something else entirely.
         source = `<selectFromSequence assignNames="x y" numToSelect="2" from="1" to="10" /><point name="p">(3,4)</point><p>$p.x $p.y</p>`;
         let result = await updateSyntaxFromV06toV07(source);
         expect(result.xml).toEqual(
-            `<selectFromSequence name="x" numToSelect="2" from="1" to="10" /><point name="p">(3,4)</point><p>$p.x[1] $p.x[2]</p>`,
+            `<selectFromSequence name="x" numToSelect="2" from="1" to="10" /><point name="p">(3,4)</point><p>$p.x $p.y</p>`,
         );
-        expect(
-            result.vfile.messages
-                .filter((m) => m.ruleId === "assign-names/prop-like-reference")
-                .map((m) => m.reason),
-        ).toHaveLength(2);
 
-        // A v0.6 namespace segment names a component rather than a prop, so converting
-        // the part after the slash is exactly right and must not warn.
+        // The same holds when nothing has a prop of that name: v0.6 dot notation could
+        // only ever have been a prop, so the reference was already broken and repairing
+        // it is not the converter's job.
+        source = `<p name="p"><collect componentTypes="point" name="points" source="panel" assignNames="q1 q2" /></p> $p.q1`;
+        result = await updateSyntaxFromV06toV07(source);
+        expect(result.xml).toEqual(
+            `<p name="p"><collect componentType="point" name="points" from="$panel" /></p> $p.q1`,
+        );
+
+        // A v0.6 namespace segment names a component rather than a prop, so the part
+        // after the slash is converted — and the `.value` after it is still left alone.
         source = `<graph name="g" newNamespace><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /></graph><p>$(g/a) $(g/b.value)</p>`;
         result = await updateSyntaxFromV06toV07(source);
         expect(result.xml).toEqual(
             `<graph name="g"><selectFromSequence name="a" numToSelect="2" from="1" to="5" /></graph><p>$g.a[1] $g.a[2].value</p>`,
         );
-        expect(
-            result.vfile.messages.filter(
-                (m) => m.ruleId === "assign-names/prop-like-reference",
-            ),
-        ).toHaveLength(0);
     });
 
     it("correct capitalization of componentTypes attribute", async () => {
