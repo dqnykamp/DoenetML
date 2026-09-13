@@ -145,11 +145,12 @@ what a reader should read.
 
 ---
 
-## Compare two samples without binning them
+## Compare two samples by their summaries
 
-A box plot summarizes a sample rather than counting it: one box per `<series>{:dn}`, running
-from the first quartile to the third with the median across it. Two samples drawn side by
-side are compared by where their boxes sit, with no cut points to agree on.
+A box plot asks a different question of a sample than a histogram does. A histogram shows the
+shape of the distribution; a box plot reduces it to five numbers and draws those — one box
+per `<series>{:dn}`, running from the first quartile to the third with the median across it —
+so two samples side by side are compared by where their middles and their spreads sit.
 
 ```doenet-editor-horiz
 <setup>
