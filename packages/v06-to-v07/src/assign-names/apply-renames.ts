@@ -9,7 +9,7 @@ import {
 import { VFile } from "vfile";
 import { visitAll, visitAllMacros } from "./visit-all";
 import { RenameRegistry } from "./rename-registry";
-import { AssignNamesContext, ancestorNamesOf } from "./context";
+import { AssignNamesContext, namespaceChainOf } from "./context";
 import { reparseAttribute } from "../reparse-attribute";
 import { isPropAccess } from "./prop-access-parts";
 
@@ -49,7 +49,7 @@ export function applyRefRenames(
             registry,
             file,
             node.position,
-            ancestorNamesOf(parents, context),
+            namespaceChainOf(parents, context),
         );
     });
 
@@ -61,7 +61,7 @@ export function applyRefRenames(
         if (!attrNames) {
             return;
         }
-        const enclosing = ancestorNamesOf(parents, context);
+        const enclosing = namespaceChainOf(parents, context);
         for (const attrName of attrNames) {
             renameRawReferenceAttribute(
                 node,

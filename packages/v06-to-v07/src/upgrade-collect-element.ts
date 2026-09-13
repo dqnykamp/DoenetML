@@ -15,7 +15,7 @@ import { reparseAttribute } from "./reparse-attribute";
 import { determinePropType } from "./core-info/determine-prop-type";
 import {
     AssignNamesContext,
-    ancestorNamesOf,
+    namespaceChainOf,
     deleteAssignNames,
     readAssignNames,
     setCompositeName,
@@ -86,7 +86,7 @@ export const upgradeCollectElement: Plugin<
                 node,
                 assignNamesValue,
                 fallbackBase: "collect",
-                ancestorNames: ancestorNamesOf(info.parents, context),
+                ancestorNames: namespaceChainOf(info.parents, context),
                 context,
                 file,
             });

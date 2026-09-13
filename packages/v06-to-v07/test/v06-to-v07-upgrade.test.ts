@@ -1106,3 +1106,39 @@ describe("regressions found by the sixth review", () => {
         );
     });
 });
+
+describe("regressions found by the seventh review", () => {
+    let source: string;
+
+    it("keeps two unnamed namespaces apart", async () => {
+        // A `<template newNamespace>` has no name, so nothing can reach into it from
+        // outside — but it still keeps its contents apart from a sibling's, and a
+        // reference written inside one means that one.
+        source = `<map name="m1"><template newNamespace><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /><p>$a</p></template><sources alias="v"><sequence from="1" to="2" /></sources></map><map name="m2"><template newNamespace><selectFromSequence assignNames="a b" numToSelect="2" from="1" to="5" /><p>$a</p></template><sources alias="w"><sequence from="1" to="2" /></sources></map>`;
+        const res = await updateSyntaxFromV06toV07(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        const xml = toXml(res.dast);
+        // Each map's local reference resolves to its own composite.
+        expect(xml).toContain(
+            `<selectFromSequence name="a" numToSelect="2" from="1" to="5" /><p>$a[1]</p>`,
+        );
+        expect(xml).toContain(
+            `<selectFromSequence name="selectFromSequence" numToSelect="2" from="1" to="5" /><p>$selectFromSequence[1]</p>`,
+        );
+        // Two namespaces using one name was always legal, so nothing is reported.
+        expect(res.vfile.messages.map((m) => m.ruleId)).not.toContain(
+            "assign-names/duplicate-name",
+        );
+    });
+
+    it("finds a self reference nested inside an attribute", async () => {
+        source = `<selectFromSequence assignNames="a" from="1" to="9" exclude="$$f($a)" /> $a`;
+        const res = await updateSyntaxFromV06toV07(source, {
+            doNotUpgradeCopyTags: true,
+        });
+        expect(res.vfile.messages.map((m) => m.ruleId)).toContain(
+            "assign-names/self-reference",
+        );
+    });
+});

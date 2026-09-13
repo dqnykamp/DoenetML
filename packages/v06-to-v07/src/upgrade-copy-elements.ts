@@ -11,7 +11,7 @@ import { renameAttrInPlace } from "./rename-attr-in-place";
 import { breakStringInPiecesBySpacesOrParens } from "./assign-names/break-into-pieces";
 import {
     AssignNamesContext,
-    ancestorNamesOf,
+    namespaceChainOf,
     deleteAssignNames,
     readAssignNames,
     setCompositeName,
@@ -65,7 +65,7 @@ export const upgradeCopyElements: Plugin<
             // references have been rewritten, too late to register anything.
             convertAssignNames(
                 node,
-                ancestorNamesOf(info.parents, context),
+                namespaceChainOf(info.parents, context),
                 context,
                 file,
             );

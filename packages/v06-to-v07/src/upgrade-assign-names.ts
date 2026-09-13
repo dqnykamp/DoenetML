@@ -10,14 +10,14 @@ import {
 } from "./assign-names/composite-info";
 import {
     AssignNamesContext,
-    ancestorNamesOf,
+    namespaceChainOf,
     deleteAssignNames,
     readAssignNames,
     setCompositeName,
 } from "./assign-names/context";
 import { isValidReferenceableName } from "./assign-names/rename-registry";
 import { registerCompositeAssignNames } from "./assign-names/register-composite";
-import { visitAll } from "./assign-names/visit-all";
+import { visitAll, visitAllMacros } from "./assign-names/visit-all";
 
 /**
  * Convert `assignNames` on the composites that v0.7 addresses positionally.
@@ -118,7 +118,7 @@ export const upgradeAssignNames: Plugin<
                     {
                         elementName: node.name,
                         position: node.position,
-                        ancestorNames: ancestorNamesOf(parents, context),
+                        ancestorNames: namespaceChainOf(parents, context),
                     },
                     file,
                 );
@@ -131,7 +131,7 @@ export const upgradeAssignNames: Plugin<
                 node,
                 assignNamesValue,
                 fallbackBase: spec.name,
-                ancestorNames: ancestorNamesOf(parents, context),
+                ancestorNames: namespaceChainOf(parents, context),
                 context,
                 file,
                 positionMap: makePositionMap(node, spec, file),
@@ -159,13 +159,18 @@ function warnIfSelfReferential(
     compositeName: string,
     file: VFile,
 ) {
-    const referencesSelf = Object.values(node.attributes).some((attr) =>
-        attr.children.some(
-            (child) =>
-                (child.type === "macro" || child.type === "function") &&
-                child.path[0]?.name === compositeName,
-        ),
-    );
+    let referencesSelf = false;
+    for (const attr of Object.values(node.attributes)) {
+        // A reference can be nested inside a function's arguments or a path index, so the
+        // whole attribute has to be walked rather than just its immediate children.
+        for (const child of attr.children) {
+            visitAllMacros(child, (macro) => {
+                if (macro.path[0]?.name === compositeName) {
+                    referencesSelf = true;
+                }
+            });
+        }
+    }
     if (!referencesSelf) {
         return;
     }

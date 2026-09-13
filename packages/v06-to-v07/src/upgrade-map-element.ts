@@ -9,7 +9,8 @@ import {
 import { reparseAttribute } from "./reparse-attribute";
 import {
     AssignNamesContext,
-    ancestorNamesOf,
+    inheritNamespace,
+    namespaceChainOf,
     readAssignNames,
 } from "./assign-names/context";
 import { registerCompositeAssignNames } from "./assign-names/register-composite";
@@ -66,7 +67,7 @@ export const upgradeMapElement: Plugin<
                         node,
                         assignNamesValue,
                         fallbackBase: "repeat",
-                        ancestorNames: ancestorNamesOf(info.parents, context),
+                        ancestorNames: namespaceChainOf(info.parents, context),
                         context,
                         file,
                     }) ?? name;
@@ -96,6 +97,9 @@ export const upgradeMapElement: Plugin<
                     };
                 }
                 sequenceNode.name = "repeatForSequence";
+                // The `<template>` is discarded here, so whatever namespace it was has
+                // to move to the element taking its place.
+                inheritNamespace(templateNode, sequenceNode, context);
                 if (valueName) {
                     sequenceNode.attributes["valueName"] = {
                         type: "attribute",

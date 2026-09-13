@@ -33,10 +33,15 @@ export type AssignNamesContext = {
     claimedNames: Set<string>;
     /**
      * The elements that carried `newNamespace`, recorded before that attribute is
-     * removed. Only these were addressable as a namespace in v0.6, so only these are
-     * boundaries when working out which of two same-named assignments a reference meant.
+     * removed. Only these were namespaces in v0.6, so only these are boundaries when
+     * working out which of two same-named assignments a reference meant.
+     *
+     * The value is how the namespace appears in a reference path: its `name`, or — for a
+     * namespace without one, such as the `<template newNamespace>` of a `<map>` — a
+     * stand-in that no written path can match. An unnamed namespace cannot be reached
+     * from outside, but it still keeps its contents apart from a sibling's.
      */
-    namespaceElements: WeakSet<DastElement>;
+    namespaceElements: WeakMap<DastElement, string>;
 };
 
 export function createAssignNamesContext(
@@ -45,7 +50,8 @@ export function createAssignNamesContext(
     const existingNames = collectExistingNames(tree);
     // This runs before `removeNewNamespaceAttribute`, which is the only chance to see
     // which elements were namespaces.
-    const namespaceElements = new WeakSet<DastElement>();
+    const namespaceElements = new WeakMap<DastElement, string>();
+    let unnamedCount = 0;
     visit(tree, (node) => {
         if (!isDastElement(node)) {
             return;
@@ -53,9 +59,15 @@ export function createAssignNamesContext(
         const hasNewNamespace = Object.keys(node.attributes).some(
             (key) => key.toLowerCase() === "newnamespace",
         );
-        if (hasNewNamespace) {
-            namespaceElements.add(node);
+        if (!hasNewNamespace) {
+            return;
         }
+        const nameAttr = findAttribute(node, "name");
+        const name = nameAttr ? toXml(nameAttr.children).trim() : "";
+        // A null byte cannot appear in a name, so a stand-in built from one can never be
+        // matched by a path an author wrote — which is right, because an unnamed
+        // namespace is exactly the one nobody can write a path into.
+        namespaceElements.set(node, name || `\u0000ns${++unnamedCount}`);
     });
     return {
         registry: new RenameRegistry(existingNames),
@@ -175,23 +187,37 @@ function assignNamesKey(node: DastElement): string | undefined {
  * a reference path reads, so the chain is reversed here. Elements without a name are
  * skipped: they were never addressable, so a reference could not have mentioned them.
  */
-export function ancestorNamesOf(
+export function namespaceChainOf(
     parents: DastElement[],
     context: AssignNamesContext,
 ): string[] {
-    const names: string[] = [];
+    const chain: string[] = [];
     for (const parent of parents) {
         // A named element that was not a namespace could not appear in a reference path,
         // so it is not a boundary — `<graph name="g" newNamespace><p name="wrapper">` is
         // reached as `$(g/...)`, never `$(g/wrapper/...)`.
-        if (!context.namespaceElements.has(parent)) {
-            continue;
-        }
-        const nameAttr = findAttribute(parent, "name");
-        const name = nameAttr ? toXml(nameAttr.children).trim() : "";
-        if (name) {
-            names.push(name);
+        const segment = context.namespaceElements.get(parent);
+        if (segment !== undefined) {
+            chain.push(segment);
         }
     }
-    return names.reverse();
+    return chain.reverse();
+}
+
+/**
+ * Record that `to` now stands where `from` stood, so it keeps its namespace.
+ *
+ * `<map>` over a `<sequence>` becomes a `<repeatForSequence>` built from the sequence
+ * element, which throws away the `<template>` — and the template is what carried
+ * `newNamespace`. Without this the names assigned inside it would look top-level.
+ */
+export function inheritNamespace(
+    from: DastElement,
+    to: DastElement,
+    context: AssignNamesContext,
+) {
+    const segment = context.namespaceElements.get(from);
+    if (segment !== undefined) {
+        context.namespaceElements.set(to, segment);
+    }
 }
